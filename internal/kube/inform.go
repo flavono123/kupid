@@ -13,45 +13,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type PropertyBuilder struct {
-	property *Property
-}
-
-func CreateProperty(name string) *PropertyBuilder {
-	return &PropertyBuilder{
-		property: &Property{
-			Name:     name,
-			Children: make(map[string]*Property),
-		},
-	}
-}
-
-func (b *PropertyBuilder) WithPath(path string) *PropertyBuilder {
-	b.property.Path = path
-	return b
-}
-
-func (b *PropertyBuilder) WithTypes(types []string) *PropertyBuilder {
-	b.property.Types = types
-	return b
-}
-
-func (b *PropertyBuilder) WithChildren(children map[string]*Property) *PropertyBuilder {
-	b.property.Children = children
-	return b
-}
-
-func (b *PropertyBuilder) WithNestedTypeChildren(nestedType string) *PropertyBuilder {
-	b.property.Children = map[string]*Property{
-		"*": CreateProperty("*").WithTypes([]string{nestedType}).Build(),
-	}
-	return b
-}
-
-func (b *PropertyBuilder) Build() *Property {
-	return b.property
-}
-
 func ListEverySchemaInCluster() {
 	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
 	if err != nil {
@@ -165,20 +126,27 @@ func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[
 				}
 			case "array":
 				items := property["items"].(map[string]interface{})
-				itemsSchemaKey, err := getAllOfSchemaKey(items)
+				itemsTypes, err := getSchemaTypes(items, key)
 				if err != nil { // no allOf
-					return nil, err
-				}
 
-				children, err := getSchemaProperties(schemas, itemsSchemaKey)
-				if err != nil {
-					return nil, err
-				}
+					itemsSchemaKey, err := getAllOfSchemaKey(items)
+					if err != nil {
+						return nil, err
+					}
+					children, err := getSchemaProperties(schemas, itemsSchemaKey)
+					if err != nil {
+						return nil, err
+					}
 
-				result[key] = CreateProperty(key).
-					WithTypes([]string{fmt.Sprintf("array<%s>", itemsSchemaKey)}).
-					WithChildren(children).
-					Build()
+					result[key] = CreateProperty(key).
+						WithTypes([]string{fmt.Sprintf("array<%s>", itemsSchemaKey)}).
+						WithChildren(children).
+						Build()
+				} else {
+					result[key] = CreateProperty(key).
+						WithTypes(itemsTypes).
+						Build()
+				}
 
 			default:
 				result[key] = CreateProperty(key).WithTypes([]string{propertyType}).Build()
