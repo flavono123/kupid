@@ -55,15 +55,15 @@ func ListEverySchemaInCluster() {
 func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[string]*Property, error) {
 	var result = map[string]*Property{}
 
-	schema, hasSchema := schemas[schemaKey].(map[string]interface{})
-	if !hasSchema {
+	schema, exists := schemas[schemaKey].(map[string]interface{})
+	if !exists {
 		return nil, fmt.Errorf("schema not found: %s", schemaKey)
 	}
 
-	properties, hasProperties := schema["properties"].(map[string]interface{})
+	properties, exists := schema["properties"].(map[string]interface{})
 	// schema but no properties
 	// e.g. io.k8s.apimachinery.pkg.apis.meta.v1.Time
-	if !hasProperties {
+	if !exists {
 		schemaType, err := getTypes(schema, schemaKey)
 		if err != nil {
 			return nil, err
@@ -78,89 +78,141 @@ func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[
 		}
 
 		property := p.(map[string]interface{})
-
-		propertyType, hasType := property["type"].(string)
-		if !hasType { // top level object properties such as spec, status and metadata does not have a type
-			allOf, ok := property["allOf"].([]interface{})
-			if !ok {
-				return nil, fmt.Errorf("no allOf found")
-			}
-			ref, exists := allOf[0].(map[string]interface{})["$ref"].(string)
-			if !exists {
-				return nil, fmt.Errorf("no $ref found in allOf[0] of %s", key)
-			}
-			nextSchemaKey := getSchemaKey(ref)
-
-			children, err := getSchemaProperties(schemas, nextSchemaKey)
-			if err != nil {
-				return nil, err
-			}
-
-			result[key] = CreateProperty(key).WithTypes([]string{fmt.Sprintf("object<%s>", nextSchemaKey)}).WithChildren(children).Build()
-		} else {
-			switch propertyType {
-			case "object":
-				additionalProperties, hasAdditionalProperties := property["additionalProperties"].(map[string]interface{})
-				if !hasAdditionalProperties {
-					return nil, fmt.Errorf("no additionalProperties found: %s", key)
-				}
-
-				ref, hasRef := additionalProperties["$ref"]
-				apType, hasApType := additionalProperties["type"].(string)
-
-				if hasRef == hasApType { // !xor
-					return nil, fmt.Errorf("no ref or type found or both are present: %s", key)
-				}
-
-				if hasRef {
-					schemaKey := getSchemaKey(ref.(string))
-					children, err := getSchemaProperties(schemas, schemaKey)
-					if err != nil {
-						return nil, err
-					}
-					types := []string{fmt.Sprintf("object<%s>", schemaKey)}
-					result[key] = CreateProperty(key).
-						WithTypes(types).
-						WithChildren(children).
-						Build()
-				} else if hasApType {
-					result[key] = CreateProperty(key).
-						WithTypes([]string{"object"}).
-						WithNestedTypeChildren(apType).
-						Build()
-				}
-			case "array":
-				items := property["items"].(map[string]interface{})
-				itemsTypes, err := getTypes(items, key)
-				if err != nil { // no allOf
-					allOf, exists := items["allOf"].([]interface{})
-					if !exists {
-						return nil, fmt.Errorf("no allOf found in items of %s", key)
-					}
-					ref, exists := allOf[0].(map[string]interface{})["$ref"].(string)
-					if !exists {
-						return nil, fmt.Errorf("no $ref found in allOf[0] of items of %s", key)
-					}
-					itemsSchemaKey := getSchemaKey(ref)
-					children, err := getSchemaProperties(schemas, itemsSchemaKey)
-					if err != nil {
-						return nil, err
-					}
-
-					result[key] = CreateProperty(key).
-						WithTypes([]string{fmt.Sprintf("array<%s>", itemsSchemaKey)}).
-						WithChildren(children).
-						Build()
-				} else {
-					result[key] = CreateProperty(key).
-						WithTypes(itemsTypes).
-						Build()
-				}
-
-			default:
-				result[key] = CreateProperty(key).WithTypes([]string{propertyType}).Build()
-			}
+		schemaProperty, err := processProperty(schemas, key, property)
+		if err != nil {
+			return nil, err
 		}
+		result[key] = schemaProperty
+	}
+
+	return result, nil
+}
+
+func processProperty(schemas map[string]interface{}, key string, property map[string]interface{}) (*Property, error) {
+	var result *Property
+
+	propertyType, exists := property["type"].(string)
+	if !exists { // top level schema object such as spec, status and metadata does not have a type
+		schemaAllOf, ok := property["allOf"].([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("no allOf found")
+		}
+
+		schemaProperty, err := processSchema(schemas, key, schemaAllOf)
+		if err != nil {
+			return nil, err
+		}
+		result = schemaProperty
+		return result, nil
+	}
+
+	var err error
+
+	switch propertyType {
+	case "object":
+		result, err = processObjectProperty(schemas, key, property)
+		if err != nil {
+			return nil, err
+		}
+	case "array":
+		result, err = processArrayProperty(schemas, key, property)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		result = CreateProperty(key).
+			WithTypes([]string{propertyType}).
+			Build()
+	}
+
+	return result, nil
+}
+
+func processSchema(schemas map[string]interface{}, key string, schemaAllOf []interface{}) (*Property, error) {
+	var result *Property
+
+	ref, exists := schemaAllOf[0].(map[string]interface{})["$ref"].(string)
+	if !exists {
+		return nil, fmt.Errorf("no $ref found in allOf[0] of %s", key)
+	}
+
+	schemaKey := getSchemaKey(ref)
+	children, err := getSchemaProperties(schemas, schemaKey)
+	if err != nil {
+		return nil, err
+	}
+	result = CreateProperty(key).
+		WithTypes([]string{fmt.Sprintf("object<%s>", schemaKey)}).
+		WithChildren(children).
+		Build()
+
+	return result, nil
+}
+
+func processObjectProperty(schemas map[string]interface{}, key string, property map[string]interface{}) (*Property, error) {
+	var result *Property
+
+	additionalProperties, exists := property["additionalProperties"].(map[string]interface{})
+	if !exists {
+		return nil, fmt.Errorf("no additionalProperties found: %s", key)
+	}
+
+	ref, hasRef := additionalProperties["$ref"]
+	apType, hasApType := additionalProperties["type"].(string)
+
+	if hasRef == hasApType { // !xor
+		return nil, fmt.Errorf("no ref or type found or both are present: %s", key)
+	}
+
+	if hasRef {
+		schemaKey := getSchemaKey(ref.(string))
+		children, err := getSchemaProperties(schemas, schemaKey)
+		if err != nil {
+			return nil, err
+		}
+		types := []string{fmt.Sprintf("object<%s>", schemaKey)}
+		result = CreateProperty(key).
+			WithTypes(types).
+			WithChildren(children).
+			Build()
+	} else if hasApType {
+		result = CreateProperty(key).
+			WithTypes([]string{"object"}).
+			WithNestedTypeChildren(apType).
+			Build()
+	}
+
+	return result, nil
+}
+
+func processArrayProperty(schemas map[string]interface{}, key string, property map[string]interface{}) (*Property, error) {
+	var result *Property
+
+	items := property["items"].(map[string]interface{})
+	itemsTypes, err := getTypes(items, key)
+	if err != nil { // no types
+		allOf, exists := items["allOf"].([]interface{})
+		if !exists {
+			return nil, fmt.Errorf("no allOf found in items of %s", key)
+		}
+		ref, exists := allOf[0].(map[string]interface{})["$ref"].(string)
+		if !exists {
+			return nil, fmt.Errorf("no $ref found in allOf[0] of items of %s", key)
+		}
+		itemsSchemaKey := getSchemaKey(ref)
+		children, err := getSchemaProperties(schemas, itemsSchemaKey)
+		if err != nil {
+			return nil, err
+		}
+
+		result = CreateProperty(key).
+			WithTypes([]string{fmt.Sprintf("array<%s>", itemsSchemaKey)}).
+			WithChildren(children).
+			Build()
+	} else {
+		result = CreateProperty(key).
+			WithTypes(itemsTypes).
+			Build()
 	}
 
 	return result, nil
