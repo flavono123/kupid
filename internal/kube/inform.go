@@ -13,14 +13,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type Property struct {
-	Name string
-	Path string
-	// Default  string
-	Types    []string
-	Children map[string]*Property
-}
-
 type PropertyBuilder struct {
 	property *Property
 }
