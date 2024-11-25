@@ -64,7 +64,7 @@ func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[
 	// schema but no properties
 	// e.g. io.k8s.apimachinery.pkg.apis.meta.v1.Time
 	if !hasProperties {
-		schemaType, err := getSchemaTypes(schema, schemaKey)
+		schemaType, err := getTypes(schema, schemaKey)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +131,7 @@ func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[
 				}
 			case "array":
 				items := property["items"].(map[string]interface{})
-				itemsTypes, err := getSchemaTypes(items, key)
+				itemsTypes, err := getTypes(items, key)
 				if err != nil { // no allOf
 					allOf, exists := items["allOf"].([]interface{})
 					if !exists {
@@ -166,8 +166,9 @@ func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[
 	return result, nil
 }
 
-func getSchemaTypes(schemaOrItems map[string]interface{}, key string) ([]string, error) {
+func getTypes(schemaOrItems map[string]interface{}, key string) ([]string, error) {
 	var result []string
+
 	schemaType, hasType := schemaOrItems["type"].(string)
 	oneOf, hasOneOf := schemaOrItems["oneOf"].([]interface{})
 
