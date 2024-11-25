@@ -178,19 +178,13 @@ func getSchemaTypes(schemaOrItems map[string]interface{}, key string) ([]string,
 	if hasType {
 		result = append(result, schemaType)
 	} else if hasOneOf {
-		result = getSchemaTypesFromOneOf(oneOf)
+		for _, obj := range oneOf {
+			oneOfType := obj.(map[string]interface{})["type"].(string)
+			result = append(result, oneOfType)
+		}
 	}
 
 	return result, nil
-}
-
-func getSchemaTypesFromOneOf(oneOf []interface{}) []string {
-	var result []string
-	for _, obj := range oneOf {
-		oneOfType := obj.(map[string]interface{})["type"].(string)
-		result = append(result, oneOfType)
-	}
-	return result
 }
 
 func getSchemaKey(ref string) string {
