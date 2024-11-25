@@ -81,10 +81,15 @@ func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[
 
 		propertyType, hasType := property["type"].(string)
 		if !hasType { // top level object properties such as spec, status and metadata does not have a type
-			nextSchemaKey, err := getAllOfSchemaKey(property)
-			if err != nil {
-				return nil, err
+			allOf, ok := property["allOf"].([]interface{})
+			if !ok {
+				return nil, fmt.Errorf("no allOf found")
 			}
+			ref, exists := allOf[0].(map[string]interface{})["$ref"].(string)
+			if !exists {
+				return nil, fmt.Errorf("no $ref found in allOf[0] of %s", key)
+			}
+			nextSchemaKey := getSchemaKey(ref)
 
 			children, err := getSchemaProperties(schemas, nextSchemaKey)
 			if err != nil {
@@ -128,11 +133,15 @@ func getSchemaProperties(schemas map[string]interface{}, schemaKey string) (map[
 				items := property["items"].(map[string]interface{})
 				itemsTypes, err := getSchemaTypes(items, key)
 				if err != nil { // no allOf
-
-					itemsSchemaKey, err := getAllOfSchemaKey(items)
-					if err != nil {
-						return nil, err
+					allOf, exists := items["allOf"].([]interface{})
+					if !exists {
+						return nil, fmt.Errorf("no allOf found in items of %s", key)
 					}
+					ref, exists := allOf[0].(map[string]interface{})["$ref"].(string)
+					if !exists {
+						return nil, fmt.Errorf("no $ref found in allOf[0] of items of %s", key)
+					}
+					itemsSchemaKey := getSchemaKey(ref)
 					children, err := getSchemaProperties(schemas, itemsSchemaKey)
 					if err != nil {
 						return nil, err
@@ -182,34 +191,6 @@ func getSchemaTypesFromOneOf(oneOf []interface{}) []string {
 		result = append(result, oneOfType)
 	}
 	return result
-}
-
-// return the key of another schema from allOf[0].$ref
-// object is one of schema, property or item
-func getAllOfSchemaKey(object map[string]interface{}) (string, error) {
-	var result string
-	allOf, ok := object["allOf"].([]interface{})
-	if !ok {
-		return "", fmt.Errorf("no allOf found")
-	}
-	result, err := getSchemaKeyFromRef(allOf)
-	if err != nil {
-		return "", err
-	}
-
-	return result, nil
-}
-
-func getSchemaKeyFromRef(allOf []interface{}) (string, error) {
-	var result string
-
-	// parse from the first
-	ref, hasRef := allOf[0].(map[string]interface{})["$ref"].(string)
-	if !hasRef {
-		return "", fmt.Errorf("no $ref found")
-	}
-	result = getSchemaKey(ref)
-	return result, nil
 }
 
 func getSchemaKey(ref string) string {
