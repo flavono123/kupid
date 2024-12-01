@@ -178,6 +178,7 @@ func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schema
 			return nil, err
 		}
 		result = property.CreatePropertyNodeBuilder(&items.Schema.SchemaProps).
+			WithPropType("array").
 			WithChildren(children).
 			Build()
 	}
