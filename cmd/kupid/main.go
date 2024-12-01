@@ -16,10 +16,11 @@ import (
 )
 
 type model struct {
-	nodes    map[string]*property.Node
-	viewport viewport.Model
-	style    lipgloss.Style
-	cursor   int
+	nodes         map[string]*property.Node
+	viewport      viewport.Model
+	style         lipgloss.Style
+	cursor        int
+	currentLineNo int
 }
 
 func newModel() *model {
@@ -39,8 +40,7 @@ func newModel() *model {
 		style:    style,
 		cursor:   0,
 	}
-	lineNum := 0
-	content := printNodes(nodes, 0, 0, vp.YOffset, &lineNum)
+	content := printNodes(nodes, 0, 0, vp.YOffset, &m.currentLineNo)
 	vp.SetContent(content)
 
 	return m
@@ -74,10 +74,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	lineNum := 0
-	content := printNodes(m.nodes, 0, m.cursor, m.viewport.YOffset, &lineNum)
+	m.currentLineNo = 0
+	content := printNodes(m.nodes, 0, m.cursor, m.viewport.YOffset, &m.currentLineNo)
 	m.viewport.SetContent(content)
-	return m.style.Render(m.viewport.View()) + "\n" + fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, lineNum)
+	return m.style.Render(m.viewport.View()) + "\n" + fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, m.currentLineNo)
 }
 
 func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewportOffset int, lineNum *int) string {
