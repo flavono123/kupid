@@ -54,7 +54,7 @@ func GetSchema(resourceKey string) {
 	printPropertyNodes(nodes, 0)
 }
 
-func printPropertyNodes(nodes map[string]*property.PropertyNode, indent int) {
+func printPropertyNodes(nodes map[string]*property.Node, indent int) {
 	keys := []string{}
 	for key := range nodes {
 		keys = append(keys, key)
@@ -74,8 +74,8 @@ func printPropertyNodes(nodes map[string]*property.PropertyNode, indent int) {
 	}
 }
 
-func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (map[string]*property.PropertyNode, error) {
-	var result = map[string]*property.PropertyNode{}
+func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (map[string]*property.Node, error) {
+	var result = map[string]*property.Node{}
 
 	schema, exists := schemas[schemaKey]
 	if !exists {
@@ -105,8 +105,8 @@ func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (
 	return result, nil
 }
 
-func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps, key string) (*property.PropertyNode, error) {
-	var result *property.PropertyNode
+func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps, key string) (*property.Node, error) {
+	var result *property.Node
 
 	if !property.HasType(schemaProps) {
 		// top level schema props; should have ref in allOf
@@ -138,8 +138,8 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 	return result, nil
 }
 
-func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*property.PropertyNode, error) {
-	var result *property.PropertyNode
+func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*property.Node, error) {
+	var result *property.Node
 
 	refKey := property.GetRefKey(&prop.AdditionalProperties.Schema.SchemaProps)
 	if refKey != "" {
@@ -159,8 +159,8 @@ func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schem
 	return result, nil
 }
 
-func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*property.PropertyNode, error) {
-	var result *property.PropertyNode
+func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*property.Node, error) {
+	var result *property.Node
 
 	items := prop.Items
 
