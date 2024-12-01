@@ -19,6 +19,7 @@ type model struct {
 	nodes    map[string]*property.Node
 	viewport viewport.Model
 	style    lipgloss.Style
+	cursor   int
 }
 
 func newModel() *model {
@@ -32,14 +33,17 @@ func newModel() *model {
 		BorderForeground(lipgloss.Color("white"))
 
 	vp := viewport.New(80, 20)
-	content := printNodes(nodes, 0)
-	vp.SetContent(content)
-
-	return &model{
+	m := &model{
 		nodes:    nodes,
 		viewport: vp,
 		style:    style,
+		cursor:   0,
 	}
+	lineNum := 0
+	content := printNodes(nodes, 0, 0, vp.YOffset, &lineNum)
+	vp.SetContent(content)
+
+	return m
 }
 
 func (m *model) Init() tea.Cmd {
@@ -53,21 +57,30 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "up":
-			m.viewport.LineUp(1)
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.viewport.LineUp(1)
+			}
 		case "down":
-			m.viewport.LineDown(1)
+			if m.cursor < 19 { // TODO: should guard the cursor disapears to the last newline
+				m.cursor++
+			} else {
+				m.viewport.LineDown(1)
+			}
 		}
 	}
 	return m, nil
 }
 
 func (m *model) View() string {
-	content := printNodes(m.nodes, 0)
+	lineNum := 0
+	content := printNodes(m.nodes, 0, m.cursor, m.viewport.YOffset, &lineNum)
 	m.viewport.SetContent(content)
-	return m.style.Render(m.viewport.View())
+	return m.style.Render(m.viewport.View()) + "\n" + fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, lineNum)
 }
 
-func printNodes(nodes map[string]*property.Node, indent int) string {
+func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewportOffset int, lineNum *int) string {
 	var result strings.Builder
 	keys := []string{}
 	for key := range nodes {
@@ -81,16 +94,31 @@ func printNodes(nodes map[string]*property.Node, indent int) string {
 		if len(displayType) == 0 {
 			displayType = property.GetRefKey(node.SchemaProps)
 		}
-		result.WriteString(fmt.Sprintf("%s(%s)\n", strings.Repeat(" ", indent*2)+key, displayType))
+
+		isCursor := *lineNum-viewportOffset == cursor
+
+		prefix := strings.Repeat(" ", indent*2)
+		if isCursor {
+			prefix += "> "
+		} else {
+			prefix += "  "
+		}
+
+		result.WriteString(fmt.Sprintf("%s%s(%s)\n", prefix, key, displayType))
+		*lineNum++
+
 		if node.Children != nil {
-			result.WriteString(printNodes(node.Children, indent+1))
+			result.WriteString(printNodes(node.Children, indent+1, cursor, viewportOffset, lineNum))
 		}
 	}
 	return result.String()
 }
 
 func main() {
-	program := tea.NewProgram(newModel())
+	program := tea.NewProgram(
+		newModel(),
+		tea.WithAltScreen(),
+	)
 	if _, err := program.Run(); err != nil {
 		log.Fatalf("failed to run program: %v", err)
 		os.Exit(1)
