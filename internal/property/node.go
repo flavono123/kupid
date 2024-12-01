@@ -7,8 +7,16 @@ import (
 type Node struct {
 	SchemaProps *spec.SchemaProps
 	Children    map[string]*Node
-	// Schema      *spec.Schema
-	// Expanded bool
+}
+
+func (n *Node) Foldable() bool {
+	// FIXME: some object or array props are not returned its type by Type()
+	nodeType := Type(n.SchemaProps)
+	if nodeType == "object" || nodeType == "array" {
+		return true
+	}
+
+	return false
 }
 
 func HasType(prop *spec.SchemaProps) bool {

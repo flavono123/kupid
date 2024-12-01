@@ -24,7 +24,8 @@ type model struct {
 }
 
 func newModel() *model {
-	nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
+	nodes, err := kube.GetNodes("io.k8s.api.core.v1.Pod")
+	// nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
 	if err != nil {
 		log.Fatalf("failed to get nodes: %v", err)
 	}
@@ -99,9 +100,15 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 
 		prefix := strings.Repeat(" ", indent*2)
 		if isCursor {
-			prefix += "> "
+			prefix += ">"
 		} else {
-			prefix += "  "
+			prefix += " "
+		}
+
+		if node.Foldable() {
+			prefix += "-"
+		} else {
+			prefix += " "
 		}
 
 		result.WriteString(fmt.Sprintf("%s%s(%s)\n", prefix, key, displayType))
