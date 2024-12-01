@@ -6,12 +6,20 @@ import (
 
 type Node struct {
 	SchemaProps *spec.SchemaProps
+	PropType    string
 	Children    map[string]*Node
 }
 
 func (n *Node) Foldable() bool {
-	// FIXME: some object or array props are not returned its type by Type()
+	// TODO: should use n.PropType
 	nodeType := Type(n.SchemaProps)
+
+	// TEMPCODE
+	if nodeType == "" {
+		nodeType = n.PropType
+	}
+	// TEMPCODE
+
 	if nodeType == "object" || nodeType == "array" {
 		return true
 	}

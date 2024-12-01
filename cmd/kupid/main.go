@@ -24,8 +24,8 @@ type model struct {
 }
 
 func newModel() *model {
-	nodes, err := kube.GetNodes("io.k8s.api.core.v1.Pod")
-	// nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
+	// nodes, err := kube.GetNodes("io.k8s.api.core.v1.Pod")
+	nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
 	if err != nil {
 		log.Fatalf("failed to get nodes: %v", err)
 	}
@@ -93,7 +93,11 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 		node := nodes[key]
 		displayType := strings.Join(property.GetType(node.SchemaProps), "|")
 		if len(displayType) == 0 {
-			displayType = property.GetRefKey(node.SchemaProps)
+			if node.PropType != "" {
+				displayType = fmt.Sprintf("%s<%s>", node.PropType, property.GetRefKey(node.SchemaProps))
+			} else {
+				displayType = property.GetRefKey(node.SchemaProps)
+			}
 		}
 
 		isCursor := *lineNum-viewportOffset == cursor

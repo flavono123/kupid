@@ -18,6 +18,13 @@ func CreatePropertyNodeBuilder(
 	}
 }
 
+func (b *NodeBuilder) WithPropType(
+	propType string,
+) *NodeBuilder {
+	b.node.PropType = propType
+	return b
+}
+
 func (b *NodeBuilder) WithChildren(
 	children map[string]*Node,
 ) *NodeBuilder {

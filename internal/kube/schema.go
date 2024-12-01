@@ -117,7 +117,10 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 		if err != nil {
 			return nil, err
 		}
-		result = property.CreatePropertyNodeBuilder(schemaProps).WithChildren(children).Build()
+		result = property.CreatePropertyNodeBuilder(schemaProps).
+			WithPropType("object").
+			WithChildren(children).
+			Build()
 		return result, nil
 	}
 
