@@ -82,7 +82,7 @@ func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (
 		return nil, fmt.Errorf("schema not found: %s", schemaKey)
 	}
 
-	node := CreatePropertyNodeBuilder(&schema.SchemaProps).Build()
+	node := property.CreatePropertyNodeBuilder(&schema.SchemaProps).Build()
 
 	// schema but no properties
 	if !node.HasProperties() {
@@ -115,7 +115,7 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 		if err != nil {
 			return nil, err
 		}
-		result = CreatePropertyNodeBuilder(schemaProps).WithChildren(children).Build()
+		result = property.CreatePropertyNodeBuilder(schemaProps).WithChildren(children).Build()
 		return result, nil
 	}
 
@@ -132,7 +132,7 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 			return nil, err
 		}
 	default:
-		result = CreatePropertyNodeBuilder(schemaProps).Build()
+		result = property.CreatePropertyNodeBuilder(schemaProps).Build()
 	}
 
 	return result, nil
@@ -147,11 +147,11 @@ func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schem
 		if err != nil {
 			return nil, err
 		}
-		result = CreatePropertyNodeBuilder(prop).
+		result = property.CreatePropertyNodeBuilder(prop).
 			WithChildren(children).
 			Build()
 	} else {
-		result = CreatePropertyNodeBuilder(prop).
+		result = property.CreatePropertyNodeBuilder(prop).
 			WithNestedTypeChildren(&prop.AdditionalProperties.Schema.SchemaProps).
 			Build()
 	}
@@ -165,14 +165,14 @@ func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schema
 	items := prop.Items
 
 	if property.HasType(&items.Schema.SchemaProps) {
-		result = CreatePropertyNodeBuilder(&items.Schema.SchemaProps).Build()
+		result = property.CreatePropertyNodeBuilder(&items.Schema.SchemaProps).Build()
 	} else { // ref
 		refKey := property.GetRefKey(&items.Schema.SchemaProps)
 		children, err := getSchemaPropertyNodes(schemas, refKey)
 		if err != nil {
 			return nil, err
 		}
-		result = CreatePropertyNodeBuilder(&items.Schema.SchemaProps).
+		result = property.CreatePropertyNodeBuilder(&items.Schema.SchemaProps).
 			WithChildren(children).
 			Build()
 	}
