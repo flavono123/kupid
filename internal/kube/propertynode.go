@@ -11,21 +11,8 @@ type PropertyNode struct {
 	// Expanded bool
 }
 
-// TODO: remove this and only use util HasType
-func (p *PropertyNode) HasType() bool {
-	return p.SchemaProps.Type != nil && len(p.SchemaProps.Type) > 0
-}
-
 func HasType(prop *spec.SchemaProps) bool {
 	return prop.Type != nil && len(prop.Type) > 0
-}
-
-func (p *PropertyNode) Type() string {
-	if !p.HasType() {
-		return ""
-	}
-
-	return p.SchemaProps.Type[0]
 }
 
 func Type(prop *spec.SchemaProps) string {
@@ -42,24 +29,6 @@ func (p *PropertyNode) HasAllOf() bool {
 
 func (p *PropertyNode) HasProperties() bool {
 	return p.SchemaProps.Properties != nil && len(p.SchemaProps.Properties) > 0
-}
-
-// TODO: remove this and only use util GetRefKey
-func (p *PropertyNode) GetRefKey() string {
-	var ref spec.Ref
-	if p.HasAllOf() {
-		ref = p.SchemaProps.AllOf[0].Ref
-	} else {
-		ref = p.SchemaProps.Ref
-	}
-
-	tokens := ref.GetPointer().DecodedTokens()
-	if len(tokens) == 0 {
-		return ""
-	}
-	refKey := tokens[len(tokens)-1] // 2
-
-	return refKey
 }
 
 func GetRefKey(prop *spec.SchemaProps) string {

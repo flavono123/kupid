@@ -39,24 +39,12 @@ func ListEverySchemaInCluster() {
 		log.Fatalf("failed to get openapi schema: %v", err)
 	}
 
-	var openAPISchema map[string]interface{}
 	var openAPI *spec3.OpenAPI
-	err = json.Unmarshal(schema, &openAPISchema)
-	if err != nil {
-		log.Fatalf("failed to unmarshal openapi schema: %v", err)
-	}
+
 	err = json.Unmarshal(schema, &openAPI)
 	if err != nil {
 		log.Fatalf("failed to unmarshal openapi: %v", err)
 	}
-
-	// schemas := openAPISchema["components"].(map[string]interface{})["schemas"].(map[string]interface{})
-
-	// properties, err := getSchemaProperties(schemas, "io.k8s.api.core.v1.Pod")
-	// if err != nil {
-	// 	log.Fatalf("failed to get schema properties: %v", err)
-	// }
-	// printSchemaProperties(properties, 0)
 
 	nodes, err := getSchemaPropertyNodes(openAPI.Components.Schemas, "io.k8s.api.core.v1.Pod")
 	if err != nil {
@@ -118,33 +106,32 @@ func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (
 
 func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps, key string) (*PropertyNode, error) {
 	var result *PropertyNode
-	nb := CreatePropertyNodeBuilder(schemaProps)
 
-	if !nb.node.HasType() {
+	if !HasType(schemaProps) {
 		// top level schema props; should have ref in allOf
-		refKey := nb.node.GetRefKey()
+		refKey := GetRefKey(schemaProps)
 		children, err := getSchemaPropertyNodes(schemas, refKey)
 		if err != nil {
 			return nil, err
 		}
-		result = nb.WithChildren(children).Build()
+		result = CreatePropertyNodeBuilder(schemaProps).WithChildren(children).Build()
 		return result, nil
 	}
 
 	var err error
-	switch nb.node.Type() {
+	switch Type(schemaProps) {
 	case "object":
-		result, err = processObjectPropertyNode(schemas, nb.node.SchemaProps)
+		result, err = processObjectPropertyNode(schemas, schemaProps)
 		if err != nil {
 			return nil, err
 		}
 	case "array":
-		result, err = processArrayPropertyNode(schemas, nb.node.SchemaProps)
+		result, err = processArrayPropertyNode(schemas, schemaProps)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		result = nb.Build()
+		result = CreatePropertyNodeBuilder(schemaProps).Build()
 	}
 
 	return result, nil
