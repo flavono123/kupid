@@ -23,10 +23,6 @@ func Type(prop *spec.SchemaProps) string {
 	return prop.Type[0]
 }
 
-func (p *PropertyNode) HasAllOf() bool {
-	return p.SchemaProps.AllOf != nil && len(p.SchemaProps.AllOf) > 0
-}
-
 func (p *PropertyNode) HasProperties() bool {
 	return p.SchemaProps.Properties != nil && len(p.SchemaProps.Properties) > 0
 }

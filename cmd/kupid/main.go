@@ -5,5 +5,6 @@ import (
 )
 
 func main() {
-	kube.GetSchema("io.k8s.api.core.v1.Pod")
+	// kube.GetSchema("io.k8s.api.core.v1.Pod")
+	kube.GetSchema("io.k8s.api.core.v1.Node")
 }
