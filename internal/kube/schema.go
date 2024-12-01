@@ -16,14 +16,15 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-func GetSchema(resourceKey string) {
+func GetNodes(resourceKey string) (map[string]*property.Node, error) {
+	var result map[string]*property.Node
 	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
 	if err != nil {
-		log.Fatalf("failed to get in-cluster config: %v", err)
+		return nil, fmt.Errorf("failed to get in-cluster config: %v", err)
 	}
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatalf("failed to create client: %v", err)
+		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 	discoveryClient := client.Discovery()
 	openapi := discoveryClient.OpenAPIV3()
@@ -31,13 +32,13 @@ func GetSchema(resourceKey string) {
 	fmt.Printf("\n=== OpenAPI Definitions ===\n")
 	paths, err := openapi.Paths()
 	if err != nil {
-		log.Fatalf("failed to get openapi paths: %v", err)
+		return nil, fmt.Errorf("failed to get openapi paths: %v", err)
 	}
 
 	// TODO: extend to other api groups
 	schema, err := paths["api/v1"].Schema("application/json")
 	if err != nil {
-		log.Fatalf("failed to get openapi schema: %v", err)
+		return nil, fmt.Errorf("failed to get openapi schema: %v", err)
 	}
 
 	var openAPI *spec3.OpenAPI
@@ -49,12 +50,14 @@ func GetSchema(resourceKey string) {
 
 	nodes, err := getSchemaPropertyNodes(openAPI.Components.Schemas, resourceKey)
 	if err != nil {
-		log.Fatalf("failed to get schema properties: %v", err)
+		return nil, fmt.Errorf("failed to get schema properties: %v", err)
 	}
-	printPropertyNodes(nodes, 0)
+
+	result = nodes
+	return result, nil
 }
 
-func printPropertyNodes(nodes map[string]*property.Node, indent int) {
+func PrintNodes(nodes map[string]*property.Node, indent int) {
 	keys := []string{}
 	for key := range nodes {
 		keys = append(keys, key)
@@ -69,7 +72,7 @@ func printPropertyNodes(nodes map[string]*property.Node, indent int) {
 		}
 		fmt.Printf("%s(%s)\n", strings.Repeat(" ", indent*2)+key, displayType)
 		if node.Children != nil {
-			printPropertyNodes(node.Children, indent+1)
+			PrintNodes(node.Children, indent+1)
 		}
 	}
 }
