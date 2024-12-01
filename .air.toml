@@ -3,4 +3,4 @@ tmp_dir = "./bin"
 [build]
 bin = "bin/kupid"
 cmd = "make build-debug"
-full_bin = "dlv exec ./bin/kupid --listen=:2345 --headless=true --api-version=2 --accept-multiclient --continue"
+full_bin = "dlv exec ./bin/kupid --listen=:2345 --headless=true --api-version=2 --accept-multiclient"
