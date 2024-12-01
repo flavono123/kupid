@@ -29,7 +29,6 @@ func GetNodes(resourceKey string) (map[string]*property.Node, error) {
 	discoveryClient := client.Discovery()
 	openapi := discoveryClient.OpenAPIV3()
 
-	fmt.Printf("\n=== OpenAPI Definitions ===\n")
 	paths, err := openapi.Paths()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openapi paths: %v", err)
