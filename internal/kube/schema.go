@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/flavono123/kupid/internal/property"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -53,7 +54,7 @@ func GetSchema(resourceKey string) {
 	printPropertyNodes(nodes, 0)
 }
 
-func printPropertyNodes(nodes map[string]*PropertyNode, indent int) {
+func printPropertyNodes(nodes map[string]*property.PropertyNode, indent int) {
 	keys := []string{}
 	for key := range nodes {
 		keys = append(keys, key)
@@ -62,9 +63,9 @@ func printPropertyNodes(nodes map[string]*PropertyNode, indent int) {
 
 	for _, key := range keys {
 		node := nodes[key]
-		displayType := strings.Join(GetType(node.SchemaProps), "|")
+		displayType := strings.Join(property.GetType(node.SchemaProps), "|")
 		if len(displayType) == 0 {
-			displayType = GetRefKey(node.SchemaProps)
+			displayType = property.GetRefKey(node.SchemaProps)
 		}
 		fmt.Printf("%s(%s)\n", strings.Repeat(" ", indent*2)+key, displayType)
 		if node.Children != nil {
@@ -73,8 +74,8 @@ func printPropertyNodes(nodes map[string]*PropertyNode, indent int) {
 	}
 }
 
-func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (map[string]*PropertyNode, error) {
-	var result = map[string]*PropertyNode{}
+func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (map[string]*property.PropertyNode, error) {
+	var result = map[string]*property.PropertyNode{}
 
 	schema, exists := schemas[schemaKey]
 	if !exists {
@@ -104,12 +105,12 @@ func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (
 	return result, nil
 }
 
-func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps, key string) (*PropertyNode, error) {
-	var result *PropertyNode
+func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps, key string) (*property.PropertyNode, error) {
+	var result *property.PropertyNode
 
-	if !HasType(schemaProps) {
+	if !property.HasType(schemaProps) {
 		// top level schema props; should have ref in allOf
-		refKey := GetRefKey(schemaProps)
+		refKey := property.GetRefKey(schemaProps)
 		children, err := getSchemaPropertyNodes(schemas, refKey)
 		if err != nil {
 			return nil, err
@@ -119,7 +120,7 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 	}
 
 	var err error
-	switch Type(schemaProps) {
+	switch property.Type(schemaProps) {
 	case "object":
 		result, err = processObjectPropertyNode(schemas, schemaProps)
 		if err != nil {
@@ -137,10 +138,10 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 	return result, nil
 }
 
-func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*PropertyNode, error) {
-	var result *PropertyNode
+func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*property.PropertyNode, error) {
+	var result *property.PropertyNode
 
-	refKey := GetRefKey(&prop.AdditionalProperties.Schema.SchemaProps)
+	refKey := property.GetRefKey(&prop.AdditionalProperties.Schema.SchemaProps)
 	if refKey != "" {
 		children, err := getSchemaPropertyNodes(schemas, refKey)
 		if err != nil {
@@ -158,15 +159,15 @@ func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schem
 	return result, nil
 }
 
-func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*PropertyNode, error) {
-	var result *PropertyNode
+func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.SchemaProps) (*property.PropertyNode, error) {
+	var result *property.PropertyNode
 
 	items := prop.Items
 
-	if HasType(&items.Schema.SchemaProps) {
+	if property.HasType(&items.Schema.SchemaProps) {
 		result = CreatePropertyNodeBuilder(&items.Schema.SchemaProps).Build()
 	} else { // ref
-		refKey := GetRefKey(&items.Schema.SchemaProps)
+		refKey := property.GetRefKey(&items.Schema.SchemaProps)
 		children, err := getSchemaPropertyNodes(schemas, refKey)
 		if err != nil {
 			return nil, err
