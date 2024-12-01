@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	kube.ListEverySchemaInCluster()
+	kube.GetSchema("io.k8s.api.core.v1.Pod")
 }

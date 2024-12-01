@@ -15,7 +15,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-func ListEverySchemaInCluster() {
+func GetSchema(resourceKey string) {
 	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
 	if err != nil {
 		log.Fatalf("failed to get in-cluster config: %v", err)
@@ -46,7 +46,7 @@ func ListEverySchemaInCluster() {
 		log.Fatalf("failed to unmarshal openapi: %v", err)
 	}
 
-	nodes, err := getSchemaPropertyNodes(openAPI.Components.Schemas, "io.k8s.api.core.v1.Pod")
+	nodes, err := getSchemaPropertyNodes(openAPI.Components.Schemas, resourceKey)
 	if err != nil {
 		log.Fatalf("failed to get schema properties: %v", err)
 	}
