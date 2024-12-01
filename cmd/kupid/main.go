@@ -92,12 +92,9 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 	for _, key := range keys {
 		node := nodes[key]
 		displayType := strings.Join(property.GetType(node.SchemaProps), "|")
-		if len(displayType) == 0 {
-			if node.PropType != "" {
-				displayType = fmt.Sprintf("%s<%s>", node.PropType, property.GetRefKey(node.SchemaProps))
-			} else {
-				displayType = property.GetRefKey(node.SchemaProps)
-			}
+		if node.PropType == "object" || node.PropType == "array" { // == displayType == ""
+			displayType = fmt.Sprintf("%s<...>", node.PropType) // shortly for now
+			// displayType = fmt.Sprintf("%s<%s>", node.PropType, property.GetRefKey(node.SchemaProps))
 		}
 
 		isCursor := *lineNum-viewportOffset == cursor

@@ -11,16 +11,7 @@ type Node struct {
 }
 
 func (n *Node) Foldable() bool {
-	// TODO: should use n.PropType
-	nodeType := Type(n.SchemaProps)
-
-	// TEMPCODE
-	if nodeType == "" {
-		nodeType = n.PropType
-	}
-	// TEMPCODE
-
-	if nodeType == "object" || nodeType == "array" {
+	if n.PropType == "object" || n.PropType == "array" {
 		return true
 	}
 

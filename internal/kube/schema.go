@@ -137,7 +137,9 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 			return nil, err
 		}
 	default:
-		result = property.CreatePropertyNodeBuilder(schemaProps).Build()
+		result = property.CreatePropertyNodeBuilder(schemaProps).
+			WithPropType(property.Type(schemaProps)).
+			Build()
 	}
 
 	return result, nil
@@ -153,10 +155,12 @@ func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schem
 			return nil, err
 		}
 		result = property.CreatePropertyNodeBuilder(prop).
+			WithPropType("object").
 			WithChildren(children).
 			Build()
 	} else {
 		result = property.CreatePropertyNodeBuilder(prop).
+			WithPropType("object").
 			WithNestedTypeChildren(&prop.AdditionalProperties.Schema.SchemaProps).
 			Build()
 	}
@@ -170,7 +174,9 @@ func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schema
 	items := prop.Items
 
 	if property.HasType(&items.Schema.SchemaProps) {
-		result = property.CreatePropertyNodeBuilder(&items.Schema.SchemaProps).Build()
+		result = property.CreatePropertyNodeBuilder(&items.Schema.SchemaProps).
+			WithPropType("array").
+			Build()
 	} else { // ref
 		refKey := property.GetRefKey(&items.Schema.SchemaProps)
 		children, err := getSchemaPropertyNodes(schemas, refKey)
