@@ -23,6 +23,7 @@ const (
 	CURSOR_TOP      = 0
 	CURSOR_BOTTOM   = VIEWPORT_HEIGHT - 1
 	SCROLL_STEP     = 1
+	VERBOSE_TYPE    = false
 )
 
 type model struct {
@@ -31,6 +32,7 @@ type model struct {
 	style         lipgloss.Style
 	cursor        int
 	currentLineNo int
+	curNode       *property.Node
 }
 
 func newModel() *model {
@@ -66,6 +68,12 @@ func (m *model) IsCursor() bool {
 	return m.currentLineNo-m.viewport.YOffset == m.cursor
 }
 
+func (m *model) ToggleFolder() {
+	if m.curNode != nil && m.curNode.Foldable() {
+		m.curNode.Expanded = !m.curNode.Expanded
+	}
+}
+
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -84,6 +92,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.viewport.LineDown(SCROLL_STEP)
 			}
+		case " ":
+			m.ToggleFolder()
 		}
 	}
 	return m, nil
@@ -108,8 +118,7 @@ func printNodes(nodes map[string]*property.Node, indent int, model *model) strin
 	for _, key := range keys {
 		node := nodes[key]
 
-		// displayType := property.DisplayType(node, true)
-		displayType := property.DisplayType(node, false)
+		displayType := property.DisplayType(node, VERBOSE_TYPE)
 
 		// - make prefix
 		// indent
@@ -118,13 +127,18 @@ func printNodes(nodes map[string]*property.Node, indent int, model *model) strin
 		// cursor
 		if model.IsCursor() {
 			prefix += ">"
+			model.curNode = node
 		} else {
 			prefix += " "
 		}
 
 		// folder
 		if node.Foldable() {
-			prefix += "-"
+			if node.Expanded {
+				prefix += "-"
+			} else {
+				prefix += "+"
+			}
 		} else {
 			prefix += " "
 		}
@@ -139,7 +153,7 @@ func printNodes(nodes map[string]*property.Node, indent int, model *model) strin
 		result.WriteString(line)
 		model.currentLineNo++
 
-		if node.Children != nil {
+		if node.Children != nil && node.Expanded {
 			result.WriteString(printNodes(node.Children, indent+1, model))
 		}
 	}

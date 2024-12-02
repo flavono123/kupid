@@ -7,11 +7,15 @@ import (
 )
 
 type Node struct {
+	// property concern
 	SchemaProps  *spec.SchemaProps
 	PropType     string
 	NestedType   string // for array if it has no child prop in ref
 	NestedRefKey string // for array or object if it has child ref
 	Children     map[string]*Node
+
+	// ui concern
+	Expanded bool
 }
 
 func DisplayType(node *Node, verbose bool) string {
