@@ -41,7 +41,7 @@ func newModel() *model {
 		style:    style,
 		cursor:   0,
 	}
-	content := printNodes(nodes, 0, 0, vp.YOffset, &m.currentLineNo)
+	content := printNodes(nodes, 0, m)
 	content = strings.TrimSuffix(content, "\n")
 	vp.SetContent(content)
 
@@ -50,6 +50,10 @@ func newModel() *model {
 
 func (m *model) Init() tea.Cmd {
 	return nil
+}
+
+func (m *model) IsCursor() bool {
+	return m.currentLineNo-m.viewport.YOffset == m.cursor
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -77,13 +81,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) View() string {
 	m.currentLineNo = 0
-	content := printNodes(m.nodes, 0, m.cursor, m.viewport.YOffset, &m.currentLineNo)
+	content := printNodes(m.nodes, 0, m)
 	content = strings.TrimSuffix(content, "\n")
 	m.viewport.SetContent(content)
 	return m.style.Render(m.viewport.View()) + "\n" + fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, m.currentLineNo)
 }
 
-func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewportOffset int, lineNum *int) string {
+func printNodes(nodes map[string]*property.Node, indent int, model *model) string {
 	var result strings.Builder
 	keys := []string{}
 	for key := range nodes {
@@ -97,10 +101,8 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 		// displayType := property.DisplayType(node, true)
 		displayType := property.DisplayType(node, false)
 
-		isCursor := *lineNum-viewportOffset == cursor
-
 		prefix := strings.Repeat(" ", indent*2)
-		if isCursor {
+		if model.IsCursor() {
 			prefix += ">"
 		} else {
 			prefix += " "
@@ -119,10 +121,10 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 			line = line[:77] + "...\n"
 		}
 		result.WriteString(line)
-		*lineNum++
+		model.currentLineNo++
 
 		if node.Children != nil {
-			result.WriteString(printNodes(node.Children, indent+1, cursor, viewportOffset, lineNum))
+			result.WriteString(printNodes(node.Children, indent+1, model))
 		}
 	}
 	return result.String()
