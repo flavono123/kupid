@@ -13,11 +13,8 @@ type Node struct {
 }
 
 func (n *Node) Foldable() bool {
-	if Type(n.SchemaProps) == "array" && n.NestedRefKey != "" {
-		return true
-	}
-
-	if n.PropType == "object" {
+	propType := Type(n.SchemaProps)
+	if (propType == "array" || propType == "object") && n.NestedRefKey != "" {
 		return true
 	}
 
@@ -30,7 +27,7 @@ func HasType(prop *spec.SchemaProps) bool {
 
 func Type(prop *spec.SchemaProps) string {
 	if !HasType(prop) {
-		return ""
+		return "object"
 	}
 
 	return prop.Type[0]

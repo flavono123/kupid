@@ -42,6 +42,7 @@ func newModel() *model {
 		cursor:   0,
 	}
 	content := printNodes(nodes, 0, 0, vp.YOffset, &m.currentLineNo)
+	content = strings.TrimSuffix(content, "\n")
 	vp.SetContent(content)
 
 	return m
@@ -64,7 +65,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.LineUp(1)
 			}
 		case "down":
-			if m.cursor < 19 { // TODO: should guard the cursor disapears to the last newline
+			if m.cursor < 20-1 {
 				m.cursor++
 			} else {
 				m.viewport.LineDown(1)
@@ -77,6 +78,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() string {
 	m.currentLineNo = 0
 	content := printNodes(m.nodes, 0, m.cursor, m.viewport.YOffset, &m.currentLineNo)
+	content = strings.TrimSuffix(content, "\n")
 	m.viewport.SetContent(content)
 	return m.style.Render(m.viewport.View()) + "\n" + fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, m.currentLineNo)
 }
@@ -91,7 +93,9 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 
 	for _, key := range keys {
 		node := nodes[key]
-		displayType := strings.Join(property.GetType(node.SchemaProps), "|")
+
+		// TODO: move to node util
+		displayType := property.Type(node.SchemaProps)
 		if displayType == "array" {
 			if node.NestedType != "" {
 				displayType += fmt.Sprintf("<%s>", node.NestedType)
@@ -100,9 +104,9 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 				displayType += fmt.Sprintf("<%s>", nestedRefKey)
 			}
 		}
-		if node.PropType == "object" || node.PropType == "array" { // == displayType == ""
-			displayType = fmt.Sprintf("%s<...>", node.PropType) // shortly for now
-			// displayType = fmt.Sprintf("%s<%s>", node.PropType, property.GetRefKey(node.SchemaProps))
+		if displayType == "object" && node.NestedRefKey != "" {
+			// displayType = fmt.Sprintf("%s<...>", node.PropType) // shortly for now
+			displayType = fmt.Sprintf("%s<%s>", displayType, node.NestedRefKey)
 		}
 
 		isCursor := *lineNum-viewportOffset == cursor
@@ -120,7 +124,13 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 			prefix += " "
 		}
 
-		result.WriteString(fmt.Sprintf("%s%s(%s)\n", prefix, key, displayType))
+		line := fmt.Sprintf("%s%s(%s)\n", prefix, key, displayType)
+
+		// truncate 80
+		if len(line) > 80 {
+			line = line[:77] + "...\n"
+		}
+		result.WriteString(line)
 		*lineNum++
 
 		if node.Children != nil {

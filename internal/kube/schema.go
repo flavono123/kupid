@@ -118,7 +118,7 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 			return nil, err
 		}
 		result = property.CreatePropertyNodeBuilder(schemaProps).
-			WithPropType("object").
+			WithNestedRefKey(refKey).
 			WithChildren(children).
 			Build()
 		return result, nil
@@ -155,12 +155,10 @@ func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schem
 			return nil, err
 		}
 		result = property.CreatePropertyNodeBuilder(prop).
-			WithPropType("object"). // do not need
 			WithChildren(children).
 			Build()
 	} else {
 		result = property.CreatePropertyNodeBuilder(prop).
-			WithPropType("object"). // do not need
 			WithNestedTypeChildren(&prop.AdditionalProperties.Schema.SchemaProps).
 			Build()
 	}
