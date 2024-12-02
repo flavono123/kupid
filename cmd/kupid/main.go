@@ -92,6 +92,14 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 	for _, key := range keys {
 		node := nodes[key]
 		displayType := strings.Join(property.GetType(node.SchemaProps), "|")
+		if displayType == "array" {
+			if node.NestedType != "" {
+				displayType += fmt.Sprintf("<%s>", node.NestedType)
+			} else { // should have child ref
+				nestedRefKey := node.NestedRefKey
+				displayType += fmt.Sprintf("<%s>", nestedRefKey)
+			}
+		}
 		if node.PropType == "object" || node.PropType == "array" { // == displayType == ""
 			displayType = fmt.Sprintf("%s<...>", node.PropType) // shortly for now
 			// displayType = fmt.Sprintf("%s<%s>", node.PropType, property.GetRefKey(node.SchemaProps))

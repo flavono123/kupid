@@ -41,6 +41,20 @@ func (b *NodeBuilder) WithNestedTypeChildren(
 	return b
 }
 
+func (b *NodeBuilder) WithNestedType(
+	nestedType string,
+) *NodeBuilder {
+	b.node.NestedType = nestedType
+	return b
+}
+
+func (b *NodeBuilder) WithNestedRefKey(
+	refKey string,
+) *NodeBuilder {
+	b.node.NestedRefKey = refKey
+	return b
+}
+
 func (b *NodeBuilder) Build() *Node {
 	return b.node
 }

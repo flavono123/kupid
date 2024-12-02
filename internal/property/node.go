@@ -5,13 +5,19 @@ import (
 )
 
 type Node struct {
-	SchemaProps *spec.SchemaProps
-	PropType    string
-	Children    map[string]*Node
+	SchemaProps  *spec.SchemaProps
+	PropType     string
+	NestedType   string // for array if it has no child prop in ref
+	NestedRefKey string // for array if it has child ref
+	Children     map[string]*Node
 }
 
 func (n *Node) Foldable() bool {
-	if n.PropType == "object" || n.PropType == "array" {
+	if Type(n.SchemaProps) == "array" && n.NestedRefKey != "" {
+		return true
+	}
+
+	if n.PropType == "object" {
 		return true
 	}
 
@@ -30,8 +36,12 @@ func Type(prop *spec.SchemaProps) string {
 	return prop.Type[0]
 }
 
-func (p *Node) HasProperties() bool {
-	return p.SchemaProps.Properties != nil && len(p.SchemaProps.Properties) > 0
+func HasProperties(prop *spec.SchemaProps) bool {
+	return prop.Properties != nil && len(prop.Properties) > 0
+}
+
+func (n *Node) HasProperties() bool {
+	return n.SchemaProps.Properties != nil && len(n.SchemaProps.Properties) > 0
 }
 
 func GetRefKey(prop *spec.SchemaProps) string {

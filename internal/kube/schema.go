@@ -155,12 +155,12 @@ func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schem
 			return nil, err
 		}
 		result = property.CreatePropertyNodeBuilder(prop).
-			WithPropType("object").
+			WithPropType("object"). // do not need
 			WithChildren(children).
 			Build()
 	} else {
 		result = property.CreatePropertyNodeBuilder(prop).
-			WithPropType("object").
+			WithPropType("object"). // do not need
 			WithNestedTypeChildren(&prop.AdditionalProperties.Schema.SchemaProps).
 			Build()
 	}
@@ -174,17 +174,18 @@ func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schema
 	items := prop.Items
 
 	if property.HasType(&items.Schema.SchemaProps) {
-		result = property.CreatePropertyNodeBuilder(&items.Schema.SchemaProps).
-			WithPropType("array").
+		nestedType := property.Type(&items.Schema.SchemaProps)
+		result = property.CreatePropertyNodeBuilder(prop).
+			WithNestedType(nestedType).
 			Build()
-	} else { // ref
+	} else { // ref; expandable
 		refKey := property.GetRefKey(&items.Schema.SchemaProps)
 		children, err := getSchemaPropertyNodes(schemas, refKey)
 		if err != nil {
 			return nil, err
 		}
-		result = property.CreatePropertyNodeBuilder(&items.Schema.SchemaProps).
-			WithPropType("array").
+		result = property.CreatePropertyNodeBuilder(prop).
+			WithNestedRefKey(refKey).
 			WithChildren(children).
 			Build()
 	}
