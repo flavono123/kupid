@@ -1,6 +1,8 @@
 package property
 
 import (
+	"fmt"
+
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -8,86 +10,34 @@ type Node struct {
 	SchemaProps  *spec.SchemaProps
 	PropType     string
 	NestedType   string // for array if it has no child prop in ref
-	NestedRefKey string // for array if it has child ref
+	NestedRefKey string // for array or object if it has child ref
 	Children     map[string]*Node
 }
 
-func (n *Node) Foldable() bool {
-	propType := Type(n.SchemaProps)
-	if (propType == "array" || propType == "object") && n.NestedRefKey != "" {
-		return true
-	}
+func DisplayType(node *Node, verbose bool) string {
+	var result string
 
-	return false
-}
-
-func HasType(prop *spec.SchemaProps) bool {
-	return prop.Type != nil && len(prop.Type) > 0
-}
-
-func Type(prop *spec.SchemaProps) string {
-	if !HasType(prop) {
-		return "object"
-	}
-
-	return prop.Type[0]
-}
-
-func HasProperties(prop *spec.SchemaProps) bool {
-	return prop.Properties != nil && len(prop.Properties) > 0
-}
-
-func (n *Node) HasProperties() bool {
-	return n.SchemaProps.Properties != nil && len(n.SchemaProps.Properties) > 0
-}
-
-func GetRefKey(prop *spec.SchemaProps) string {
-	var ref spec.Ref
-	if prop.AllOf != nil && len(prop.AllOf) > 0 {
-		ref = prop.AllOf[0].Ref
-	} else {
-		ref = prop.Ref
-	}
-
-	tokens := ref.GetPointer().DecodedTokens()
-	if len(tokens) == 0 {
-		return ""
-	}
-	refKey := tokens[len(tokens)-1] // 2
-
-	return refKey
-}
-
-func GetType(prop *spec.SchemaProps) []string {
-	var result []string
-
-	if HasType(prop) {
-		result = prop.Type
-	} else if HasAllOf(prop) {
-		for _, schema := range prop.AllOf {
-			result = append(result, GetType(&schema.SchemaProps)...)
-		}
-	} else if HasOneOf(prop) {
-		for _, schema := range prop.OneOf {
-			result = append(result, GetType(&schema.SchemaProps)...)
-		}
-	} else if HasAnyOf(prop) {
-		for _, schema := range prop.AnyOf {
-			result = append(result, GetType(&schema.SchemaProps)...)
+	propType := GetType(node.SchemaProps)
+	result = propType
+	if verbose {
+		if propType == "array" || propType == "object" {
+			if node.NestedType != "" {
+				result += fmt.Sprintf("<%s>", node.NestedType)
+			} else { // should have child ref
+				nestedRefKey := node.NestedRefKey
+				result += fmt.Sprintf("<%s>", nestedRefKey)
+			}
 		}
 	}
 
 	return result
 }
 
-func HasAllOf(prop *spec.SchemaProps) bool {
-	return prop.AllOf != nil && len(prop.AllOf) > 0
-}
+func (n *Node) Foldable() bool {
+	propType := GetType(n.SchemaProps)
+	if (propType == "array" || propType == "object") && n.NestedRefKey != "" {
+		return true
+	}
 
-func HasOneOf(prop *spec.SchemaProps) bool {
-	return prop.OneOf != nil && len(prop.OneOf) > 0
-}
-
-func HasAnyOf(prop *spec.SchemaProps) bool {
-	return prop.AnyOf != nil && len(prop.AnyOf) > 0
+	return false
 }

@@ -24,8 +24,8 @@ type model struct {
 }
 
 func newModel() *model {
-	// nodes, err := kube.GetNodes("io.k8s.api.core.v1.Pod")
-	nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
+	nodes, err := kube.GetNodes("io.k8s.api.core.v1.Pod")
+	// nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
 	if err != nil {
 		log.Fatalf("failed to get nodes: %v", err)
 	}
@@ -94,20 +94,8 @@ func printNodes(nodes map[string]*property.Node, indent int, cursor int, viewpor
 	for _, key := range keys {
 		node := nodes[key]
 
-		// TODO: move to node util
-		displayType := property.Type(node.SchemaProps)
-		if displayType == "array" {
-			if node.NestedType != "" {
-				displayType += fmt.Sprintf("<%s>", node.NestedType)
-			} else { // should have child ref
-				nestedRefKey := node.NestedRefKey
-				displayType += fmt.Sprintf("<%s>", nestedRefKey)
-			}
-		}
-		if displayType == "object" && node.NestedRefKey != "" {
-			// displayType = fmt.Sprintf("%s<...>", node.PropType) // shortly for now
-			displayType = fmt.Sprintf("%s<%s>", displayType, node.NestedRefKey)
-		}
+		// displayType := property.DisplayType(node, true)
+		displayType := property.DisplayType(node, false)
 
 		isCursor := *lineNum-viewportOffset == cursor
 

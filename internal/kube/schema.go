@@ -6,8 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/flavono123/kupid/internal/property"
 	"k8s.io/client-go/kubernetes"
@@ -56,26 +54,6 @@ func GetNodes(resourceKey string) (map[string]*property.Node, error) {
 	return result, nil
 }
 
-func PrintNodes(nodes map[string]*property.Node, indent int) {
-	keys := []string{}
-	for key := range nodes {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		node := nodes[key]
-		displayType := strings.Join(property.GetType(node.SchemaProps), "|")
-		if len(displayType) == 0 {
-			displayType = property.GetRefKey(node.SchemaProps)
-		}
-		fmt.Printf("%s(%s)\n", strings.Repeat(" ", indent*2)+key, displayType)
-		if node.Children != nil {
-			PrintNodes(node.Children, indent+1)
-		}
-	}
-}
-
 func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (map[string]*property.Node, error) {
 	var result = map[string]*property.Node{}
 
@@ -84,20 +62,19 @@ func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (
 		return nil, fmt.Errorf("schema not found: %s", schemaKey)
 	}
 
-	node := property.CreatePropertyNodeBuilder(&schema.SchemaProps).Build()
-
 	// schema but no properties
-	if !node.HasProperties() {
-		result["*"] = node
+	if !property.HasProperties(&schema.SchemaProps) {
+		result["*"] = property.CreatePropertyNodeBuilder(&schema.SchemaProps).
+			Build()
 		return result, nil
 	}
 
-	for key, propSchema := range node.SchemaProps.Properties {
+	for key, propSchema := range schema.SchemaProps.Properties {
 		if key == "apiVersion" || key == "kind" || key == "metadata" {
 			continue
 		}
 
-		propNode, err := processPropertyNode(schemas, &propSchema.SchemaProps, key)
+		propNode, err := processPropertyNode(schemas, &propSchema.SchemaProps)
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +84,7 @@ func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (
 	return result, nil
 }
 
-func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps, key string) (*property.Node, error) {
+func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps) (*property.Node, error) {
 	var result *property.Node
 
 	if !property.HasType(schemaProps) {
@@ -125,7 +102,7 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 	}
 
 	var err error
-	switch property.Type(schemaProps) {
+	switch property.GetType(schemaProps) {
 	case "object":
 		result, err = processObjectPropertyNode(schemas, schemaProps)
 		if err != nil {
@@ -138,7 +115,7 @@ func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.Sche
 		}
 	default:
 		result = property.CreatePropertyNodeBuilder(schemaProps).
-			WithPropType(property.Type(schemaProps)).
+			WithPropType(property.GetType(schemaProps)).
 			Build()
 	}
 
@@ -159,6 +136,7 @@ func processObjectPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schem
 			Build()
 	} else {
 		result = property.CreatePropertyNodeBuilder(prop).
+			WithNestedType(property.GetType(&prop.AdditionalProperties.Schema.SchemaProps)).
 			WithNestedTypeChildren(&prop.AdditionalProperties.Schema.SchemaProps).
 			Build()
 	}
@@ -172,7 +150,7 @@ func processArrayPropertyNode(schemas map[string]*spec.Schema, prop *spec.Schema
 	items := prop.Items
 
 	if property.HasType(&items.Schema.SchemaProps) {
-		nestedType := property.Type(&items.Schema.SchemaProps)
+		nestedType := property.GetType(&items.Schema.SchemaProps)
 		result = property.CreatePropertyNodeBuilder(prop).
 			WithNestedType(nestedType).
 			Build()
