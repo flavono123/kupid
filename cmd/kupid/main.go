@@ -15,6 +15,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	START_INDENT    = 0
+	VIEWPORT_WIDTH  = 80
+	VIEWPORT_HEIGHT = 20
+	LINE_ELLIPSIS   = "...\n"
+	CURSOR_TOP      = 0
+	CURSOR_BOTTOM   = VIEWPORT_HEIGHT - 1
+	SCROLL_STEP     = 1
+)
+
 type model struct {
 	nodes         map[string]*property.Node
 	viewport      viewport.Model
@@ -34,14 +44,14 @@ func newModel() *model {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("white"))
 
-	vp := viewport.New(80, 20)
+	vp := viewport.New(VIEWPORT_WIDTH, VIEWPORT_HEIGHT)
 	m := &model{
 		nodes:    nodes,
 		viewport: vp,
 		style:    style,
 		cursor:   0,
 	}
-	content := printNodes(nodes, 0, m)
+	content := printNodes(nodes, START_INDENT, m)
 	content = strings.TrimSuffix(content, "\n")
 	vp.SetContent(content)
 
@@ -63,16 +73,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "up":
-			if m.cursor > 0 {
+			if m.cursor > CURSOR_TOP {
 				m.cursor--
 			} else {
-				m.viewport.LineUp(1)
+				m.viewport.LineUp(SCROLL_STEP)
 			}
 		case "down":
-			if m.cursor < 20-1 {
+			if m.cursor < CURSOR_BOTTOM {
 				m.cursor++
 			} else {
-				m.viewport.LineDown(1)
+				m.viewport.LineDown(SCROLL_STEP)
 			}
 		}
 	}
@@ -80,8 +90,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	m.currentLineNo = 0
-	content := printNodes(m.nodes, 0, m)
+	m.currentLineNo = 0 // to avoid accumulating line number infinitely
+	content := printNodes(m.nodes, START_INDENT, m)
 	content = strings.TrimSuffix(content, "\n")
 	m.viewport.SetContent(content)
 	return m.style.Render(m.viewport.View()) + "\n" + fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, m.currentLineNo)
@@ -101,13 +111,18 @@ func printNodes(nodes map[string]*property.Node, indent int, model *model) strin
 		// displayType := property.DisplayType(node, true)
 		displayType := property.DisplayType(node, false)
 
+		// - make prefix
+		// indent
 		prefix := strings.Repeat(" ", indent*2)
+
+		// cursor
 		if model.IsCursor() {
 			prefix += ">"
 		} else {
 			prefix += " "
 		}
 
+		// folder
 		if node.Foldable() {
 			prefix += "-"
 		} else {
@@ -116,10 +131,11 @@ func printNodes(nodes map[string]*property.Node, indent int, model *model) strin
 
 		line := fmt.Sprintf("%s%s(%s)\n", prefix, key, displayType)
 
-		// truncate 80
-		if len(line) > 80 {
-			line = line[:77] + "...\n"
+		// truncate over viewport width
+		if len(line) > VIEWPORT_WIDTH {
+			line = line[:VIEWPORT_WIDTH-len(LINE_ELLIPSIS)] + LINE_ELLIPSIS
 		}
+
 		result.WriteString(line)
 		model.currentLineNo++
 
