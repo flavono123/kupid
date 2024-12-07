@@ -7,6 +7,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/sahilm/fuzzy"
 )
 
 const (
@@ -18,7 +20,6 @@ var kinds = []string{
 	"pod",
 	"deployment",
 	"service",
-	"ingress",
 	"secret",
 	"configmap",
 	"hpa",
@@ -41,9 +42,9 @@ func (i kbarItem) String() string {
 	return fmt.Sprintf("%s %s %s", i.Group, i.Kind, i.Version)
 }
 
-func (m kbarItems) View(filter string) string {
+func (m kbarItems) View(inputValue string) string {
 	var result []string
-	filtered := m.Filter(filter)
+	filtered := m.Filter(inputValue)
 	for _, item := range filtered {
 		result = append(result, item.String())
 	}
@@ -51,12 +52,19 @@ func (m kbarItems) View(filter string) string {
 	return strings.Join(result, "\n")
 }
 
-func (m kbarItems) Filter(filter string) kbarItems {
+func (m kbarItems) Filter(inputValue string) kbarItems {
+	if inputValue == "" {
+		return m
+	}
+
 	var items kbarItems
+	var itemStrings []string
 	for _, item := range m {
-		if strings.Contains(item.String(), filter) {
-			items = append(items, item)
-		}
+		itemStrings = append(itemStrings, item.String())
+	}
+	matches := fuzzy.Find(inputValue, itemStrings)
+	for _, match := range matches {
+		items = append(items, m[match.Index])
 	}
 	return items
 }
