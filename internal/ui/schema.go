@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 
@@ -90,7 +91,8 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var model tea.Model
 			model, cmd = m.kbarModel.Update(msg)
 			m.kbarModel = model.(*kbarModel)
-			if msg.String() == "k" || msg.String() == "esc" {
+			switch msg.String() {
+			case "esc", "alt+k": // TODO: bind to command modifier over option(alt)
 				m.showKbar = false
 			}
 			return m, cmd
@@ -111,8 +113,13 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case " ":
 			m.ToggleFolder()
-		case "k":
+		case "alt+k": // TODO: bind to command modifier over option(alt)
 			m.showKbar = !m.showKbar
+			m.kbarModel.ResetInput()
+			return m, tea.Batch(
+				m.kbarModel.input.Focus(),
+				textinput.Blink, // FIXME: not blinking
+			)
 		}
 		return m, nil
 	}
