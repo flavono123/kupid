@@ -41,12 +41,24 @@ func (i kbarItem) String() string {
 	return fmt.Sprintf("%s %s %s", i.Group, i.Kind, i.Version)
 }
 
-func (m kbarItems) View() string {
-	var items []string
-	for _, item := range m {
-		items = append(items, item.String())
+func (m kbarItems) View(filter string) string {
+	var result []string
+	filtered := m.Filter(filter)
+	for _, item := range filtered {
+		result = append(result, item.String())
 	}
-	return strings.Join(items, "\n")
+
+	return strings.Join(result, "\n")
+}
+
+func (m kbarItems) Filter(filter string) kbarItems {
+	var items kbarItems
+	for _, item := range m {
+		if strings.Contains(item.String(), filter) {
+			items = append(items, item)
+		}
+	}
+	return items
 }
 
 type kbarModel struct {
@@ -94,7 +106,7 @@ func (m *kbarModel) Init() tea.Cmd {
 func (m *kbarModel) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.input.View(),
-		m.items.View(),
+		m.items.View(m.input.Value()),
 	)
 }
 
