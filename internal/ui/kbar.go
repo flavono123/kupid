@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
@@ -15,8 +16,10 @@ import (
 )
 
 const (
-	modalWidth  = 50
-	modalHeight = 10
+	KBAR_WIDTH                = 50
+	SEARCH_RESULTS_MAX_HEIGHT = 10
+
+	KBAR_SCROLL_STEP = 1
 )
 
 var kinds = []string{
@@ -47,7 +50,11 @@ type searchResults []searchResult
 type kbarItems []kbarItem
 
 func (i kbarItem) String() string {
-	return fmt.Sprintf("%s %s %s", i.Group, i.Kind, i.Version)
+	s := fmt.Sprintf("%s %s %s", i.Group, i.Kind, i.Version)
+	if len(s) > KBAR_WIDTH {
+		return s[:KBAR_WIDTH-3] + "..."
+	}
+	return s
 }
 
 func (sr searchResult) Render() string {
@@ -58,7 +65,7 @@ func (sr searchResult) Render() string {
 	return style.Render(sr.Item.String())
 }
 
-func (sr searchResults) View() string {
+func (sr searchResults) String() string {
 	noResultsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	if len(sr) == 0 {
 		return noResultsStyle.Render("No results found.")
@@ -69,12 +76,6 @@ func (sr searchResults) View() string {
 		result = append(result, item.Render())
 	}
 
-	// cut max 10 items
-	// TODO: set max height and scroll
-	if len(result) > 10 {
-		result = result[:10]
-		result = append(result, "more gvks ...")
-	}
 	return strings.Join(result, "\n")
 }
 
@@ -100,6 +101,7 @@ type kbarModel struct {
 	items         kbarItems
 	input         textinput.Model
 	searchResults searchResults
+	srViewport    viewport.Model
 	cursor        int
 }
 
@@ -131,10 +133,11 @@ func NewKbarModel() *kbarModel {
 		style: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			Padding(1, 0).
-			Width(modalWidth),
-		items:  items,
-		input:  ti,
-		cursor: 0,
+			Width(KBAR_WIDTH),
+		items:      items,
+		input:      ti,
+		cursor:     0,
+		srViewport: viewport.New(KBAR_WIDTH, SEARCH_RESULTS_MAX_HEIGHT),
 	}
 
 	m.SetSearchResults(items)
@@ -150,10 +153,12 @@ func (m *kbarModel) Init() tea.Cmd {
 
 func (m *kbarModel) View() string {
 	inputStyle := lipgloss.NewStyle().Margin(0, 0, 1, 0)
+	searchResult := strings.TrimSuffix(m.searchResults.String(), "\n")
+	m.srViewport.SetContent(searchResult)
 	return m.style.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
 			inputStyle.Render(m.input.View()),
-			m.searchResults.View(),
+			m.srViewport.View(),
 		),
 	)
 }
@@ -174,11 +179,17 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "up":
 			if m.cursor > 0 {
 				m.MoveCursorUp(filtered)
+			} else {
+				m.srViewport.LineUp(KBAR_SCROLL_STEP)
 			}
+			m.SetSearchResults(filtered)
 		case "down":
-			if m.cursor < len(filtered)-1 {
+			if m.cursor < min(len(filtered)-1, SEARCH_RESULTS_MAX_HEIGHT-1) {
 				m.MoveCursorDown(filtered)
+			} else {
+				m.srViewport.LineDown(KBAR_SCROLL_STEP)
 			}
+			m.SetSearchResults(filtered)
 		}
 	}
 
@@ -190,7 +201,7 @@ func (m *kbarModel) SetSearchResults(items kbarItems) {
 	for index, item := range items {
 		newSearchResults = append(newSearchResults, searchResult{
 			Item:    item,
-			Hovered: m.cursor == index,
+			Hovered: m.cursor == index-m.srViewport.YOffset,
 		})
 	}
 	m.searchResults = newSearchResults
@@ -202,19 +213,9 @@ func (m *kbarModel) MoveCursorTop(items kbarItems) {
 }
 
 func (m *kbarModel) MoveCursorUp(items kbarItems) {
-	if m.cursor == 0 {
-		return
-	}
-
-	m.cursor -= 1
-	m.SetSearchResults(items)
+	m.cursor--
 }
 
 func (m *kbarModel) MoveCursorDown(items kbarItems) {
-	if m.cursor == len(items)-1 {
-		return
-	}
-
-	m.cursor += 1
-	m.SetSearchResults(items)
+	m.cursor++
 }
