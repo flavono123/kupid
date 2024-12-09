@@ -115,7 +115,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ToggleFolder()
 		case "alt+k": // TODO: bind to command modifier over option(alt)
 			m.showKbar = !m.showKbar
-			m.kbarModel.ResetInput()
+			m.kbarModel.Reset()
 			return m, tea.Batch(
 				m.kbarModel.input.Focus(),
 				textinput.Blink, // FIXME: not blinking

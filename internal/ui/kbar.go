@@ -58,6 +58,11 @@ func (sr searchResult) Render() string {
 }
 
 func (sr searchResults) View() string {
+	noResultsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	if len(sr) == 0 {
+		return noResultsStyle.Render("No results found.")
+	}
+
 	var result []string
 	for _, item := range sr {
 		result = append(result, item.Render())
@@ -90,8 +95,10 @@ type kbarModel struct {
 	cursor        int
 }
 
-func (m *kbarModel) ResetInput() {
+func (m *kbarModel) Reset() {
 	m.input.Reset()
+	m.cursor = 0
+	m.SetSearchResults(m.items)
 }
 
 func NewKbarModel() *kbarModel {
@@ -111,7 +118,7 @@ func NewKbarModel() *kbarModel {
 		style: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			Padding(1, 0).
-			Width(modalWidth).Align(lipgloss.Center),
+			Width(modalWidth),
 		items:  items,
 		input:  ti,
 		cursor: 0,
@@ -129,9 +136,12 @@ func (m *kbarModel) Init() tea.Cmd {
 }
 
 func (m *kbarModel) View() string {
-	return lipgloss.JoinVertical(lipgloss.Left,
-		m.input.View(),
-		m.searchResults.View(),
+	inputStyle := lipgloss.NewStyle().Margin(0, 0, 1, 0)
+	return m.style.Render(
+		lipgloss.JoinVertical(lipgloss.Left,
+			inputStyle.Render(m.input.View()),
+			m.searchResults.View(),
+		),
 	)
 }
 
@@ -142,7 +152,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.input, cmd = m.input.Update(msg)
 	filtered := m.items.Filter(m.input.Value())
 	if prevInputValue != m.input.Value() {
-		m.MoveTop(filtered)
+		m.MoveCursorTop(filtered)
 	}
 
 	switch msg := msg.(type) {
@@ -150,11 +160,11 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "up":
 			if m.cursor > 0 {
-				m.MoveUp(filtered)
+				m.MoveCursorUp(filtered)
 			}
 		case "down":
 			if m.cursor < len(filtered)-1 {
-				m.MoveDown(filtered)
+				m.MoveCursorDown(filtered)
 			}
 		}
 	}
@@ -173,12 +183,12 @@ func (m *kbarModel) SetSearchResults(items kbarItems) {
 	m.searchResults = newSearchResults
 }
 
-func (m *kbarModel) MoveTop(items kbarItems) {
+func (m *kbarModel) MoveCursorTop(items kbarItems) {
 	m.cursor = 0
 	m.SetSearchResults(items)
 }
 
-func (m *kbarModel) MoveUp(items kbarItems) {
+func (m *kbarModel) MoveCursorUp(items kbarItems) {
 	if m.cursor == 0 {
 		return
 	}
@@ -187,7 +197,7 @@ func (m *kbarModel) MoveUp(items kbarItems) {
 	m.SetSearchResults(items)
 }
 
-func (m *kbarModel) MoveDown(items kbarItems) {
+func (m *kbarModel) MoveCursorDown(items kbarItems) {
 	if m.cursor == len(items)-1 {
 		return
 	}
