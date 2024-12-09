@@ -2,11 +2,14 @@ package ui
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/flavono123/kupid/internal/kube"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/sahilm/fuzzy"
 )
@@ -29,9 +32,7 @@ var kinds = []string{
 }
 
 type kbarItem struct {
-	Group   string
-	Kind    string
-	Version string
+	schema.GroupVersionKind
 
 	Selected bool
 }
@@ -66,6 +67,13 @@ func (sr searchResults) View() string {
 	var result []string
 	for _, item := range sr {
 		result = append(result, item.Render())
+	}
+
+	// cut max 10 items
+	// TODO: set max height and scroll
+	if len(result) > 10 {
+		result = result[:10]
+		result = append(result, "more gvks ...")
 	}
 	return strings.Join(result, "\n")
 }
@@ -103,8 +111,13 @@ func (m *kbarModel) Reset() {
 
 func NewKbarModel() *kbarModel {
 	var items kbarItems
-	for _, kind := range kinds {
-		items = append(items, kbarItem{Kind: kind})
+
+	gvks, err := kube.GetGVKs()
+	if err != nil {
+		log.Fatalf("failed to get gvks: %v", err)
+	}
+	for _, gvk := range gvks {
+		items = append(items, kbarItem{GroupVersionKind: gvk})
 	}
 
 	ti := textinput.New()
