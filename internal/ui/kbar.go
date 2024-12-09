@@ -109,6 +109,10 @@ func (m *kbarModel) Reset() {
 	m.input.Reset()
 	m.cursor = 0
 	m.SetSearchResults(m.items)
+	m.srViewport.SetYOffset(0)
+	for _, item := range m.items {
+		item.Selected = false
+	}
 }
 
 func NewKbarModel() *kbarModel {
@@ -163,6 +167,10 @@ func (m *kbarModel) View() string {
 	)
 }
 
+type selectGVKMsg struct {
+	gvk schema.GroupVersionKind
+}
+
 func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -190,6 +198,11 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.srViewport.LineDown(KBAR_SCROLL_STEP)
 			}
 			m.SetSearchResults(filtered)
+		case "enter":
+			// filtered[m.cursor].Selected = true
+			return m, func() tea.Msg {
+				return selectGVKMsg{gvk: filtered[m.cursor].GroupVersionKind}
+			}
 		}
 	}
 

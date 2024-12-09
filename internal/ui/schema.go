@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -34,6 +35,7 @@ type schemaModel struct {
 	cursor    int
 	curLineNo int
 	curNode   *property.Node
+	curGVK    schema.GroupVersionKind
 
 	kbarModel *kbarModel
 	showKbar  bool
@@ -57,6 +59,11 @@ func NewSchemaModel() *schemaModel {
 		style:     style,
 		cursor:    0,
 		kbarModel: NewKbarModel(),
+		curGVK: schema.GroupVersionKind{
+			Group:   "",
+			Version: "v1",
+			Kind:    "Pod",
+		},
 	}
 	content := printNodes(nodes, START_INDENT, m)
 	content = strings.TrimSuffix(content, "\n")
@@ -122,6 +129,11 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			)
 		}
 		return m, nil
+
+	case selectGVKMsg:
+		m.curGVK = msg.gvk
+		m.kbarModel.Reset()
+		m.showKbar = false
 	}
 	return m, nil
 }
@@ -142,8 +154,11 @@ func (m *schemaModel) View() string {
 		)
 	}
 
-	return m.style.Render(m.viewport.View()) +
-		"\n" + fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, m.curLineNo) // debug
+	return lipgloss.JoinVertical(lipgloss.Left,
+		m.curGVK.String(),
+		m.style.Render(m.viewport.View()),
+		fmt.Sprintf("cursor: %d, lineNum: %d", m.cursor, m.curLineNo), // debug
+	)
 }
 
 func printNodes(nodes map[string]*property.Node, indent int, sm *schemaModel) string {
