@@ -42,7 +42,12 @@ type schemaModel struct {
 }
 
 func NewSchemaModel() *schemaModel {
-	nodes, err := kube.GetNodes("io.k8s.api.core.v1.Pod")
+	gvk := schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Pod",
+	}
+	nodes, err := kube.GetNodes(gvk)
 	// nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
 	if err != nil {
 		log.Fatalf("failed to get nodes: %v", err)
@@ -132,6 +137,13 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
+		var err error
+		m.nodes, err = kube.GetNodes(msg.gvk)
+		if err != nil {
+			log.Fatalf("failed to get nodes: %v", err)
+		}
+
+		m.cursor = 0
 		m.kbarModel.Reset()
 		m.showKbar = false
 	}

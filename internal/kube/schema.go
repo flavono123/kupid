@@ -6,15 +6,17 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/flavono123/kupid/internal/property"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-func GetNodes(resourceKey string) (map[string]*property.Node, error) {
+func GetNodes(gvk schema.GroupVersionKind) (map[string]*property.Node, error) {
 	var result map[string]*property.Node
 	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
 	if err != nil {
@@ -32,8 +34,7 @@ func GetNodes(resourceKey string) (map[string]*property.Node, error) {
 		return nil, fmt.Errorf("failed to get openapi paths: %v", err)
 	}
 
-	// TODO: extend to other api groups
-	schema, err := paths["api/v1"].Schema("application/json")
+	schema, err := paths[getPath(gvk)].Schema("application/json")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openapi schema: %v", err)
 	}
@@ -45,7 +46,7 @@ func GetNodes(resourceKey string) (map[string]*property.Node, error) {
 		log.Fatalf("failed to unmarshal openapi: %v", err)
 	}
 
-	nodes, err := getSchemaPropertyNodes(openAPI.Components.Schemas, resourceKey)
+	nodes, err := getSchemaPropertyNodes(openAPI.Components.Schemas, getResourceKey(gvk))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get schema properties: %v", err)
 	}
@@ -82,6 +83,42 @@ func getSchemaPropertyNodes(schemas map[string]*spec.Schema, schemaKey string) (
 	}
 
 	return result, nil
+}
+
+func getPath(gvk schema.GroupVersionKind) string {
+	if gvk.Group == "" { // core
+		return "api/v1"
+	}
+	return fmt.Sprintf("apis/%s/%s", gvk.Group, gvk.Version)
+}
+
+func getResourceKey(gvk schema.GroupVersionKind) string {
+	var reversedGroup string
+	var domain []string
+
+	if gvk.Group == "" { // core
+		domain = []string{"core", "api", "k8s", "io"}
+	} else if len(strings.Split(gvk.Group, ".")) == 1 { // apps, ...
+		domain = strings.Split(gvk.Group, ".")
+		domain = append(domain, "api", "k8s", "io")
+	} else if strings.HasSuffix(gvk.Group, ".k8s.io") { // networking.k8s.io, ...
+		domain = strings.Split(gvk.Group, ".")
+		domain = domain[0:1] // HACK: remain only the first subdomain, e.g. rbac.authorization.k8s.io, cannot sure for all the other cases
+		domain = append(domain, "api", "k8s", "io")
+	} else {
+		domain = strings.Split(gvk.Group, ".")
+	}
+
+	// reverse domain
+	for i, j := 0, len(domain)-1; i < j; i, j = i+1, j-1 {
+		domain[i], domain[j] = domain[j], domain[i]
+	}
+
+	reversedGroup = strings.Join(domain, ".")
+
+	// io.k8s.api.core.v1.Pod
+	// TODO: cover crd
+	return fmt.Sprintf("%s.%s.%s", reversedGroup, gvk.Version, gvk.Kind)
 }
 
 func processPropertyNode(schemas map[string]*spec.Schema, schemaProps *spec.SchemaProps) (*property.Node, error) {

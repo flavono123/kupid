@@ -36,8 +36,6 @@ var kinds = []string{
 
 type kbarItem struct {
 	schema.GroupVersionKind
-
-	Selected bool
 }
 
 type searchResult struct {
@@ -110,9 +108,6 @@ func (m *kbarModel) Reset() {
 	m.cursor = 0
 	m.SetSearchResults(m.items)
 	m.srViewport.SetYOffset(0)
-	for _, item := range m.items {
-		item.Selected = false
-	}
 }
 
 func NewKbarModel() *kbarModel {
@@ -163,6 +158,7 @@ func (m *kbarModel) View() string {
 		lipgloss.JoinVertical(lipgloss.Left,
 			inputStyle.Render(m.input.View()),
 			m.srViewport.View(),
+			fmt.Sprintf("cursor: %d, results: %d", m.cursor, len(m.searchResults)),
 		),
 	)
 }
@@ -201,7 +197,8 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			// filtered[m.cursor].Selected = true
 			return m, func() tea.Msg {
-				return selectGVKMsg{gvk: filtered[m.cursor].GroupVersionKind}
+				actualIndex := m.cursor + m.srViewport.YOffset
+				return selectGVKMsg{gvk: filtered[actualIndex].GroupVersionKind}
 			}
 		}
 	}
