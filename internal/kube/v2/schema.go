@@ -190,27 +190,27 @@ func FieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, fieldPat
 		history[refString] = true
 	}
 
+	resolvedSchema := schema
 	if resolved := resolveRef(refString, document); resolved != nil {
-		schema = resolved
+		resolvedSchema = resolved
 	}
 
-	for key, prop := range schema.Properties {
-		fieldDetail(key, schema, level, document)
+	for key, prop := range resolvedSchema.Properties {
+		fieldDetail(key, resolvedSchema, level, document)
+		// recursive
 		FieldList(&prop, level+1, document, fieldPath, history)
 	}
 
-	for _, subSchema := range schema.AllOf {
+	for _, subSchema := range resolvedSchema.AllOf {
 		FieldList(&subSchema, level, document, fieldPath, history)
 	}
 
-	if schema.Items != nil {
-		for _, subSchema := range schema.Items.Schemas {
-			FieldList(&subSchema, level, document, fieldPath, history)
-		}
+	if resolvedSchema.Items != nil {
+		FieldList(resolvedSchema.Items.Schema, level, document, fieldPath, history)
 	}
 
-	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Allows {
-		FieldList(schema.AdditionalProperties.Schema, level, document, fieldPath, history)
+	if resolvedSchema.AdditionalProperties != nil && resolvedSchema.AdditionalProperties.Allows {
+		FieldList(resolvedSchema.AdditionalProperties.Schema, level, document, fieldPath, history)
 	}
 
 	return nil
