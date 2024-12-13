@@ -1,14 +1,51 @@
 package v2
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-openapi/jsonreference"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
+
+func GetDocument(gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
+	var result *spec3.OpenAPI
+	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-cluster config: %v", err)
+	}
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+	discoveryClient := client.Discovery()
+
+	openapiv3 := discoveryClient.OpenAPIV3()
+
+	paths, err := openapiv3.Paths()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get openapi paths: %v", err)
+	}
+	schemabytes, err := paths[getDocumentPath(gvr)].Schema(runtime.ContentTypeJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get openapi schema: %v", err)
+	}
+	var document *spec3.OpenAPI
+	if err := json.Unmarshal(schemabytes, &document); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal schema: %v", err)
+	}
+	result = document
+
+	return result, nil
+}
 
 func GetPathPrefix(gvr schema.GroupVersionResource) string {
 	if gvr.Group != "" {
@@ -16,6 +53,10 @@ func GetPathPrefix(gvr schema.GroupVersionResource) string {
 	}
 
 	return "/api"
+}
+
+func getDocumentPath(gvr schema.GroupVersionResource) string {
+	return strings.TrimPrefix(strings.Join([]string{GetPathPrefix(gvr), gvr.Version}, "/"), "/")
 }
 
 func GetClusterScopedPath(gvr schema.GroupVersionResource) string {
@@ -227,9 +268,6 @@ func createField(name string, schema *spec.Schema, level int, document *spec3.Op
 	result.Level = level
 	fieldSchema := schema.Properties[name]
 	result.Type = typeGuess(&fieldSchema, document)
-	if result.Type == "Object" || strings.Contains(result.Type, "[]") || strings.Contains(result.Type, "map[string]") {
-		result.Foldable = true
-	}
 	for _, required := range schema.Required {
 		if required == name {
 			result.Required = true

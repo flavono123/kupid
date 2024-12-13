@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/flavono123/kupid/internal/kube"
+	kubev2 "github.com/flavono123/kupid/internal/kube/v2"
 	"github.com/flavono123/kupid/internal/property"
 )
 
@@ -29,6 +30,8 @@ const (
 )
 
 type schemaModel struct {
+	fields    map[string]*kubev2.Field
+	curField  *kubev2.Field
 	nodes     map[string]*property.Node
 	viewport  viewport.Model
 	style     lipgloss.Style
@@ -47,6 +50,24 @@ func NewSchemaModel() *schemaModel {
 		Version: "v1",
 		Kind:    "Pod",
 	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    gvk.Group,
+		Version:  gvk.Version,
+		Resource: "pods",
+	}
+	document, err := kubev2.GetDocument(gvr)
+	if err != nil {
+		log.Fatalf("failed to get document: %v", err)
+	}
+	schema, err := kubev2.FindSchemaByGVK(document, gvk)
+	if err != nil {
+		log.Fatalf("failed to find schema: %v", err)
+	}
+	fields, err := kubev2.CreateFieldTree(schema, document, make(map[string]bool))
+	if err != nil {
+		log.Fatalf("failed to create field tree: %v", err)
+	}
 	nodes, err := kube.GetNodes(gvk)
 	// nodes, err := kube.GetNodes("io.k8s.api.core.v1.Node")
 	if err != nil {
@@ -59,18 +80,15 @@ func NewSchemaModel() *schemaModel {
 
 	vp := viewport.New(VIEWPORT_WIDTH, VIEWPORT_HEIGHT)
 	m := &schemaModel{
+		fields:    fields,
 		nodes:     nodes,
 		viewport:  vp,
 		style:     style,
 		cursor:    0,
 		kbarModel: NewKbarModel(),
-		curGVK: schema.GroupVersionKind{
-			Group:   "",
-			Version: "v1",
-			Kind:    "Pod",
-		},
+		curGVK:    gvk,
 	}
-	content := printNodes(nodes, START_INDENT, m)
+	content := m.renderRecursive(m.fields)
 	content = strings.TrimSuffix(content, "\n")
 	vp.SetContent(content)
 
@@ -86,8 +104,8 @@ func (m *schemaModel) IsCursor() bool {
 }
 
 func (m *schemaModel) ToggleFolder() {
-	if m.curNode != nil && m.curNode.Foldable() {
-		m.curNode.Expanded = !m.curNode.Expanded
+	if m.curField != nil && m.curField.Foldable() {
+		m.curField.Expanded = !m.curField.Expanded
 	}
 }
 
@@ -152,7 +170,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *schemaModel) View() string {
 	m.curLineNo = 0 // to avoid accumulating line number infinitely
-	content := printNodes(m.nodes, START_INDENT, m)
+	content := m.renderRecursive(m.fields)
 	content = strings.TrimSuffix(content, "\n")
 	m.viewport.SetContent(content)
 
@@ -223,5 +241,50 @@ func printNodes(nodes map[string]*property.Node, indent int, sm *schemaModel) st
 			result.WriteString(printNodes(node.Children, indent+1, sm))
 		}
 	}
+	return result.String()
+}
+
+func (m *schemaModel) renderRecursive(fields map[string]*kubev2.Field) string {
+	var result strings.Builder
+	keys := []string{}
+	for key := range fields {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		if key == "apiVersion" || key == "kind" || key == "metadata" {
+			continue
+		}
+		field := fields[key]
+
+		prefix := strings.Repeat(" ", field.Level*2)
+		if m.IsCursor() {
+			prefix += ">"
+			m.curField = field
+		} else {
+			prefix += " "
+		}
+		if field.Foldable() {
+			if field.Expanded {
+				prefix += "-"
+			} else {
+				prefix += "+"
+			}
+		} else {
+			prefix += " "
+		}
+		line := fmt.Sprintf("%s%s\n", prefix, field.String())
+		if len(line) > VIEWPORT_WIDTH {
+			line = line[:VIEWPORT_WIDTH-len(LINE_ELLIPSIS)] + LINE_ELLIPSIS
+		}
+		result.WriteString(line)
+		m.curLineNo++
+
+		if field.Children != nil && field.Expanded {
+			result.WriteString(m.renderRecursive(field.Children))
+		}
+	}
+
 	return result.String()
 }
