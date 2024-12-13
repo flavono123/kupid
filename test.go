@@ -45,11 +45,11 @@ func main() {
 	gvk := v2.FindGVK(document, []string{resourcePath})
 	fmt.Println(gvk)
 
-	schema, err := v2.FindSchemaByGVK(document, *gvk, []string{resourcePath}, false)
+	schema, err := v2.FindSchemaByGVK(document, *gvk)
 	if err != nil {
 		panic(fmt.Errorf("failed to find schema: %v", err))
 	}
 	// fmt.Println(schema.Description)
 	history := make(map[string]bool)
-	v2.Output(schema, document, []string{}, history)
+	v2.Output(schema, document, history)
 }

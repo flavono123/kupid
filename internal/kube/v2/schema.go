@@ -84,7 +84,7 @@ func FindGVK(document *spec3.OpenAPI, paths []string) *schema.GroupVersionKind {
 }
 
 // FindSchemaByGVK searches for a schema with the given GVK in the OpenAPI document
-func FindSchemaByGVK(document *spec3.OpenAPI, gvk schema.GroupVersionKind, fieldPath []string, recursive bool) (*spec.Schema, error) {
+func FindSchemaByGVK(document *spec3.OpenAPI, gvk schema.GroupVersionKind) (*spec.Schema, error) {
 	// components/schemas에서 GVK에 해당하는 스키마 찾기
 	for _, schema := range document.Components.Schemas {
 		if matchXKubeGVK(schema.Extensions, gvk) {
@@ -114,7 +114,7 @@ func matchXKubeGVK(extension spec.Extensions, gvk schema.GroupVersionKind) bool 
 	return false
 }
 
-func Output(schema *spec.Schema, document *spec3.OpenAPI, fieldPath []string, history map[string]bool) error {
+func Output(schema *spec.Schema, document *spec3.OpenAPI, history map[string]bool) error {
 	if schema == nil {
 		return fmt.Errorf("schema is nil")
 	}
@@ -135,49 +135,15 @@ func Output(schema *spec.Schema, document *spec3.OpenAPI, fieldPath []string, hi
 		schema = resolved
 	}
 
-	// FieldPath가 비어있으면 전체 스키마 출력
-	if len(fieldPath) == 0 {
-		err := FieldList(schema, 0, document, fieldPath, history)
-		if err != nil {
-			return err
-		}
-		return nil
+	err := FieldList(schema, 0, document, history)
+	if err != nil {
+		return err
 	}
-
-	// 현재 필드 경로에 해당하는 속성이 있는 경우
-	if schema.Properties != nil {
-		firstField := fieldPath[0]
-		if prop, exists := schema.Properties[firstField]; exists {
-			// 마지막 필드인 경우 해당 필드 정보 출력
-			if len(fieldPath) == 1 {
-				fmt.Printf("%s<%s>\n\n", firstField, prop.Type)
-			}
-
-			return Output(&prop, document, fieldPath[1:], history)
-		}
-	}
-
-	// 배열인 경우
-	if schema.Items != nil {
-		return Output(schema.Items.Schema, document, fieldPath, history)
-	}
-
-	// 맵인 경우
-	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
-		return Output(schema.AdditionalProperties.Schema, document, fieldPath, history)
-	}
-
-	// allOf 처리
-	for _, subSchema := range schema.AllOf {
-		if err := Output(&subSchema, document, fieldPath, history); err == nil {
-			return nil
-		}
-	}
-
 	return nil
+
 }
 
-func FieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, fieldPath []string, history map[string]bool) error {
+func FieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, history map[string]bool) error {
 	if schema == nil {
 		return fmt.Errorf("schema is nil")
 	}
@@ -198,19 +164,19 @@ func FieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, fieldPat
 	for key, prop := range resolvedSchema.Properties {
 		fieldDetail(key, resolvedSchema, level, document)
 		// recursive
-		FieldList(&prop, level+1, document, fieldPath, history)
+		FieldList(&prop, level+1, document, history)
 	}
 
 	for _, subSchema := range resolvedSchema.AllOf {
-		FieldList(&subSchema, level, document, fieldPath, history)
+		FieldList(&subSchema, level, document, history)
 	}
 
 	if resolvedSchema.Items != nil {
-		FieldList(resolvedSchema.Items.Schema, level, document, fieldPath, history)
+		FieldList(resolvedSchema.Items.Schema, level, document, history)
 	}
 
 	if resolvedSchema.AdditionalProperties != nil && resolvedSchema.AdditionalProperties.Allows {
-		FieldList(resolvedSchema.AdditionalProperties.Schema, level, document, fieldPath, history)
+		FieldList(resolvedSchema.AdditionalProperties.Schema, level, document, history)
 	}
 
 	return nil
