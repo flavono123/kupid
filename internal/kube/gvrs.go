@@ -2,26 +2,17 @@ package kube
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func GetGVKs() ([]schema.GroupVersionKind, error) {
 	var result []schema.GroupVersionKind
 
-	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
+	discoveryClient, err := DiscoveryClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %v", err)
+		return nil, fmt.Errorf("failed to get discovery client: %v", err)
 	}
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %v", err)
-	}
-	discoveryClient := client.Discovery()
 
 	apiResourceList, err := discoveryClient.ServerPreferredResources()
 	if err != nil {

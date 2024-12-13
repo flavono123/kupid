@@ -45,12 +45,12 @@ func NewSchemaModel() *schemaModel {
 		Version: "v1",
 		Kind:    "Pod",
 	}
-
 	gvr := schema.GroupVersionResource{
 		Group:    gvk.Group,
 		Version:  gvk.Version,
 		Resource: "pods",
 	}
+
 	document, err := kubev2.GetDocument(gvr)
 	if err != nil {
 		log.Fatalf("failed to get document: %v", err)

@@ -3,30 +3,24 @@ package v2
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/flavono123/kupid/internal/kube"
 
 	"github.com/go-openapi/jsonreference"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func GetDocument(gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
 	var result *spec3.OpenAPI
-	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
+
+	discoveryClient, err := kube.DiscoveryClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %v", err)
+		return nil, fmt.Errorf("failed to get discovery client: %v", err)
 	}
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %v", err)
-	}
-	discoveryClient := client.Discovery()
 
 	openapiv3 := discoveryClient.OpenAPIV3()
 
