@@ -39,32 +39,12 @@ func GetDocument(gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
 	return result, nil
 }
 
-func GetPathPrefix(gvr schema.GroupVersionResource) string {
+func getPathPrefix(gvr schema.GroupVersionResource) string {
 	if gvr.Group != "" {
 		return "/apis/" + gvr.Group
 	}
 
 	return "/api"
-}
-
-func getDocumentPath(gvr schema.GroupVersionResource) string {
-	return strings.TrimPrefix(strings.Join([]string{GetPathPrefix(gvr), gvr.Version}, "/"), "/")
-}
-
-func GetClusterScopedPath(gvr schema.GroupVersionResource) string {
-	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, gvr.Resource}, "/")
-}
-
-func GetClusterScopedNamePath(gvr schema.GroupVersionResource) string {
-	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, gvr.Resource, "{name}"}, "/")
-}
-
-func GetNamespaceScopedPath(gvr schema.GroupVersionResource) string {
-	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, "namespaces", "{namespace}", gvr.Resource}, "/")
-}
-
-func GetNamespaceScopedNamePath(gvr schema.GroupVersionResource) string {
-	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, "namespaces", "{namespace}", gvr.Resource, "{name}"}, "/")
 }
 
 func FindGVK(document *spec3.OpenAPI, paths []string) *schema.GroupVersionKind {
@@ -116,8 +96,8 @@ func FindGVK(document *spec3.OpenAPI, paths []string) *schema.GroupVersionKind {
 	return nil
 }
 
-// FindSchemaByGVK searches for a schema with the given GVK in the OpenAPI document
-func FindSchemaByGVK(document *spec3.OpenAPI, gvk schema.GroupVersionKind) (*spec.Schema, error) {
+// FindSchema searches for a schema with the given GVK in the OpenAPI document
+func FindSchema(document *spec3.OpenAPI, gvk schema.GroupVersionKind) (*spec.Schema, error) {
 	// components/schemas에서 GVK에 해당하는 스키마 찾기
 	for _, schema := range document.Components.Schemas {
 		if matchXKubeGVK(schema.Extensions, gvk) {
@@ -156,7 +136,7 @@ func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
 	if err != nil {
 		return nil, err
 	}
-	schema, err := FindSchemaByGVK(document, gvk)
+	schema, err := FindSchema(document, gvk)
 	if err != nil {
 		return nil, err
 	}
@@ -346,3 +326,24 @@ func extractEnum(schema *spec.Schema) []string {
 
 	return result
 }
+
+func getDocumentPath(gvr schema.GroupVersionResource) string {
+	return strings.TrimPrefix(strings.Join([]string{getPathPrefix(gvr), gvr.Version}, "/"), "/")
+}
+
+// TODO: remove if not used
+// func GetClusterScopedPath(gvr schema.GroupVersionResource) string {
+// 	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, gvr.Resource}, "/")
+// }
+
+// func GetClusterScopedNamePath(gvr schema.GroupVersionResource) string {
+// 	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, gvr.Resource, "{name}"}, "/")
+// }
+
+// func GetNamespaceScopedPath(gvr schema.GroupVersionResource) string {
+// 	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, "namespaces", "{namespace}", gvr.Resource}, "/")
+// }
+
+// func GetNamespaceScopedNamePath(gvr schema.GroupVersionResource) string {
+// 	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, "namespaces", "{namespace}", gvr.Resource, "{name}"}, "/")
+// }
