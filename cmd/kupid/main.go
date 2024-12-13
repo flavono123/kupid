@@ -10,7 +10,7 @@ import (
 
 func main() {
 	program := tea.NewProgram(
-		ui.NewSchemaModel(),
+		ui.InitModel(),
 		tea.WithAltScreen(),
 	)
 	if _, err := program.Run(); err != nil {

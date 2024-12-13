@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"log"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/sahilm/fuzzy"
@@ -47,20 +47,27 @@ type searchResults []searchResult
 
 type kbarItems []kbarItem
 
-func (i kbarItem) String() string {
-	s := fmt.Sprintf("%s %s %s", i.Group, i.Kind, i.Version)
-	if len(s) > KBAR_WIDTH {
-		return s[:KBAR_WIDTH-3] + "..."
-	}
-	return s
+func (i kbarItem) Render() string {
+	l := lipgloss.NewStyle().
+		MaxWidth(KBAR_WIDTH).
+		Padding(0, 0, 0, 1)
+	g := lipgloss.NewStyle().Foreground(theme.Subtext1)
+	s := lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		i.Kind,
+		" ",
+		g.Render(i.Group),
+	)
+
+	return l.Render(s)
 }
 
 func (sr searchResult) Render() string {
 	style := lipgloss.NewStyle()
 	if sr.Hovered {
-		style = style.Background(lipgloss.Color("236"))
+		style = style.Background(theme.Overlay0)
 	}
-	return style.Render(sr.Item.String())
+	return style.Render(sr.Item.Render())
 }
 
 func (sr searchResults) String() string {
@@ -130,8 +137,7 @@ func NewKbarModel() *kbarModel {
 	ti.Cursor.Blink = true
 	m := &kbarModel{
 		style: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			Padding(1, 0).
+			Border(lipgloss.ThickBorder()).
 			Width(KBAR_WIDTH),
 		items:      items,
 		input:      ti,
@@ -158,7 +164,6 @@ func (m *kbarModel) View() string {
 		lipgloss.JoinVertical(lipgloss.Left,
 			inputStyle.Render(m.input.View()),
 			m.srViewport.View(),
-			fmt.Sprintf("cursor: %d, results: %d", m.cursor, len(m.searchResults)),
 		),
 	)
 }

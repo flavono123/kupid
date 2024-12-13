@@ -1,7 +1,5 @@
 package kube
 
-import "fmt"
-
 type Field struct {
 	Name     string
 	Level    int // maybe not needed
@@ -13,10 +11,6 @@ type Field struct {
 
 	// render on ui
 	Expanded bool
-}
-
-func (f *Field) String() string {
-	return fmt.Sprintf("%s<%s>", f.Name, f.Type)
 }
 
 func (f *Field) Foldable() bool {
