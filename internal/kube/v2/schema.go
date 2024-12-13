@@ -114,7 +114,7 @@ func matchXKubeGVK(extension spec.Extensions, gvk schema.GroupVersionKind) bool 
 	return false
 }
 
-func CreateResourceFields(schema *spec.Schema, document *spec3.OpenAPI, history map[string]bool) (map[string]*Field, error) {
+func CreateFieldTree(schema *spec.Schema, document *spec3.OpenAPI, history map[string]bool) (map[string]*Field, error) {
 	if schema == nil {
 		return nil, fmt.Errorf("schema is nil")
 	}
@@ -221,21 +221,24 @@ func resolveRef(refString string, document *spec3.OpenAPI) *spec.Schema {
 }
 
 func createField(name string, schema *spec.Schema, level int, document *spec3.OpenAPI) *Field {
+	var result Field
 
-	result := &Field{
-		Name:  name,
-		Level: level,
-	}
+	result.Name = name
+	result.Level = level
 	fieldSchema := schema.Properties[name]
 	result.Type = typeGuess(&fieldSchema, document)
+	if result.Type == "Object" || strings.Contains(result.Type, "[]") || strings.Contains(result.Type, "map[string]") {
+		result.Foldable = true
+	}
 	for _, required := range schema.Required {
 		if required == name {
 			result.Required = true
 		}
 	}
+
 	result.Enum = extractEnum(&fieldSchema)
 
-	return result
+	return &result
 }
 
 func typeGuess(schema *spec.Schema, document *spec3.OpenAPI) string {
@@ -258,7 +261,7 @@ func typeGuess(schema *spec.Schema, document *spec3.OpenAPI) string {
 		if resolved := resolveRef(refString, document); resolved != nil {
 			// ref된 스키마가 primitive type이 아닌 경우에만 ref 이름 사용
 			if resolved.Type == nil || resolved.Type[0] == "object" {
-				// ref 문자열에서 마지막 컴포넌트만 추출 (예: io.k8s.api.core.v1.Pod -> Pod)
+				// ref 문자열에서 마지막 컴포넌트만 추출 (예: io.k8s.api.core.v1.PodTemplateSpec -> PodTemplateSpec)
 				parts := strings.Split(refString, "/")
 				name := parts[len(parts)-1]
 				nameParts := strings.Split(name, ".")

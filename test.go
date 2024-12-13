@@ -51,7 +51,7 @@ func main() {
 	}
 	// fmt.Println(schema.Description)
 	history := make(map[string]bool)
-	nodes, err := v2.CreateResourceFields(schema, document, history)
+	nodes, err := v2.CreateFieldTree(schema, document, history)
 	if err != nil {
 		panic(fmt.Errorf("failed to output schema: %v", err))
 	}
