@@ -7,13 +7,12 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/flavono123/kupid/internal/kube"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
-
-	kubev2 "github.com/flavono123/kupid/internal/kube/v2"
 )
 
 const (
@@ -27,12 +26,12 @@ const (
 )
 
 type schemaModel struct {
-	fields    map[string]*kubev2.Field
+	fields    map[string]*kube.Field
 	viewport  viewport.Model
 	style     lipgloss.Style
 	cursor    int
 	curLineNo int
-	curField  *kubev2.Field
+	curField  *kube.Field
 	curGVK    schema.GroupVersionKind
 
 	kbarModel *kbarModel
@@ -51,15 +50,15 @@ func NewSchemaModel() *schemaModel {
 		Resource: "pods",
 	}
 
-	document, err := kubev2.GetDocument(gvr)
+	document, err := kube.GetDocument(gvr)
 	if err != nil {
 		log.Fatalf("failed to get document: %v", err)
 	}
-	schema, err := kubev2.FindSchemaByGVK(document, gvk)
+	schema, err := kube.FindSchemaByGVK(document, gvk)
 	if err != nil {
 		log.Fatalf("failed to find schema: %v", err)
 	}
-	fields, err := kubev2.CreateFieldTree(schema, document, make(map[string]bool))
+	fields, err := kube.CreateFieldTree(schema, document, make(map[string]bool))
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
@@ -177,7 +176,7 @@ func (m *schemaModel) View() string {
 	)
 }
 
-func (m *schemaModel) renderRecursive(fields map[string]*kubev2.Field) string {
+func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 	var result strings.Builder
 	keys := []string{}
 	for key := range fields {

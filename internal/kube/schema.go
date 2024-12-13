@@ -1,11 +1,9 @@
-package v2
+package kube
 
 import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/flavono123/kupid/internal/kube"
 
 	"github.com/go-openapi/jsonreference"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,7 +15,7 @@ import (
 func GetDocument(gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
 	var result *spec3.OpenAPI
 
-	discoveryClient, err := kube.DiscoveryClient()
+	discoveryClient, err := DiscoveryClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery client: %v", err)
 	}
