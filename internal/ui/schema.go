@@ -44,21 +44,8 @@ func NewSchemaModel() *schemaModel {
 		Version: "v1",
 		Kind:    "Pod",
 	}
-	gvr := schema.GroupVersionResource{
-		Group:    gvk.Group,
-		Version:  gvk.Version,
-		Resource: "pods",
-	}
 
-	document, err := kube.GetDocument(gvr)
-	if err != nil {
-		log.Fatalf("failed to get document: %v", err)
-	}
-	schema, err := kube.FindSchemaByGVK(document, gvk)
-	if err != nil {
-		log.Fatalf("failed to find schema: %v", err)
-	}
-	fields, err := kube.CreateFieldTree(schema, document, make(map[string]bool))
+	fields, err := kube.CreateFieldTree(gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
@@ -143,8 +130,11 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
-		// var err error
-		// TODO: update fields
+		var err error
+		m.fields, err = kube.CreateFieldTree(msg.gvk)
+		if err != nil {
+			log.Fatalf("failed to create field tree: %v", err)
+		}
 
 		m.cursor = 0
 		m.kbarModel.Reset()

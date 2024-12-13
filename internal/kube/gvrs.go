@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/restmapper"
 )
 
 func GetGVKs() ([]schema.GroupVersionKind, error) {
@@ -30,4 +31,23 @@ func GetGVKs() ([]schema.GroupVersionKind, error) {
 		}
 	}
 	return result, nil
+}
+
+func GetGVR(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+	discoveryClient, err := DiscoveryClient()
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+	groupResources, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+
+	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+
+	return mapping.Resource, nil
 }

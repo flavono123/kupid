@@ -147,21 +147,31 @@ func matchXKubeGVK(extension spec.Extensions, gvk schema.GroupVersionKind) bool 
 	return false
 }
 
-func CreateFieldTree(schema *spec.Schema, document *spec3.OpenAPI, history map[string]bool) (map[string]*Field, error) {
-	if schema == nil {
-		return nil, fmt.Errorf("schema is nil")
+func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
+	gvr, err := GetGVR(gvk)
+	if err != nil {
+		return nil, err
 	}
+	document, err := GetDocument(gvr)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := FindSchemaByGVK(document, gvk)
+	if err != nil {
+		return nil, err
+	}
+	history := make(map[string]bool)
 
 	// 참조 문자열 가져오기
 	refString := schema.Ref.String()
 
 	// 순환 참조 감지
-	if refString != "" {
-		if history[refString] {
-			return nil, nil
-		}
-		history[refString] = true
-	}
+	// if refString != "" {
+	// 	if history[refString] {
+	// 		return nil, nil
+	// 	}
+	// 	history[refString] = true
+	// }
 
 	// 스키마 해석 (참조인 경우 참조를 따라감
 	if resolved := resolveRef(refString, document); resolved != nil {
