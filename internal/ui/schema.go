@@ -138,22 +138,6 @@ func (m *schemaModel) ToggleFolder() {
 func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if key.Matches(msg, m.keys.quit) {
-			return m, tea.Quit
-		}
-
-		if m.showKbar {
-			var cmd tea.Cmd
-			var model tea.Model
-			model, cmd = m.kbarModel.Update(msg)
-			m.kbarModel = model.(*kbarModel)
-			switch {
-			case key.Matches(msg, m.keys.hideKbar):
-				m.showKbar = false
-			}
-			return m, cmd
-		}
-
 		switch {
 		case key.Matches(msg, m.keys.up):
 			if m.cursor > CURSOR_TOP {
@@ -176,7 +160,22 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.kbarModel.input.Focus(),
 				textinput.Blink, // FIXME: not blinking
 			)
+		case key.Matches(msg, m.keys.quit):
+			return m, tea.Quit
 		}
+
+		if m.showKbar {
+			var cmd tea.Cmd
+			var model tea.Model
+			model, cmd = m.kbarModel.Update(msg)
+			m.kbarModel = model.(*kbarModel)
+			switch {
+			case key.Matches(msg, m.keys.hideKbar):
+				m.showKbar = false
+			}
+			return m, cmd
+		}
+
 		return m, nil
 
 	case selectGVKMsg:
