@@ -237,11 +237,12 @@ func fieldDetail(name string, schema *spec.Schema, level int, document *spec3.Op
 	indentAmount := level * 2
 	indent := strings.Repeat(" ", indentAmount)
 
+	fieldSchema := schema.Properties[name]
 	// 필드 이름, 타입, required 여부 출력
 	fmt.Printf("%s%s\t<%s>",
 		indent,
 		name,
-		typeGuess(schema, document))
+		typeGuess(&fieldSchema, document))
 
 	for _, required := range schema.Required {
 		if required == name {
@@ -256,7 +257,6 @@ func typeGuess(schema *spec.Schema, document *spec3.OpenAPI) string {
 	if schema == nil {
 		return "Object"
 	}
-
 	// Array 타입
 	if schema.Items != nil && schema.Items.Schema != nil {
 		return "[]" + typeGuess(schema.Items.Schema, document)
