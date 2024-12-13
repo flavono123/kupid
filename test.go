@@ -28,7 +28,8 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("failed to get openapi paths: %v", err))
 	}
-	schemabytes, err := paths["api/v1"].Schema(runtime.ContentTypeJSON)
+	gvPath := "apis/karpenter.sh/v1"
+	schemabytes, err := paths[gvPath].Schema(runtime.ContentTypeJSON)
 	if err != nil {
 		panic(fmt.Errorf("failed to get openapi schema: %v", err))
 	}
@@ -39,11 +40,12 @@ func main() {
 	// podSchema := schema.Components.Schemas["io.k8s.api.core.v1.Pod"]
 
 	// FindGVK
-	path := "/api/v1/nodes"
-	gvk := v2.FindGVK(document, []string{path})
+	resource := "nodepools"
+	resourcePath := fmt.Sprintf("/%s/%s", gvPath, resource)
+	gvk := v2.FindGVK(document, []string{resourcePath})
 	fmt.Println(gvk)
 
-	schema, err := v2.FindSchemaByGVK(document, *gvk, []string{path}, false)
+	schema, err := v2.FindSchemaByGVK(document, *gvk, []string{resourcePath}, false)
 	if err != nil {
 		panic(fmt.Errorf("failed to find schema: %v", err))
 	}

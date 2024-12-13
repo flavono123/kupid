@@ -195,7 +195,7 @@ func FieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, fieldPat
 	}
 
 	for key, prop := range schema.Properties {
-		fieldDetail(key, &prop, level, document)
+		fieldDetail(key, schema, level, document)
 		FieldList(&prop, level+1, document, fieldPath, history)
 	}
 
