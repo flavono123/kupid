@@ -250,7 +250,7 @@ func fieldDetail(name string, schema *spec.Schema, level int, document *spec3.Op
 		}
 	}
 
-	fmt.Println()
+	fmt.Println(extractEnum(&fieldSchema, indentAmount))
 }
 
 func typeGuess(schema *spec.Schema, document *spec3.OpenAPI) string {
@@ -297,4 +297,33 @@ func typeGuess(schema *spec.Schema, document *spec3.OpenAPI) string {
 	}
 
 	return "Object"
+}
+
+func extractEnum(schema *spec.Schema, indentAmount int) string {
+	if schema == nil || len(schema.Enum) == 0 {
+		return ""
+	}
+
+	var result strings.Builder
+
+	// 뷰 타입에 따라 다른 포맷 사용
+	result.WriteString("ENUM:")
+
+	// enum 값들 순회
+	for i, element := range schema.Enum {
+
+		// 긴 뷰에서는 각 항목을 새 줄에 출력
+		if i > 0 {
+			result.WriteString(", ")
+		}
+
+		// 빈 문자열은 "" 로 표시
+		if str, ok := element.(string); ok && str == "" {
+			result.WriteString(`""`)
+		} else {
+			result.WriteString(fmt.Sprintf("%v", element))
+		}
+	}
+
+	return result.String()
 }
