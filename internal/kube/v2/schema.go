@@ -114,9 +114,9 @@ func matchXKubeGVK(extension spec.Extensions, gvk schema.GroupVersionKind) bool 
 	return false
 }
 
-func Output(schema *spec.Schema, document *spec3.OpenAPI, history map[string]bool) error {
+func CreateResourceFields(schema *spec.Schema, document *spec3.OpenAPI, history map[string]bool) (map[string]*Field, error) {
 	if schema == nil {
-		return fmt.Errorf("schema is nil")
+		return nil, fmt.Errorf("schema is nil")
 	}
 
 	// 참조 문자열 가져오기
@@ -125,7 +125,7 @@ func Output(schema *spec.Schema, document *spec3.OpenAPI, history map[string]boo
 	// 순환 참조 감지
 	if refString != "" {
 		if history[refString] {
-			return nil // 순환 참조 발견, 처리 중단
+			return nil, nil
 		}
 		history[refString] = true
 	}
@@ -135,23 +135,26 @@ func Output(schema *spec.Schema, document *spec3.OpenAPI, history map[string]boo
 		schema = resolved
 	}
 
-	err := FieldList(schema, 0, document, history)
+	nodes, err := createFieldList(schema, 0, document, history)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
 
+	return nodes, nil
 }
 
-func FieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, history map[string]bool) error {
+func createFieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, history map[string]bool) (map[string]*Field, error) {
+	var result map[string]*Field
+	nodes := make(map[string]*Field)
+
 	if schema == nil {
-		return fmt.Errorf("schema is nil")
+		return nil, fmt.Errorf("schema is nil")
 	}
 
 	refString := schema.Ref.String()
 	if refString != "" {
 		if history[refString] {
-			return nil // 순환 참조 발견, 처리 중단
+			return nil, nil
 		}
 		history[refString] = true
 	}
@@ -162,24 +165,41 @@ func FieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, history 
 	}
 
 	for key, prop := range resolvedSchema.Properties {
-		fieldDetail(key, resolvedSchema, level, document)
-		// recursive
-		FieldList(&prop, level+1, document, history)
+		children, err := createFieldList(&prop, level+1, document, history)
+		if err != nil {
+			return nil, err
+		}
+		node := createField(key, resolvedSchema, level, document)
+		node.Children = children
+		nodes[key] = node
+
+		result = nodes
 	}
 
 	for _, subSchema := range resolvedSchema.AllOf {
-		FieldList(&subSchema, level, document, history)
+		nodes, err := createFieldList(&subSchema, level, document, history)
+		if err != nil {
+			return nil, err
+		}
+		result = nodes
 	}
 
 	if resolvedSchema.Items != nil {
-		FieldList(resolvedSchema.Items.Schema, level, document, history)
+		nodes, err := createFieldList(resolvedSchema.Items.Schema, level, document, history)
+		if err != nil {
+			return nil, err
+		}
+		result = nodes
 	}
-
 	if resolvedSchema.AdditionalProperties != nil && resolvedSchema.AdditionalProperties.Allows {
-		FieldList(resolvedSchema.AdditionalProperties.Schema, level, document, history)
+		nodes, err := createFieldList(resolvedSchema.AdditionalProperties.Schema, level, document, history)
+		if err != nil {
+			return nil, err
+		}
+		result = nodes
 	}
 
-	return nil
+	return result, nil
 }
 
 func resolveRef(refString string, document *spec3.OpenAPI) *spec.Schema {
@@ -196,27 +216,26 @@ func resolveRef(refString string, document *spec3.OpenAPI) *spec.Schema {
 	fragment := ref.GetURL().Fragment
 	components := strings.Split(fragment, "/")
 
+	// components e.g. #/components/schemas/io.k8s.api.core.v1.Pod -> io.k8s.api.core.v1.Pod
 	return document.Components.Schemas[components[3]]
 }
 
-func fieldDetail(name string, schema *spec.Schema, level int, document *spec3.OpenAPI) {
-	indentAmount := level * 2
-	indent := strings.Repeat(" ", indentAmount)
+func createField(name string, schema *spec.Schema, level int, document *spec3.OpenAPI) *Field {
 
+	result := &Field{
+		Name:  name,
+		Level: level,
+	}
 	fieldSchema := schema.Properties[name]
-	// 필드 이름, 타입, required 여부 출력
-	fmt.Printf("%s%s\t<%s>",
-		indent,
-		name,
-		typeGuess(&fieldSchema, document))
-
+	result.Type = typeGuess(&fieldSchema, document)
 	for _, required := range schema.Required {
 		if required == name {
-			fmt.Print(" -required-")
+			result.Required = true
 		}
 	}
+	result.Enum = extractEnum(&fieldSchema)
 
-	fmt.Println(extractEnum(&fieldSchema, indentAmount))
+	return result
 }
 
 func typeGuess(schema *spec.Schema, document *spec3.OpenAPI) string {
@@ -265,31 +284,22 @@ func typeGuess(schema *spec.Schema, document *spec3.OpenAPI) string {
 	return "Object"
 }
 
-func extractEnum(schema *spec.Schema, indentAmount int) string {
+func extractEnum(schema *spec.Schema) []string {
+	var result []string
+
 	if schema == nil || len(schema.Enum) == 0 {
-		return ""
+		return result
 	}
-
-	var result strings.Builder
-
-	// 뷰 타입에 따라 다른 포맷 사용
-	result.WriteString("ENUM:")
 
 	// enum 값들 순회
-	for i, element := range schema.Enum {
-
-		// 긴 뷰에서는 각 항목을 새 줄에 출력
-		if i > 0 {
-			result.WriteString(", ")
-		}
-
+	for _, element := range schema.Enum {
 		// 빈 문자열은 "" 로 표시
 		if str, ok := element.(string); ok && str == "" {
-			result.WriteString(`""`)
+			result = append(result, `""`)
 		} else {
-			result.WriteString(fmt.Sprintf("%v", element))
+			result = append(result, fmt.Sprintf("%v", element))
 		}
 	}
 
-	return result.String()
+	return result
 }

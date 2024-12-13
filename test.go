@@ -51,5 +51,13 @@ func main() {
 	}
 	// fmt.Println(schema.Description)
 	history := make(map[string]bool)
-	v2.Output(schema, document, history)
+	nodes, err := v2.CreateResourceFields(schema, document, history)
+	if err != nil {
+		panic(fmt.Errorf("failed to output schema: %v", err))
+	}
+
+	delete(nodes, "apiVersion")
+	delete(nodes, "kind")
+	delete(nodes, "metadata")
+	fmt.Println(nodes)
 }
