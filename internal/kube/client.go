@@ -17,6 +17,20 @@ var (
 	clientSetErr       error
 )
 
+func CurrentContext() (string, error) {
+
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	configOverrides := &clientcmd.ConfigOverrides{}
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+
+	rawConfig, err := kubeConfig.RawConfig()
+	if err != nil {
+		return "", err
+	}
+
+	return rawConfig.CurrentContext, nil
+}
+
 func DiscoveryClient() (discovery.DiscoveryInterface, error) {
 	clientSet, err := clientSet()
 	if err != nil {

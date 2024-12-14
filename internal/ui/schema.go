@@ -101,7 +101,7 @@ func InitModel() *schemaModel {
 
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("white"))
+		BorderForeground(theme.Overlay0)
 
 	vp := viewport.New(VIEWPORT_WIDTH, VIEWPORT_HEIGHT)
 	m := &schemaModel{
@@ -210,12 +210,12 @@ func (m *schemaModel) View() string {
 		)
 	}
 
-	topBarStyle := lipgloss.NewStyle().
-		Foreground(theme.Blue).
-		Padding(0, 0, 0, 1)
-
+	ctx, err := kube.CurrentContext()
+	if err != nil {
+		log.Fatalf("failed to get current context: %v", err)
+	}
 	return lipgloss.JoinVertical(lipgloss.Left,
-		topBarStyle.Render(m.curGVK.Kind),
+		ctx,
 		m.style.Render(m.viewport.View()),
 		m.help.View(m.keys),
 	)
