@@ -17,14 +17,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const (
-	SCHEMA_WIDTH         = 80
-	SCHEMA_HEIGHT        = 20
-	SCHEMA_CURSOR_TOP    = 0
-	SCHEMA_CURSOR_BOTTOM = SCHEMA_HEIGHT - 1
-	SCHEMA_SCROLL_STEP   = 1
-)
-
 type schemaModel struct {
 	fields    map[string]*kube.Field
 	viewport  viewport.Model

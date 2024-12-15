@@ -1,0 +1,9 @@
+package ui
+
+const (
+	SCHEMA_WIDTH         = 80
+	SCHEMA_HEIGHT        = 20
+	SCHEMA_CURSOR_TOP    = 0
+	SCHEMA_CURSOR_BOTTOM = SCHEMA_HEIGHT - 1
+	SCHEMA_SCROLL_STEP   = 1
+)
