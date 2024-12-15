@@ -32,11 +32,10 @@ func (k keyMap) FullHelp() [][]key.Binding {
 
 // schema
 type schemaKeyMap struct {
-	up         key.Binding
-	down       key.Binding
-	toggleReq  key.Binding
-	toggleFold key.Binding
-	quit       key.Binding
+	up     key.Binding
+	down   key.Binding
+	action key.Binding
+	quit   key.Binding
 }
 
 func newSchemaKeyMap() schemaKeyMap {
@@ -44,17 +43,16 @@ func newSchemaKeyMap() schemaKeyMap {
 		up:   key.NewBinding(key.WithKeys("up")),
 		down: key.NewBinding(key.WithKeys("down")),
 		quit: key.NewBinding(key.WithKeys("ctrl+c")),
-		toggleFold: key.NewBinding(
+		action: key.NewBinding(
 			key.WithKeys(" "),
-			key.WithHelp("space", "(un)fold"),
+			key.WithHelp("space", "fold/pick"),
 		),
 	}
 }
 
 func (k schemaKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.toggleReq,
-		k.toggleFold,
+		k.action,
 	}
 }
 

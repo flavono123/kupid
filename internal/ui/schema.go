@@ -79,7 +79,18 @@ func (m *schemaModel) ToggleFolder() {
 	}
 }
 
+type pickFieldMsg struct {
+	field kube.Field
+}
+
+type unpickFieldMsg struct {
+	field kube.Field
+}
+
 func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var retCmd tea.Cmd
+	retCmd = nil
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
@@ -95,14 +106,32 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.vp.LineDown(SCHEMA_SCROLL_STEP)
 			}
-		case key.Matches(msg, m.keys.toggleFold):
-			m.ToggleFolder()
+		case key.Matches(msg, m.keys.action):
+			if m.curField == nil {
+				break
+			}
+
+			if m.curField.Foldable() {
+				m.ToggleFolder()
+			} else { // selectable, for leaf fields
+				if m.curField.Selected {
+					m.curField.Selected = false
+					retCmd = func() tea.Msg {
+						return unpickFieldMsg{field: *m.curField}
+					}
+				} else {
+					m.curField.Selected = true
+					retCmd = func() tea.Msg {
+						return pickFieldMsg{field: *m.curField}
+					}
+				}
+			}
 		case key.Matches(msg, m.keys.quit):
 			return m, tea.Quit
 		}
 	}
 
-	return m, nil
+	return m, retCmd
 }
 
 func (m *schemaModel) View() string {
@@ -160,7 +189,7 @@ func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 				foldStr = "+"
 			}
 		} else { // selectable
-			if m.IsCursor() { // HACKtesting
+			if field.Selected {
 				foldStr = "◉"
 			} else {
 				foldStr = "○"

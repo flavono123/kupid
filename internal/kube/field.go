@@ -10,7 +10,9 @@ type Field struct {
 	Children map[string]*Field // optional
 
 	// render on ui
+	// TODO: wrap renderableField struct in ui package
 	Expanded bool
+	Selected bool
 }
 
 func (f *Field) Foldable() bool {

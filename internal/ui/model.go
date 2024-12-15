@@ -2,6 +2,7 @@ package ui
 
 import (
 	"log"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -14,15 +15,15 @@ import (
 )
 
 type mainModel struct {
-	keys      keyMap
-	vp        viewport.Model
-	schema    *schemaModel
-	table     table.Model
-	curGVK    schema.GroupVersionKind
-	informers map[schema.GroupVersionKind]*kube.Informer
-	stop      chan struct{}
-
-	kbar *kbarModel
+	keys           keyMap
+	vp             viewport.Model
+	schema         *schemaModel
+	table          table.Model
+	curGVK         schema.GroupVersionKind
+	informers      map[schema.GroupVersionKind]*kube.Informer
+	stop           chan struct{}
+	selectedFields []*kube.Field
+	kbar           *kbarModel
 }
 
 type resourceMsg struct {
@@ -99,14 +100,15 @@ func InitMainModel() *mainModel {
 	)
 
 	return &mainModel{
-		keys:      newKeyMap(),
-		vp:        viewport.New(WIDTH, HEIGHT),
-		schema:    InitModel(initGvk),
-		curGVK:    initGvk,
-		table:     tm,
-		informers: informers,
-		stop:      nil,
-		kbar:      NewKbarModel(),
+		keys:           newKeyMap(),
+		vp:             viewport.New(WIDTH, HEIGHT),
+		schema:         InitModel(initGvk),
+		curGVK:         initGvk,
+		table:          tm,
+		informers:      informers,
+		stop:           nil,
+		selectedFields: []*kube.Field{},
+		kbar:           NewKbarModel(),
 	}
 }
 
@@ -138,9 +140,27 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.kbar.visible = false
 		// TODO: spinner status bar for long inform operation
 		return m, m.inform(msg.gvk)
+	case pickFieldMsg:
+		m.selectedFields = append(m.selectedFields, &msg.field)
+	case unpickFieldMsg:
+		for idx, field := range m.selectedFields {
+			if field.Name == msg.field.Name { // HACK: maybe uuid needed?
+				m.selectedFields = append(m.selectedFields[:idx], m.selectedFields[idx+1:]...)
+				break
+			}
+		}
 	}
 
 	return m, tea.Batch(sCmd, kCmd)
+}
+
+// HACK: tmp
+func (m *mainModel) renderSelectedFields() string {
+	selectedFields := []string{}
+	for _, field := range m.selectedFields {
+		selectedFields = append(selectedFields, field.Name)
+	}
+	return strings.Join(selectedFields, ", ")
 }
 
 func (m *mainModel) View() string {
@@ -165,5 +185,6 @@ func (m *mainModel) View() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.vp.View(),
+		m.renderSelectedFields(),
 	)
 }
