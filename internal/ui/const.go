@@ -1,7 +1,12 @@
 package ui
 
 const (
-	SCHEMA_WIDTH         = 80
+	UPPER_20 = 0.8
+
+	WIDTH  = 80
+	HEIGHT = 45
+
+	SCHEMA_WIDTH         = WIDTH
 	SCHEMA_HEIGHT        = 20
 	SCHEMA_CURSOR_TOP    = 0
 	SCHEMA_CURSOR_BOTTOM = SCHEMA_HEIGHT - 1

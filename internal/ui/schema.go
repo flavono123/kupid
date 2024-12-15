@@ -18,8 +18,11 @@ import (
 )
 
 type schemaModel struct {
-	fields    map[string]*kube.Field
-	viewport  viewport.Model
+	fields map[string]*kube.Field
+	vp     viewport.Model
+	width  int
+	height int
+
 	style     lipgloss.Style
 	cursor    int
 	curLineNo int
@@ -40,15 +43,20 @@ func InitModel(gvk schema.GroupVersionKind) *schemaModel {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.Overlay0)
 
-	vp := viewport.New(SCHEMA_WIDTH, SCHEMA_HEIGHT)
+	hMargin, vMargin := style.GetFrameSize()
+	width := SCHEMA_WIDTH - hMargin
+	height := SCHEMA_HEIGHT - vMargin
+	vp := viewport.New(width, height)
 	m := &schemaModel{
-		fields:   fields,
-		viewport: vp,
-		style:    style,
-		cursor:   0,
-		curGVK:   gvk,
-		keys:     newSchemaKeyMap(),
-		help:     help.New(),
+		fields: fields,
+		vp:     vp,
+		width:  width,
+		height: height,
+		style:  style,
+		cursor: 0,
+		curGVK: gvk,
+		keys:   newSchemaKeyMap(),
+		help:   help.New(),
 	}
 	content := m.renderRecursive(m.fields)
 	content = strings.TrimSuffix(content, "\n")
@@ -62,7 +70,7 @@ func (m *schemaModel) Init() tea.Cmd {
 }
 
 func (m *schemaModel) IsCursor() bool {
-	return m.curLineNo-m.viewport.YOffset == m.cursor
+	return m.curLineNo-m.vp.YOffset == m.cursor
 }
 
 func (m *schemaModel) ToggleFolder() {
@@ -79,13 +87,13 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > SCHEMA_CURSOR_TOP {
 				m.cursor--
 			} else {
-				m.viewport.LineUp(SCHEMA_SCROLL_STEP)
+				m.vp.LineUp(SCHEMA_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.down):
 			if m.cursor < min(SCHEMA_CURSOR_BOTTOM, m.curLineNo-1) {
 				m.cursor++
 			} else {
-				m.viewport.LineDown(SCHEMA_SCROLL_STEP)
+				m.vp.LineDown(SCHEMA_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.toggleFold):
 			m.ToggleFolder()
@@ -101,7 +109,7 @@ func (m *schemaModel) View() string {
 	m.curLineNo = 0 // to avoid accumulating line number infinitely
 	content := m.renderRecursive(m.fields)
 	content = strings.TrimSuffix(content, "\n")
-	m.viewport.SetContent(content)
+	m.vp.SetContent(content)
 
 	ctx, err := kube.CurrentContext()
 	if err != nil {
@@ -109,7 +117,7 @@ func (m *schemaModel) View() string {
 	}
 	return lipgloss.JoinVertical(lipgloss.Left,
 		ctx,
-		m.style.Render(m.viewport.View()),
+		m.style.Render(m.vp.View()),
 		m.help.View(m.keys),
 	)
 }
@@ -148,7 +156,7 @@ func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 		} else {
 			foldStr = " "
 		}
-		line := lipgloss.NewStyle().MaxWidth(SCHEMA_WIDTH)
+		line := lipgloss.NewStyle().MaxWidth(m.width)
 
 		result.WriteString(line.Render(lipgloss.JoinHorizontal(
 			lipgloss.Left,

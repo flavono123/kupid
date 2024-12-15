@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
@@ -14,6 +15,7 @@ import (
 
 type mainModel struct {
 	keys      keyMap
+	vp        viewport.Model
 	schema    *schemaModel
 	table     table.Model
 	curGVK    schema.GroupVersionKind
@@ -98,6 +100,7 @@ func InitMainModel() *mainModel {
 
 	return &mainModel{
 		keys:      newKeyMap(),
+		vp:        viewport.New(WIDTH, HEIGHT),
 		schema:    InitModel(initGvk),
 		curGVK:    initGvk,
 		table:     tm,
@@ -141,12 +144,19 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *mainModel) View() string {
+	mainContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.schema.View(),
+		m.table.View(),
+	)
+	m.vp.SetContent(mainContent)
+
 	if m.kbar.visible {
 		return lipgloss.Place(
-			SCHEMA_WIDTH,
-			SCHEMA_HEIGHT,
+			WIDTH,
+			HEIGHT,
 			lipgloss.Center,
-			lipgloss.Center,
+			UPPER_20,
 			m.kbar.View(),
 			lipgloss.WithWhitespaceBackground(theme.Mantle),
 		)
@@ -154,7 +164,6 @@ func (m *mainModel) View() string {
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		m.schema.View(),
-		m.table.View(),
+		m.vp.View(),
 	)
 }
