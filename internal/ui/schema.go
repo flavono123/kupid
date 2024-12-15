@@ -115,8 +115,14 @@ func (m *schemaModel) View() string {
 	if err != nil {
 		log.Fatalf("failed to get current context: %v", err)
 	}
-	return lipgloss.JoinVertical(lipgloss.Left,
+	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.curGVK.Kind)
+	topbar := lipgloss.JoinHorizontal(lipgloss.Left,
 		ctx,
+		" ",
+		kind,
+	)
+	return lipgloss.JoinVertical(lipgloss.Left,
+		topbar,
 		m.style.Render(m.vp.View()),
 		m.help.View(m.keys),
 	)
