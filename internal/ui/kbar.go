@@ -200,7 +200,6 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.SetSearchResults(filtered)
 		case "enter":
-			// filtered[m.cursor].Selected = true
 			return m, func() tea.Msg {
 				actualIndex := m.cursor + m.srViewport.YOffset
 				return selectGVKMsg{gvk: filtered[actualIndex].GroupVersionKind}

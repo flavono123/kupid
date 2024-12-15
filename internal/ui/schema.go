@@ -68,7 +68,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	}
 }
 
-func InitModel() *schemaModel {
+func InitModel(gvk schema.GroupVersionKind) *schemaModel {
 	keys := keyMap{
 		up:       key.NewBinding(key.WithKeys("up")),
 		down:     key.NewBinding(key.WithKeys("down")),
@@ -78,20 +78,10 @@ func InitModel() *schemaModel {
 			key.WithKeys("alt+k"),
 			key.WithHelp("alt+k", "kinds"),
 		),
-		toggleReq: key.NewBinding( // TODO: implement
-			key.WithKeys("ctrl+r"),
-			key.WithHelp("ctrl+r", "required only"),
-		),
 		toggleFold: key.NewBinding(
 			key.WithKeys(" "),
 			key.WithHelp("space", "(un)fold"),
 		),
-	}
-
-	gvk := schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Pod",
 	}
 
 	fields, err := kube.CreateFieldTree(gvk)
@@ -189,6 +179,10 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.kbarModel.Reset()
 		m.showKbar = false
+
+		return m, func() tea.Msg {
+			return selectGVKMsg{gvk: msg.gvk}
+		}
 	}
 	return m, nil
 }
