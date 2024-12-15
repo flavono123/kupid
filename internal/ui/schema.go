@@ -19,10 +19,8 @@ import (
 )
 
 const (
-	START_INDENT    = 0
 	VIEWPORT_WIDTH  = 80
 	VIEWPORT_HEIGHT = 20
-	LINE_ELLIPSIS   = "..."
 	CURSOR_TOP      = 0
 	CURSOR_BOTTOM   = VIEWPORT_HEIGHT - 1
 	SCROLL_STEP     = 1
