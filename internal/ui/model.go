@@ -31,6 +31,16 @@ func toRows(objs []*unstructured.Unstructured) []table.Row {
 	return rows
 }
 
+func maxColumnWidth(rows []table.Row, col int) int {
+	max := 0
+	for _, row := range rows {
+		if len(row[col]) > max {
+			max = len(row[col])
+		}
+	}
+	return max
+}
+
 func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
 	if m.informers[gvk] == nil {
 		gvr, err := kube.GetGVR(gvk)
@@ -71,7 +81,10 @@ func InitMainModel() *mainModel {
 	}
 	informers := map[schema.GroupVersionKind]*kube.Informer{initGvk: kube.NewInformer(gvr)}
 	initColumns := []table.Column{
-		{Title: "Name", Width: 30},
+		{
+			Title: "Name",
+			Width: maxColumnWidth(initRows, 0),
+		},
 	}
 	tm := table.New(
 		table.WithColumns(initColumns),
@@ -98,6 +111,14 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case resourceMsg:
+		m.table.SetColumns(
+			[]table.Column{
+				{
+					Title: "Name",
+					Width: maxColumnWidth(msg.rows, 0),
+				},
+			},
+		)
 		m.table.SetRows(msg.rows)
 		return m, nil
 	case selectGVKMsg:
@@ -109,7 +130,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *mainModel) View() string {
-	return lipgloss.JoinHorizontal(
+	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.schema.View(),
 		m.table.View(),
