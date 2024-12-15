@@ -17,6 +17,7 @@ import (
 type Informer struct {
 	client dynamic.Interface
 	gvr    schema.GroupVersionResource
+	objs   []*unstructured.Unstructured
 }
 
 func NewInformer(gvr schema.GroupVersionResource) *Informer {
@@ -30,13 +31,11 @@ func NewInformer(gvr schema.GroupVersionResource) *Informer {
 	}
 }
 
-type ResourceEventHandler interface {
-	Add(obj interface{})
-	Update(oldObj, newObj interface{})
-	Delete(obj interface{})
+func (i *Informer) GetObjects() []*unstructured.Unstructured {
+	return i.objs
 }
 
-func (i *Informer) Inform(handler ResourceEventHandler) (chan struct{}, error) {
+func (i *Informer) Inform() (chan struct{}, error) {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return i.client.Resource(i.gvr).Namespace("").List(context.Background(), options)
@@ -50,9 +49,29 @@ func (i *Informer) Inform(handler ResourceEventHandler) (chan struct{}, error) {
 		ListerWatcher: lw,
 		ObjectType:    &unstructured.Unstructured{},
 		Handler: cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { handler.Add(obj) },
-			UpdateFunc: func(oldObj, newObj interface{}) { handler.Update(oldObj, newObj) },
-			DeleteFunc: func(obj interface{}) { handler.Delete(obj) },
+			AddFunc: func(obj interface{}) {
+				i.objs = append(i.objs, obj.(*unstructured.Unstructured))
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				o := oldObj.(*unstructured.Unstructured)
+				n := newObj.(*unstructured.Unstructured)
+
+				for idx, obj := range i.objs {
+					if obj.GetName() == o.GetName() {
+						i.objs[idx] = n
+						break
+					}
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				u := obj.(*unstructured.Unstructured)
+				for idx, obj := range i.objs {
+					if obj.GetName() == u.GetName() {
+						i.objs = append(i.objs[:idx], i.objs[idx+1:]...)
+						break
+					}
+				}
+			},
 		},
 	}
 	_, controller := cache.NewInformerWithOptions(

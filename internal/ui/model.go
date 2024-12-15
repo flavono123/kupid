@@ -16,49 +16,16 @@ type mainModel struct {
 	table     table.Model
 	curGVK    schema.GroupVersionKind
 	informers map[schema.GroupVersionKind]*kube.Informer
-	handler   *resourceHandler
 	stop      chan struct{}
-}
-
-type resourceHandler struct {
-	objs []*unstructured.Unstructured // TODO: move to informer's field
 }
 
 type resourceMsg struct {
 	rows []table.Row
 }
 
-func (h *resourceHandler) Add(obj interface{}) {
-	u := obj.(*unstructured.Unstructured)
-	h.objs = append(h.objs, u)
-}
-
-func (h *resourceHandler) Update(oldObj, newObj interface{}) {
-	o := oldObj.(*unstructured.Unstructured)
-	n := newObj.(*unstructured.Unstructured)
-
-	for i, obj := range h.objs {
-		if obj.GetName() == o.GetName() {
-			h.objs[i] = n
-			break
-		}
-	}
-
-}
-
-func (h *resourceHandler) Delete(obj interface{}) {
-	u := obj.(*unstructured.Unstructured)
-	for i, obj := range h.objs {
-		if obj.GetName() == u.GetName() {
-			h.objs = append(h.objs[:i], h.objs[i+1:]...)
-			break
-		}
-	}
-}
-
-func (h *resourceHandler) toRows() []table.Row {
+func toRows(objs []*unstructured.Unstructured) []table.Row {
 	rows := []table.Row{}
-	for _, obj := range h.objs {
+	for _, obj := range objs {
 		rows = append(rows, table.Row{obj.GetName()})
 	}
 	return rows
@@ -68,7 +35,7 @@ func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
 	if m.informers[gvk] == nil {
 		gvr, err := kube.GetGVR(gvk)
 		if err != nil {
-			return nil
+			return nil // HACK: to be treated
 		}
 		m.informers[gvk] = kube.NewInformer(gvr)
 	}
@@ -80,15 +47,14 @@ func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 		close(m.stop)
 	}
 
-	m.handler.objs = []*unstructured.Unstructured{}
-	stop, err := m.getInformer(gvk).Inform(m.handler)
+	stop, err := m.getInformer(gvk).Inform()
 	if err != nil {
 		return nil
 	}
 	m.stop = stop
 
 	return func() tea.Msg {
-		return resourceMsg{rows: m.handler.toRows()}
+		return resourceMsg{rows: toRows(m.getInformer(gvk).GetObjects())}
 	}
 }
 
@@ -112,16 +78,12 @@ func InitMainModel() *mainModel {
 		table.WithRows(initRows),
 		table.WithFocused(false),
 	)
-	handler := &resourceHandler{
-		objs: []*unstructured.Unstructured{},
-	}
 
 	return &mainModel{
 		schema:    InitModel(initGvk),
 		curGVK:    initGvk,
 		table:     tm,
 		informers: informers,
-		handler:   handler,
 		stop:      nil,
 	}
 }
