@@ -38,38 +38,7 @@ type schemaModel struct {
 	help help.Model
 }
 
-type schemaKeyMap struct {
-	up         key.Binding
-	down       key.Binding
-	toggleReq  key.Binding
-	toggleFold key.Binding
-	quit       key.Binding
-}
-
-func (k schemaKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{
-		k.toggleReq,
-		k.toggleFold,
-	}
-}
-
-func (k schemaKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{},
-	}
-}
-
 func InitModel(gvk schema.GroupVersionKind) *schemaModel {
-	keys := schemaKeyMap{
-		up:   key.NewBinding(key.WithKeys("up")),
-		down: key.NewBinding(key.WithKeys("down")),
-		quit: key.NewBinding(key.WithKeys("ctrl+c")),
-		toggleFold: key.NewBinding(
-			key.WithKeys(" "),
-			key.WithHelp("space", "(un)fold"),
-		),
-	}
-
 	fields, err := kube.CreateFieldTree(gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
@@ -86,7 +55,7 @@ func InitModel(gvk schema.GroupVersionKind) *schemaModel {
 		style:    style,
 		cursor:   0,
 		curGVK:   gvk,
-		keys:     keys,
+		keys:     newSchemaKeyMap(),
 		help:     help.New(),
 	}
 	content := m.renderRecursive(m.fields)

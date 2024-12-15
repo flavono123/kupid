@@ -14,23 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type keyMap struct {
-	hideKbar key.Binding
-	showKbar key.Binding
-}
-
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{
-		k.showKbar,
-	}
-}
-
-func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{},
-	}
-}
-
 type mainModel struct {
 	keys      keyMap
 	schema    *schemaModel
@@ -93,14 +76,6 @@ func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 }
 
 func InitMainModel() *mainModel {
-	keys := keyMap{
-		hideKbar: key.NewBinding(key.WithKeys("esc", "alt+k")),
-		showKbar: key.NewBinding(
-			key.WithKeys("alt+k"),
-			key.WithHelp("alt(opt)+k", "kinds"),
-		),
-	}
-
 	initGvk := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
@@ -125,7 +100,7 @@ func InitMainModel() *mainModel {
 	)
 
 	return &mainModel{
-		keys:      keys,
+		keys:      newKeyMap(),
 		schema:    InitModel(initGvk),
 		curGVK:    initGvk,
 		table:     tm,
