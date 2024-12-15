@@ -19,11 +19,11 @@ import (
 )
 
 const (
-	VIEWPORT_WIDTH  = 80
-	VIEWPORT_HEIGHT = 20
-	CURSOR_TOP      = 0
-	CURSOR_BOTTOM   = VIEWPORT_HEIGHT - 1
-	SCROLL_STEP     = 1
+	SCHEMA_WIDTH         = 80
+	SCHEMA_HEIGHT        = 20
+	SCHEMA_CURSOR_TOP    = 0
+	SCHEMA_CURSOR_BOTTOM = SCHEMA_HEIGHT - 1
+	SCHEMA_SCROLL_STEP   = 1
 )
 
 type schemaModel struct {
@@ -35,14 +35,14 @@ type schemaModel struct {
 	curField  *kube.Field
 	curGVK    schema.GroupVersionKind
 
-	keys keyMap
+	keys schemaKeyMap
 	help help.Model
 
 	kbarModel *kbarModel
 	showKbar  bool
 }
 
-type keyMap struct {
+type schemaKeyMap struct {
 	up         key.Binding
 	down       key.Binding
 	hideKbar   key.Binding
@@ -52,7 +52,7 @@ type keyMap struct {
 	quit       key.Binding
 }
 
-func (k keyMap) ShortHelp() []key.Binding {
+func (k schemaKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.showKbar,
 		k.toggleReq,
@@ -60,14 +60,14 @@ func (k keyMap) ShortHelp() []key.Binding {
 	}
 }
 
-func (k keyMap) FullHelp() [][]key.Binding {
+func (k schemaKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{},
 	}
 }
 
 func InitModel(gvk schema.GroupVersionKind) *schemaModel {
-	keys := keyMap{
+	keys := schemaKeyMap{
 		up:       key.NewBinding(key.WithKeys("up")),
 		down:     key.NewBinding(key.WithKeys("down")),
 		hideKbar: key.NewBinding(key.WithKeys("esc", "alt+k")),
@@ -91,7 +91,7 @@ func InitModel(gvk schema.GroupVersionKind) *schemaModel {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.Overlay0)
 
-	vp := viewport.New(VIEWPORT_WIDTH, VIEWPORT_HEIGHT)
+	vp := viewport.New(SCHEMA_WIDTH, SCHEMA_HEIGHT)
 	m := &schemaModel{
 		fields:    fields,
 		viewport:  vp,
@@ -128,13 +128,13 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.up):
-			if m.cursor > CURSOR_TOP {
+			if m.cursor > SCHEMA_CURSOR_TOP {
 				m.cursor--
 			} else {
 				m.viewport.LineUp(SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.down):
-			if m.cursor < min(CURSOR_BOTTOM, m.curLineNo-1) {
+			if m.cursor < min(SCHEMA_CURSOR_BOTTOM, m.curLineNo-1) {
 				m.cursor++
 			} else {
 				m.viewport.LineDown(SCROLL_STEP)
@@ -193,8 +193,8 @@ func (m *schemaModel) View() string {
 
 	if m.showKbar {
 		return lipgloss.Place(
-			VIEWPORT_WIDTH,
-			VIEWPORT_HEIGHT,
+			SCHEMA_WIDTH,
+			SCHEMA_HEIGHT,
 			lipgloss.Center,
 			lipgloss.Center,
 			m.kbarModel.View(),
@@ -247,7 +247,7 @@ func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 		} else {
 			foldStr = " "
 		}
-		line := lipgloss.NewStyle().MaxWidth(VIEWPORT_WIDTH)
+		line := lipgloss.NewStyle().MaxWidth(SCHEMA_WIDTH)
 
 		result.WriteString(line.Render(lipgloss.JoinHorizontal(
 			lipgloss.Left,
