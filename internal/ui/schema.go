@@ -159,8 +159,12 @@ func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 			} else {
 				foldStr = "+"
 			}
-		} else {
-			foldStr = " "
+		} else { // selectable
+			if m.IsCursor() { // HACKtesting
+				foldStr = "◉"
+			} else {
+				foldStr = "○"
+			}
 		}
 		line := lipgloss.NewStyle().MaxWidth(m.width)
 
