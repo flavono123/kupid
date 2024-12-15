@@ -3,9 +3,7 @@ package ui
 import (
 	"log"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
@@ -22,8 +20,7 @@ type mainModel struct {
 	informers map[schema.GroupVersionKind]*kube.Informer
 	stop      chan struct{}
 
-	kbar     *kbarModel
-	showKbar bool
+	kbar *kbarModel
 }
 
 type resourceMsg struct {
@@ -107,7 +104,6 @@ func InitMainModel() *mainModel {
 		informers: informers,
 		stop:      nil,
 		kbar:      NewKbarModel(),
-		showKbar:  false,
 	}
 }
 
@@ -116,34 +112,12 @@ func (m *mainModel) Init() tea.Cmd {
 }
 
 func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	sm, cmd := m.schema.Update(msg)
+	sm, sCmd := m.schema.Update(msg)
 	m.schema = sm.(*schemaModel)
+	km, kCmd := m.kbar.Update(msg)
+	m.kbar = km.(*kbarModel)
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, m.keys.hideKbar):
-			m.showKbar = !m.showKbar
-			m.kbar.Reset()
-			return m, tea.Batch(
-				m.kbar.input.Focus(),
-				textinput.Blink, // FIXME: not blinking
-			)
-		}
-
-		if m.showKbar {
-			var cmd tea.Cmd
-			var model tea.Model
-			model, cmd = m.kbar.Update(msg)
-			m.kbar = model.(*kbarModel)
-			switch {
-			case key.Matches(msg, m.keys.hideKbar):
-				m.showKbar = false
-			}
-			return m, cmd
-		}
-
-		return m, cmd
 	case resourceMsg:
 		m.table.SetColumns(
 			[]table.Column{
@@ -158,16 +132,16 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
 		m.schema.Reset(msg.gvk)
-		m.showKbar = false
+		m.kbar.visible = false
 		// TODO: spinner status bar for long inform operation
 		return m, m.inform(msg.gvk)
 	}
 
-	return m, cmd
+	return m, tea.Batch(sCmd, kCmd)
 }
 
 func (m *mainModel) View() string {
-	if m.showKbar {
+	if m.kbar.visible {
 		return lipgloss.Place(
 			SCHEMA_WIDTH,
 			SCHEMA_HEIGHT,

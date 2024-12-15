@@ -4,6 +4,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -102,6 +103,8 @@ func (m kbarItems) Filter(inputValue string) kbarItems {
 }
 
 type kbarModel struct {
+	keys          kbarKeyMap
+	visible       bool
 	style         lipgloss.Style
 	items         kbarItems
 	input         textinput.Model
@@ -136,6 +139,8 @@ func NewKbarModel() *kbarModel {
 	ti.Width = 30
 	ti.Cursor.Blink = true
 	m := &kbarModel{
+		keys:    newKbarKeyMap(),
+		visible: false,
 		style: lipgloss.NewStyle().
 			Border(lipgloss.ThickBorder()).
 			Width(KBAR_WIDTH),
@@ -152,7 +157,7 @@ func NewKbarModel() *kbarModel {
 func (m *kbarModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.input.Focus(),
-		textinput.Blink, // FIXME: not blinking
+		textinput.Blink,
 	)
 }
 
@@ -184,25 +189,41 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "up":
-			if m.cursor > 0 {
-				m.MoveCursorUp(filtered)
-			} else {
-				m.srViewport.LineUp(KBAR_SCROLL_STEP)
+		if m.visible {
+			switch msg.String() {
+			case "up":
+				if m.cursor > 0 {
+					m.MoveCursorUp(filtered)
+				} else {
+					m.srViewport.LineUp(KBAR_SCROLL_STEP)
+				}
+				m.SetSearchResults(filtered)
+			case "down":
+				if m.cursor < min(len(filtered)-1, SEARCH_RESULTS_MAX_HEIGHT-1) {
+					m.MoveCursorDown(filtered)
+				} else {
+					m.srViewport.LineDown(KBAR_SCROLL_STEP)
+				}
+				m.SetSearchResults(filtered)
+			case "enter":
+				return m, func() tea.Msg {
+					actualIndex := m.cursor + m.srViewport.YOffset
+					return selectGVKMsg{gvk: filtered[actualIndex].GroupVersionKind}
+				}
+			case "esc", "alt+k": // HACK: use keymap
+				m.visible = false
+				cmd = nil
 			}
-			m.SetSearchResults(filtered)
-		case "down":
-			if m.cursor < min(len(filtered)-1, SEARCH_RESULTS_MAX_HEIGHT-1) {
-				m.MoveCursorDown(filtered)
-			} else {
-				m.srViewport.LineDown(KBAR_SCROLL_STEP)
-			}
-			m.SetSearchResults(filtered)
-		case "enter":
-			return m, func() tea.Msg {
-				actualIndex := m.cursor + m.srViewport.YOffset
-				return selectGVKMsg{gvk: filtered[actualIndex].GroupVersionKind}
+		} else {
+			switch {
+			case key.Matches(msg, m.keys.show):
+				m.visible = true
+				m.Reset()
+
+				cmd = tea.Batch(
+					m.input.Focus(),
+					textinput.Blink,
+				)
 			}
 		}
 	}
@@ -232,4 +253,8 @@ func (m *kbarModel) MoveCursorUp(items kbarItems) {
 
 func (m *kbarModel) MoveCursorDown(items kbarItems) {
 	m.cursor++
+}
+
+func (m *kbarModel) actualItemIndex() int {
+	return m.cursor + m.srViewport.YOffset
 }

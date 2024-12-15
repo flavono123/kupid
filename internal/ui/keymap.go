@@ -63,3 +63,16 @@ func (k schemaKeyMap) FullHelp() [][]key.Binding {
 		{}, // only render short help
 	}
 }
+
+// kbar
+type kbarKeyMap struct {
+	show key.Binding
+	hide key.Binding
+}
+
+func newKbarKeyMap() kbarKeyMap {
+	return kbarKeyMap{
+		show: key.NewBinding(key.WithKeys("alt+k")),
+		hide: key.NewBinding(key.WithKeys("esc", "alt+k")),
+	}
+}
