@@ -13,7 +13,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -37,16 +36,11 @@ type schemaModel struct {
 
 	keys schemaKeyMap
 	help help.Model
-
-	kbarModel *kbarModel
-	showKbar  bool
 }
 
 type schemaKeyMap struct {
 	up         key.Binding
 	down       key.Binding
-	hideKbar   key.Binding
-	showKbar   key.Binding
 	toggleReq  key.Binding
 	toggleFold key.Binding
 	quit       key.Binding
@@ -54,7 +48,6 @@ type schemaKeyMap struct {
 
 func (k schemaKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.showKbar,
 		k.toggleReq,
 		k.toggleFold,
 	}
@@ -68,14 +61,9 @@ func (k schemaKeyMap) FullHelp() [][]key.Binding {
 
 func InitModel(gvk schema.GroupVersionKind) *schemaModel {
 	keys := schemaKeyMap{
-		up:       key.NewBinding(key.WithKeys("up")),
-		down:     key.NewBinding(key.WithKeys("down")),
-		hideKbar: key.NewBinding(key.WithKeys("esc", "alt+k")),
-		quit:     key.NewBinding(key.WithKeys("ctrl+c")),
-		showKbar: key.NewBinding(
-			key.WithKeys("alt+k"),
-			key.WithHelp("alt+k", "kinds"),
-		),
+		up:   key.NewBinding(key.WithKeys("up")),
+		down: key.NewBinding(key.WithKeys("down")),
+		quit: key.NewBinding(key.WithKeys("ctrl+c")),
 		toggleFold: key.NewBinding(
 			key.WithKeys(" "),
 			key.WithHelp("space", "(un)fold"),
@@ -93,14 +81,13 @@ func InitModel(gvk schema.GroupVersionKind) *schemaModel {
 
 	vp := viewport.New(SCHEMA_WIDTH, SCHEMA_HEIGHT)
 	m := &schemaModel{
-		fields:    fields,
-		viewport:  vp,
-		style:     style,
-		cursor:    0,
-		kbarModel: NewKbarModel(),
-		curGVK:    gvk,
-		keys:      keys,
-		help:      help.New(),
+		fields:   fields,
+		viewport: vp,
+		style:    style,
+		cursor:   0,
+		curGVK:   gvk,
+		keys:     keys,
+		help:     help.New(),
 	}
 	content := m.renderRecursive(m.fields)
 	content = strings.TrimSuffix(content, "\n")
@@ -131,57 +118,21 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > SCHEMA_CURSOR_TOP {
 				m.cursor--
 			} else {
-				m.viewport.LineUp(SCROLL_STEP)
+				m.viewport.LineUp(SCHEMA_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.down):
 			if m.cursor < min(SCHEMA_CURSOR_BOTTOM, m.curLineNo-1) {
 				m.cursor++
 			} else {
-				m.viewport.LineDown(SCROLL_STEP)
+				m.viewport.LineDown(SCHEMA_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.toggleFold):
 			m.ToggleFolder()
-		case key.Matches(msg, m.keys.showKbar):
-			m.showKbar = !m.showKbar
-			m.kbarModel.Reset()
-			return m, tea.Batch(
-				m.kbarModel.input.Focus(),
-				textinput.Blink, // FIXME: not blinking
-			)
 		case key.Matches(msg, m.keys.quit):
 			return m, tea.Quit
 		}
-
-		if m.showKbar {
-			var cmd tea.Cmd
-			var model tea.Model
-			model, cmd = m.kbarModel.Update(msg)
-			m.kbarModel = model.(*kbarModel)
-			switch {
-			case key.Matches(msg, m.keys.hideKbar):
-				m.showKbar = false
-			}
-			return m, cmd
-		}
-
-		return m, nil
-
-	case selectGVKMsg:
-		m.curGVK = msg.gvk
-		var err error
-		m.fields, err = kube.CreateFieldTree(msg.gvk)
-		if err != nil {
-			log.Fatalf("failed to create field tree: %v", err)
-		}
-
-		m.cursor = 0
-		m.kbarModel.Reset()
-		m.showKbar = false
-
-		return m, func() tea.Msg {
-			return selectGVKMsg{gvk: msg.gvk}
-		}
 	}
+
 	return m, nil
 }
 
@@ -190,17 +141,6 @@ func (m *schemaModel) View() string {
 	content := m.renderRecursive(m.fields)
 	content = strings.TrimSuffix(content, "\n")
 	m.viewport.SetContent(content)
-
-	if m.showKbar {
-		return lipgloss.Place(
-			SCHEMA_WIDTH,
-			SCHEMA_HEIGHT,
-			lipgloss.Center,
-			lipgloss.Center,
-			m.kbarModel.View(),
-			lipgloss.WithWhitespaceBackground(theme.Mantle),
-		)
-	}
 
 	ctx, err := kube.CurrentContext()
 	if err != nil {
@@ -274,4 +214,16 @@ func renderField(field *kube.Field) string {
 		n.Render(field.Name),
 		t.Render(fmt.Sprintf("<%s>", field.Type)),
 	)
+}
+
+func (m *schemaModel) Reset(gvk schema.GroupVersionKind) {
+	m.curGVK = gvk // TODO: check if this is necessary
+	fields, err := kube.CreateFieldTree(m.curGVK)
+	if err != nil {
+		log.Fatalf("failed to create field tree: %v", err)
+	}
+	m.fields = fields
+	m.cursor = 0
+	// m.curLineNo = 0
+	// m.curField = nil
 }
