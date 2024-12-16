@@ -122,18 +122,7 @@ func (m *schemaModel) View() string {
 	content = strings.TrimSuffix(content, "\n")
 	m.vp.SetContent(content)
 
-	ctx, err := kube.CurrentContext()
-	if err != nil {
-		log.Fatalf("failed to get current context: %v", err)
-	}
-	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.curGVK.Kind)
-	topbar := lipgloss.JoinHorizontal(lipgloss.Left,
-		ctx,
-		" ",
-		kind,
-	)
 	return lipgloss.JoinVertical(lipgloss.Left,
-		topbar,
 		m.style.Render(m.vp.View()),
 		m.help.View(m.keys),
 	)
