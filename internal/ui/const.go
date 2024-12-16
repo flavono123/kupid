@@ -5,7 +5,7 @@ const (
 	// mabye static const would be replaced min, max values
 	UPPER_20 = 0.8
 
-	WIDTH  = 80
+	WIDTH  = 180 // HACK: longing for https://github.com/charmbracelet/bubbles/pull/240
 	HEIGHT = 45
 
 	SCHEMA_WIDTH         = WIDTH
