@@ -26,8 +26,6 @@ type mainModel struct {
 	kbar           *kbarModel
 }
 
-
-
 func toRows(objs []*unstructured.Unstructured) []table.Row {
 	rows := []table.Row{}
 	for _, obj := range objs {
@@ -156,7 +154,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *mainModel) renderSelectedFields() string {
 	selectedFields := []string{}
 	for _, field := range m.selectedFields {
-		selectedFields = append(selectedFields, field.Name)
+		selectedFields = append(selectedFields, strings.Join(field.FullPath(), "."))
 	}
 	return strings.Join(selectedFields, ", ")
 }

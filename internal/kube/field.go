@@ -2,7 +2,8 @@ package kube
 
 type Field struct {
 	Name     string
-	Level    int // maybe not needed
+	Prefix   []string
+	Level    int
 	Type     string
 	Required bool
 
@@ -17,4 +18,11 @@ type Field struct {
 
 func (f *Field) Foldable() bool {
 	return f.Children != nil
+}
+
+func (f *Field) FullPath() []string {
+	fullPath := []string{}
+	fullPath = append(fullPath, f.Prefix...)
+	fullPath = append(fullPath, f.Name)
+	return fullPath
 }

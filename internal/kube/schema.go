@@ -158,7 +158,7 @@ func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
 		schema = resolved
 	}
 
-	nodes, err := createFieldList(schema, 0, document, history)
+	nodes, err := createFieldList(schema, []string{}, 0, document, history)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
 	return nodes, nil
 }
 
-func createFieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, history map[string]bool) (map[string]*Field, error) {
+func createFieldList(schema *spec.Schema, prefix []string, level int, document *spec3.OpenAPI, history map[string]bool) (map[string]*Field, error) {
 	var result map[string]*Field
 	nodes := make(map[string]*Field)
 
@@ -188,11 +188,11 @@ func createFieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, hi
 	}
 
 	for key, prop := range resolvedSchema.Properties {
-		children, err := createFieldList(&prop, level+1, document, history)
+		children, err := createFieldList(&prop, append(prefix, key), level+1, document, history)
 		if err != nil {
 			return nil, err
 		}
-		node := createField(key, resolvedSchema, level, document)
+		node := createField(key, prefix, resolvedSchema, level, document)
 		node.Children = children
 		nodes[key] = node
 
@@ -200,7 +200,7 @@ func createFieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, hi
 	}
 
 	for _, subSchema := range resolvedSchema.AllOf {
-		nodes, err := createFieldList(&subSchema, level, document, history)
+		nodes, err := createFieldList(&subSchema, prefix, level, document, history)
 		if err != nil {
 			return nil, err
 		}
@@ -208,14 +208,15 @@ func createFieldList(schema *spec.Schema, level int, document *spec3.OpenAPI, hi
 	}
 
 	if resolvedSchema.Items != nil {
-		nodes, err := createFieldList(resolvedSchema.Items.Schema, level, document, history)
+		// HACK: special char might be needed such as `[]`?
+		nodes, err := createFieldList(resolvedSchema.Items.Schema, prefix, level, document, history)
 		if err != nil {
 			return nil, err
 		}
 		result = nodes
 	}
 	if resolvedSchema.AdditionalProperties != nil && resolvedSchema.AdditionalProperties.Allows {
-		nodes, err := createFieldList(resolvedSchema.AdditionalProperties.Schema, level, document, history)
+		nodes, err := createFieldList(resolvedSchema.AdditionalProperties.Schema, prefix, level, document, history)
 		if err != nil {
 			return nil, err
 		}
@@ -243,11 +244,12 @@ func resolveRef(refString string, document *spec3.OpenAPI) *spec.Schema {
 	return document.Components.Schemas[components[3]]
 }
 
-func createField(name string, schema *spec.Schema, level int, document *spec3.OpenAPI) *Field {
+func createField(name string, prefix []string, schema *spec.Schema, level int, document *spec3.OpenAPI) *Field {
 	var result Field
 
 	result.Name = name
 	result.Level = level
+	result.Prefix = prefix
 	fieldSchema := schema.Properties[name]
 	result.Type = typeGuess(&fieldSchema, document)
 	for _, required := range schema.Required {
