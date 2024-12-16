@@ -15,13 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const (
-	KBAR_WIDTH                = 50
-	SEARCH_RESULTS_MAX_HEIGHT = 10
-
-	KBAR_SCROLL_STEP = 1
-)
-
 var kinds = []string{
 	"pod",
 	"deployment",
@@ -72,7 +65,7 @@ func NewKbarModel() *kbarModel {
 		items:      items,
 		input:      ti,
 		cursor:     0,
-		srViewport: viewport.New(KBAR_WIDTH, SEARCH_RESULTS_MAX_HEIGHT),
+		srViewport: viewport.New(KBAR_WIDTH, KBAR_SEARCH_RESULTS_MAX_HEIGHT),
 	}
 
 	m.SetSearchResults(items)
@@ -108,7 +101,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.SetSearchResults(filtered)
 			case "down":
-				if m.cursor < min(len(filtered)-1, SEARCH_RESULTS_MAX_HEIGHT-1) {
+				if m.cursor < min(len(filtered)-1, KBAR_SEARCH_RESULTS_MAX_HEIGHT-1) {
 					m.MoveCursorDown(filtered)
 				} else {
 					m.srViewport.LineDown(KBAR_SCROLL_STEP)
