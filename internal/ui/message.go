@@ -20,7 +20,13 @@ type unpickFieldMsg struct {
 	field kube.Field
 }
 
-// main(table)
+// main
 type resourceMsg struct {
 	objs []*unstructured.Unstructured
+}
+
+// result
+type resultMsg struct {
+	fields []*kube.Field
+	objs   []*unstructured.Unstructured
 }

@@ -4,13 +4,11 @@ import (
 	"log"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -18,30 +16,12 @@ type mainModel struct {
 	keys           keyMap
 	vp             viewport.Model
 	schema         *schemaModel
-	table          table.Model
+	result         *resultModel
 	curGVK         schema.GroupVersionKind
 	informers      map[schema.GroupVersionKind]*kube.Informer
 	stop           chan struct{}
 	selectedFields []*kube.Field
 	kbar           *kbarModel
-}
-
-func toRows(objs []*unstructured.Unstructured) []table.Row {
-	rows := []table.Row{}
-	for _, obj := range objs {
-		rows = append(rows, table.Row{obj.GetName()})
-	}
-	return rows
-}
-
-func maxColumnWidth(rows []table.Row, col int) int {
-	max := 0
-	for _, row := range rows {
-		if len(row[col]) > max {
-			max = len(row[col])
-		}
-	}
-	return max
 }
 
 func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
@@ -79,30 +59,18 @@ func InitMainModel() *mainModel {
 		Version: "v1",
 		Kind:    "Pod",
 	}
-	initRows := []table.Row{}
 	gvr, err := kube.GetGVR(initGvk)
 	if err != nil {
 		log.Fatalf("failed to get gvr: %v", err)
 	}
 	informers := map[schema.GroupVersionKind]*kube.Informer{initGvk: kube.NewInformer(gvr)}
-	initColumns := []table.Column{
-		{
-			Title: "Name",
-			Width: maxColumnWidth(initRows, 0),
-		},
-	}
-	tm := table.New(
-		table.WithColumns(initColumns),
-		table.WithRows(initRows),
-		table.WithFocused(false),
-	)
 
 	return &mainModel{
 		keys:           newKeyMap(),
 		vp:             viewport.New(WIDTH, HEIGHT),
 		schema:         InitModel(initGvk),
 		curGVK:         initGvk,
-		table:          tm,
+		result:         newResultModel(informers[initGvk].GetObjects()),
 		informers:      informers,
 		stop:           nil,
 		selectedFields: []*kube.Field{},
@@ -119,20 +87,17 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.schema = sm.(*schemaModel)
 	km, kCmd := m.kbar.Update(msg)
 	m.kbar = km.(*kbarModel)
+	rm, rCmd := m.result.Update(msg)
+	m.result = rm.(*resultModel)
 
 	switch msg := msg.(type) {
 	case resourceMsg:
-		rows := toRows(msg.objs)
-		m.table.SetColumns(
-			[]table.Column{
-				{
-					Title: "Name",
-					Width: maxColumnWidth(rows, 0),
-				},
-			},
-		)
-		m.table.SetRows(rows)
-		return m, nil
+		return m, func() tea.Msg {
+			return resultMsg{
+				fields: m.selectedFields,
+				objs:   msg.objs,
+			}
+		}
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
 		m.schema.Reset(msg.gvk)
@@ -150,7 +115,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, tea.Batch(sCmd, kCmd)
+	return m, tea.Batch(sCmd, kCmd, rCmd)
 }
 
 // HACK: tmp
@@ -166,7 +131,7 @@ func (m *mainModel) View() string {
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.schema.View(),
-		m.table.View(),
+		m.result.View(),
 	)
 	m.vp.SetContent(mainContent)
 
