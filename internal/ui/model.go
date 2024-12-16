@@ -2,7 +2,6 @@ package ui
 
 import (
 	"log"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -79,11 +78,25 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.inform(msg.gvk)
 	case pickFieldMsg:
 		m.selectedFields = append(m.selectedFields, &msg.field)
+		return m, func() tea.Msg {
+			return resultMsg{
+				fields: m.selectedFields,
+				objs:   m.informers[m.curGVK].GetObjects(),
+				add:    true,
+			}
+		}
 	case unpickFieldMsg:
 		for idx, field := range m.selectedFields {
 			if field.Name == msg.field.Name { // HACK: maybe uuid needed?
 				m.selectedFields = append(m.selectedFields[:idx], m.selectedFields[idx+1:]...)
 				break
+			}
+		}
+		return m, func() tea.Msg {
+			return resultMsg{
+				fields: m.selectedFields,
+				objs:   m.informers[m.curGVK].GetObjects(),
+				add:    false,
 			}
 		}
 	}
@@ -97,6 +110,7 @@ func (m *mainModel) View() string {
 		m.schema.View(),
 		m.result.View(),
 	)
+
 	m.vp.SetContent(mainContent)
 
 	if m.kbar.visible {
@@ -113,7 +127,6 @@ func (m *mainModel) View() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.vp.View(),
-		m.renderSelectedFields(),
 	)
 }
 
@@ -132,6 +145,7 @@ func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
 
 func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 	if m.stop != nil {
+		// inform a single gvk at a time for now
 		close(m.stop)
 	}
 
@@ -146,13 +160,4 @@ func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 			objs: m.getInformer(gvk).GetObjects(),
 		}
 	}
-}
-
-// HACK: tmp
-func (m *mainModel) renderSelectedFields() string {
-	selectedFields := []string{}
-	for _, field := range m.selectedFields {
-		selectedFields = append(selectedFields, strings.Join(field.FullPath(), "."))
-	}
-	return strings.Join(selectedFields, ", ")
 }

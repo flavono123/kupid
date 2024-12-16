@@ -29,4 +29,5 @@ type resourceMsg struct {
 type resultMsg struct {
 	fields []*kube.Field
 	objs   []*unstructured.Unstructured
+	add    bool // HACK: to avoid previous table's index out of range
 }
