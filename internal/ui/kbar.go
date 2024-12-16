@@ -95,14 +95,14 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "up":
 				if m.cursor > 0 {
-					m.moveCursorUp(filtered)
+					m.cursor--
 				} else {
 					m.srViewport.LineUp(KBAR_SCROLL_STEP)
 				}
 				m.setSearchResults(filtered)
 			case "down":
 				if m.cursor < min(len(filtered)-1, KBAR_SEARCH_RESULTS_MAX_HEIGHT-1) {
-					m.moveCursorDown(filtered)
+					m.cursor++
 				} else {
 					m.srViewport.LineDown(KBAR_SCROLL_STEP)
 				}
@@ -167,16 +167,7 @@ func (m *kbarModel) setSearchResults(items kbarItems) {
 
 func (m *kbarModel) moveCursorTop(items kbarItems) {
 	m.cursor = 0
-	// TODO: remove
 	m.setSearchResults(items)
-}
-
-func (m *kbarModel) moveCursorUp(items kbarItems) {
-	m.cursor--
-}
-
-func (m *kbarModel) moveCursorDown(items kbarItems) {
-	m.cursor++
 }
 
 func (m *kbarModel) actualItemIndex() int {
