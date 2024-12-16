@@ -71,8 +71,10 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
+		// reset
 		m.schema.Reset(msg.gvk)
 		m.kbar.visible = false
+		m.selectedFields = []*kube.Field{}
 		// TODO: spinner status bar for long inform operation
 		return m, m.inform(msg.gvk)
 	case pickFieldMsg:
