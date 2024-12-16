@@ -69,16 +69,6 @@ func (m *schemaModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m *schemaModel) IsCursor() bool {
-	return m.curLineNo-m.vp.YOffset == m.cursor
-}
-
-func (m *schemaModel) ToggleFolder() {
-	if m.curField != nil && m.curField.Foldable() {
-		m.curField.Expanded = !m.curField.Expanded
-	}
-}
-
 func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var retCmd tea.Cmd
 	retCmd = nil
@@ -147,6 +137,17 @@ func (m *schemaModel) View() string {
 		m.style.Render(m.vp.View()),
 		m.help.View(m.keys),
 	)
+}
+
+// utils
+func (m *schemaModel) IsCursor() bool {
+	return m.curLineNo-m.vp.YOffset == m.cursor
+}
+
+func (m *schemaModel) ToggleFolder() {
+	if m.curField != nil && m.curField.Foldable() {
+		m.curField.Expanded = !m.curField.Expanded
+	}
 }
 
 func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {

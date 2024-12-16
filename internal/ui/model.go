@@ -24,35 +24,6 @@ type mainModel struct {
 	kbar           *kbarModel
 }
 
-func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
-	if m.informers[gvk] == nil {
-		gvr, err := kube.GetGVR(gvk)
-		if err != nil {
-			return nil // HACK: to be treated
-		}
-		m.informers[gvk] = kube.NewInformer(gvr)
-	}
-	return m.informers[gvk]
-}
-
-func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
-	if m.stop != nil {
-		close(m.stop)
-	}
-
-	stop, err := m.getInformer(gvk).Inform()
-	if err != nil {
-		return nil
-	}
-	m.stop = stop
-
-	return func() tea.Msg {
-		return resourceMsg{
-			objs: m.getInformer(gvk).GetObjects(),
-		}
-	}
-}
-
 func InitMainModel() *mainModel {
 	initGvk := schema.GroupVersionKind{
 		Group:   "",
@@ -118,15 +89,6 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(sCmd, kCmd, rCmd)
 }
 
-// HACK: tmp
-func (m *mainModel) renderSelectedFields() string {
-	selectedFields := []string{}
-	for _, field := range m.selectedFields {
-		selectedFields = append(selectedFields, strings.Join(field.FullPath(), "."))
-	}
-	return strings.Join(selectedFields, ", ")
-}
-
 func (m *mainModel) View() string {
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -151,4 +113,44 @@ func (m *mainModel) View() string {
 		m.vp.View(),
 		m.renderSelectedFields(),
 	)
+}
+
+// utils
+
+func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
+	if m.informers[gvk] == nil {
+		gvr, err := kube.GetGVR(gvk)
+		if err != nil {
+			return nil // HACK: to be treated
+		}
+		m.informers[gvk] = kube.NewInformer(gvr)
+	}
+	return m.informers[gvk]
+}
+
+func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
+	if m.stop != nil {
+		close(m.stop)
+	}
+
+	stop, err := m.getInformer(gvk).Inform()
+	if err != nil {
+		return nil
+	}
+	m.stop = stop
+
+	return func() tea.Msg {
+		return resourceMsg{
+			objs: m.getInformer(gvk).GetObjects(),
+		}
+	}
+}
+
+// HACK: tmp
+func (m *mainModel) renderSelectedFields() string {
+	selectedFields := []string{}
+	for _, field := range m.selectedFields {
+		selectedFields = append(selectedFields, strings.Join(field.FullPath(), "."))
+	}
+	return strings.Join(selectedFields, ", ")
 }

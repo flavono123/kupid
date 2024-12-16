@@ -11,9 +11,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/sahilm/fuzzy"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -35,6 +34,162 @@ var kinds = []string{
 	"ec2nodeclass",
 }
 
+type kbarModel struct {
+	keys          kbarKeyMap
+	visible       bool
+	style         lipgloss.Style
+	items         kbarItems
+	input         textinput.Model
+	searchResults searchResults
+	srViewport    viewport.Model
+	cursor        int
+}
+
+func NewKbarModel() *kbarModel {
+	var items kbarItems
+
+	gvks, err := kube.GetGVKs()
+	if err != nil {
+		log.Fatalf("failed to get gvks: %v", err)
+	}
+	for _, gvk := range gvks {
+		items = append(items, kbarItem{GroupVersionKind: gvk})
+	}
+
+	ti := textinput.New()
+	ti.Placeholder = "Search or jump to..."
+	ti.Focus()
+	ti.SetCursor(0)
+	ti.Prompt = "🔍 "
+	ti.Width = 30
+	ti.Cursor.Blink = true
+	m := &kbarModel{
+		keys:    newKbarKeyMap(),
+		visible: false,
+		style: lipgloss.NewStyle().
+			Border(lipgloss.ThickBorder()).
+			Width(KBAR_WIDTH),
+		items:      items,
+		input:      ti,
+		cursor:     0,
+		srViewport: viewport.New(KBAR_WIDTH, SEARCH_RESULTS_MAX_HEIGHT),
+	}
+
+	m.SetSearchResults(items)
+	return m
+}
+
+func (m *kbarModel) Init() tea.Cmd {
+	return tea.Batch(
+		m.input.Focus(),
+		textinput.Blink,
+	)
+}
+
+func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	prevInputValue := m.input.Value()
+	m.input, cmd = m.input.Update(msg)
+	filtered := m.items.Filter(m.input.Value())
+	if prevInputValue != m.input.Value() {
+		m.MoveCursorTop(filtered)
+	}
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if m.visible {
+			switch msg.String() {
+			case "up":
+				if m.cursor > 0 {
+					m.MoveCursorUp(filtered)
+				} else {
+					m.srViewport.LineUp(KBAR_SCROLL_STEP)
+				}
+				m.SetSearchResults(filtered)
+			case "down":
+				if m.cursor < min(len(filtered)-1, SEARCH_RESULTS_MAX_HEIGHT-1) {
+					m.MoveCursorDown(filtered)
+				} else {
+					m.srViewport.LineDown(KBAR_SCROLL_STEP)
+				}
+				m.SetSearchResults(filtered)
+			case "enter":
+				return m, func() tea.Msg {
+					actualIndex := m.cursor + m.srViewport.YOffset
+					return selectGVKMsg{gvk: filtered[actualIndex].GroupVersionKind}
+				}
+			case "esc", "alt+k": // HACK: use keymap
+				m.visible = false
+				cmd = nil
+			}
+		} else {
+			switch {
+			case key.Matches(msg, m.keys.show):
+				m.visible = true
+				m.Reset()
+
+				cmd = tea.Batch(
+					m.input.Focus(),
+					textinput.Blink,
+				)
+			}
+		}
+	}
+
+	return m, cmd
+}
+
+func (m *kbarModel) View() string {
+	inputStyle := lipgloss.NewStyle().Margin(0, 0, 1, 0)
+	searchResult := strings.TrimSuffix(m.searchResults.String(), "\n")
+	m.srViewport.SetContent(searchResult)
+	return m.style.Render(
+		lipgloss.JoinVertical(lipgloss.Left,
+			inputStyle.Render(m.input.View()),
+			m.srViewport.View(),
+		),
+	)
+}
+
+// utils
+
+func (m *kbarModel) Reset() {
+	m.input.Reset()
+	m.cursor = 0
+	m.SetSearchResults(m.items)
+	m.srViewport.SetYOffset(0)
+}
+
+func (m *kbarModel) SetSearchResults(items kbarItems) {
+	var newSearchResults searchResults
+	for index, item := range items {
+		newSearchResults = append(newSearchResults, searchResult{
+			Item:    item,
+			Hovered: m.cursor == index-m.srViewport.YOffset,
+		})
+	}
+	m.searchResults = newSearchResults
+}
+
+func (m *kbarModel) MoveCursorTop(items kbarItems) {
+	m.cursor = 0
+	m.SetSearchResults(items)
+}
+
+func (m *kbarModel) MoveCursorUp(items kbarItems) {
+	m.cursor--
+}
+
+func (m *kbarModel) MoveCursorDown(items kbarItems) {
+	m.cursor++
+}
+
+func (m *kbarModel) actualItemIndex() int {
+	return m.cursor + m.srViewport.YOffset
+}
+
+// subcomponents(not model)
 type kbarItem struct {
 	schema.GroupVersionKind
 }
@@ -100,157 +255,4 @@ func (m kbarItems) Filter(inputValue string) kbarItems {
 		items = append(items, m[match.Index])
 	}
 	return items
-}
-
-type kbarModel struct {
-	keys          kbarKeyMap
-	visible       bool
-	style         lipgloss.Style
-	items         kbarItems
-	input         textinput.Model
-	searchResults searchResults
-	srViewport    viewport.Model
-	cursor        int
-}
-
-func (m *kbarModel) Reset() {
-	m.input.Reset()
-	m.cursor = 0
-	m.SetSearchResults(m.items)
-	m.srViewport.SetYOffset(0)
-}
-
-func NewKbarModel() *kbarModel {
-	var items kbarItems
-
-	gvks, err := kube.GetGVKs()
-	if err != nil {
-		log.Fatalf("failed to get gvks: %v", err)
-	}
-	for _, gvk := range gvks {
-		items = append(items, kbarItem{GroupVersionKind: gvk})
-	}
-
-	ti := textinput.New()
-	ti.Placeholder = "Search or jump to..."
-	ti.Focus()
-	ti.SetCursor(0)
-	ti.Prompt = "🔍 "
-	ti.Width = 30
-	ti.Cursor.Blink = true
-	m := &kbarModel{
-		keys:    newKbarKeyMap(),
-		visible: false,
-		style: lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
-			Width(KBAR_WIDTH),
-		items:      items,
-		input:      ti,
-		cursor:     0,
-		srViewport: viewport.New(KBAR_WIDTH, SEARCH_RESULTS_MAX_HEIGHT),
-	}
-
-	m.SetSearchResults(items)
-	return m
-}
-
-func (m *kbarModel) Init() tea.Cmd {
-	return tea.Batch(
-		m.input.Focus(),
-		textinput.Blink,
-	)
-}
-
-func (m *kbarModel) View() string {
-	inputStyle := lipgloss.NewStyle().Margin(0, 0, 1, 0)
-	searchResult := strings.TrimSuffix(m.searchResults.String(), "\n")
-	m.srViewport.SetContent(searchResult)
-	return m.style.Render(
-		lipgloss.JoinVertical(lipgloss.Left,
-			inputStyle.Render(m.input.View()),
-			m.srViewport.View(),
-		),
-	)
-}
-
-func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	prevInputValue := m.input.Value()
-	m.input, cmd = m.input.Update(msg)
-	filtered := m.items.Filter(m.input.Value())
-	if prevInputValue != m.input.Value() {
-		m.MoveCursorTop(filtered)
-	}
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if m.visible {
-			switch msg.String() {
-			case "up":
-				if m.cursor > 0 {
-					m.MoveCursorUp(filtered)
-				} else {
-					m.srViewport.LineUp(KBAR_SCROLL_STEP)
-				}
-				m.SetSearchResults(filtered)
-			case "down":
-				if m.cursor < min(len(filtered)-1, SEARCH_RESULTS_MAX_HEIGHT-1) {
-					m.MoveCursorDown(filtered)
-				} else {
-					m.srViewport.LineDown(KBAR_SCROLL_STEP)
-				}
-				m.SetSearchResults(filtered)
-			case "enter":
-				return m, func() tea.Msg {
-					actualIndex := m.cursor + m.srViewport.YOffset
-					return selectGVKMsg{gvk: filtered[actualIndex].GroupVersionKind}
-				}
-			case "esc", "alt+k": // HACK: use keymap
-				m.visible = false
-				cmd = nil
-			}
-		} else {
-			switch {
-			case key.Matches(msg, m.keys.show):
-				m.visible = true
-				m.Reset()
-
-				cmd = tea.Batch(
-					m.input.Focus(),
-					textinput.Blink,
-				)
-			}
-		}
-	}
-
-	return m, cmd
-}
-
-func (m *kbarModel) SetSearchResults(items kbarItems) {
-	var newSearchResults searchResults
-	for index, item := range items {
-		newSearchResults = append(newSearchResults, searchResult{
-			Item:    item,
-			Hovered: m.cursor == index-m.srViewport.YOffset,
-		})
-	}
-	m.searchResults = newSearchResults
-}
-
-func (m *kbarModel) MoveCursorTop(items kbarItems) {
-	m.cursor = 0
-	m.SetSearchResults(items)
-}
-
-func (m *kbarModel) MoveCursorUp(items kbarItems) {
-	m.cursor--
-}
-
-func (m *kbarModel) MoveCursorDown(items kbarItems) {
-	m.cursor++
-}
-
-func (m *kbarModel) actualItemIndex() int {
-	return m.cursor + m.srViewport.YOffset
 }
