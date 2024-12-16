@@ -23,7 +23,7 @@ type mainModel struct {
 	kbar           *kbarModel
 }
 
-func InitMainModel() *mainModel {
+func InitModel() *mainModel {
 	initGvk := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
@@ -33,18 +33,20 @@ func InitMainModel() *mainModel {
 	if err != nil {
 		log.Fatalf("failed to get gvr: %v", err)
 	}
-	informers := map[schema.GroupVersionKind]*kube.Informer{initGvk: kube.NewInformer(gvr)}
+	informers := map[schema.GroupVersionKind]*kube.Informer{
+		initGvk: kube.NewInformer(gvr),
+	}
 
 	return &mainModel{
 		keys:           newKeyMap(),
-		vp:             viewport.New(WIDTH, HEIGHT),
-		schema:         InitModel(initGvk),
-		curGVK:         initGvk,
+		schema:         newSchemaModel(initGvk),
 		result:         newResultModel(informers[initGvk].GetObjects()),
+		vp:             viewport.New(WIDTH, HEIGHT),
+		curGVK:         initGvk,
+		kbar:           newKbarModel(),
 		informers:      informers,
 		stop:           nil,
 		selectedFields: []*kube.Field{},
-		kbar:           NewKbarModel(),
 	}
 }
 

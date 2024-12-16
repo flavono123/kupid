@@ -38,7 +38,7 @@ type kbarModel struct {
 	cursor        int
 }
 
-func NewKbarModel() *kbarModel {
+func newKbarModel() *kbarModel {
 	var items kbarItems
 
 	gvks, err := kube.GetGVKs()
@@ -68,7 +68,7 @@ func NewKbarModel() *kbarModel {
 		srViewport: viewport.New(KBAR_WIDTH, KBAR_SEARCH_RESULTS_MAX_HEIGHT),
 	}
 
-	m.SetSearchResults(items)
+	m.setSearchResults(items)
 	return m
 }
 
@@ -84,9 +84,9 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	prevInputValue := m.input.Value()
 	m.input, cmd = m.input.Update(msg)
-	filtered := m.items.Filter(m.input.Value())
+	filtered := m.items.filter(m.input.Value())
 	if prevInputValue != m.input.Value() {
-		m.MoveCursorTop(filtered)
+		m.moveCursorTop(filtered)
 	}
 
 	switch msg := msg.(type) {
@@ -95,18 +95,18 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "up":
 				if m.cursor > 0 {
-					m.MoveCursorUp(filtered)
+					m.moveCursorUp(filtered)
 				} else {
 					m.srViewport.LineUp(KBAR_SCROLL_STEP)
 				}
-				m.SetSearchResults(filtered)
+				m.setSearchResults(filtered)
 			case "down":
 				if m.cursor < min(len(filtered)-1, KBAR_SEARCH_RESULTS_MAX_HEIGHT-1) {
-					m.MoveCursorDown(filtered)
+					m.moveCursorDown(filtered)
 				} else {
 					m.srViewport.LineDown(KBAR_SCROLL_STEP)
 				}
-				m.SetSearchResults(filtered)
+				m.setSearchResults(filtered)
 			case "enter":
 				return m, func() tea.Msg {
 					actualIndex := m.cursor + m.srViewport.YOffset
@@ -120,7 +120,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case key.Matches(msg, m.keys.show):
 				m.visible = true
-				m.Reset()
+				m.reset()
 
 				cmd = tea.Batch(
 					m.input.Focus(),
@@ -135,7 +135,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *kbarModel) View() string {
 	inputStyle := lipgloss.NewStyle().Margin(0, 0, 1, 0)
-	searchResult := strings.TrimSuffix(m.searchResults.String(), "\n")
+	searchResult := strings.TrimSuffix(m.searchResults.string(), "\n")
 	m.srViewport.SetContent(searchResult)
 	return m.style.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
@@ -147,14 +147,14 @@ func (m *kbarModel) View() string {
 
 // utils
 
-func (m *kbarModel) Reset() {
+func (m *kbarModel) reset() {
 	m.input.Reset()
 	m.cursor = 0
-	m.SetSearchResults(m.items)
+	m.setSearchResults(m.items)
 	m.srViewport.SetYOffset(0)
 }
 
-func (m *kbarModel) SetSearchResults(items kbarItems) {
+func (m *kbarModel) setSearchResults(items kbarItems) {
 	var newSearchResults searchResults
 	for index, item := range items {
 		newSearchResults = append(newSearchResults, searchResult{
@@ -165,16 +165,17 @@ func (m *kbarModel) SetSearchResults(items kbarItems) {
 	m.searchResults = newSearchResults
 }
 
-func (m *kbarModel) MoveCursorTop(items kbarItems) {
+func (m *kbarModel) moveCursorTop(items kbarItems) {
 	m.cursor = 0
-	m.SetSearchResults(items)
+	// TODO: remove
+	m.setSearchResults(items)
 }
 
-func (m *kbarModel) MoveCursorUp(items kbarItems) {
+func (m *kbarModel) moveCursorUp(items kbarItems) {
 	m.cursor--
 }
 
-func (m *kbarModel) MoveCursorDown(items kbarItems) {
+func (m *kbarModel) moveCursorDown(items kbarItems) {
 	m.cursor++
 }
 
@@ -186,6 +187,7 @@ func (m *kbarModel) actualItemIndex() int {
 type kbarItem struct {
 	schema.GroupVersionKind
 }
+type kbarItems []kbarItem
 
 type searchResult struct {
 	Item    kbarItem
@@ -194,9 +196,7 @@ type searchResult struct {
 
 type searchResults []searchResult
 
-type kbarItems []kbarItem
-
-func (i kbarItem) Render() string {
+func (i kbarItem) render() string {
 	l := lipgloss.NewStyle().
 		MaxWidth(KBAR_WIDTH).
 		Padding(0, 0, 0, 1)
@@ -211,29 +211,7 @@ func (i kbarItem) Render() string {
 	return l.Render(s)
 }
 
-func (sr searchResult) Render() string {
-	style := lipgloss.NewStyle()
-	if sr.Hovered {
-		style = style.Background(theme.Overlay0)
-	}
-	return style.Render(sr.Item.Render())
-}
-
-func (sr searchResults) String() string {
-	noResultsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	if len(sr) == 0 {
-		return noResultsStyle.Render("No results found.")
-	}
-
-	var result []string
-	for _, item := range sr {
-		result = append(result, item.Render())
-	}
-
-	return strings.Join(result, "\n")
-}
-
-func (m kbarItems) Filter(inputValue string) kbarItems {
+func (m kbarItems) filter(inputValue string) kbarItems {
 	if inputValue == "" {
 		return m
 	}
@@ -248,4 +226,26 @@ func (m kbarItems) Filter(inputValue string) kbarItems {
 		items = append(items, m[match.Index])
 	}
 	return items
+}
+
+func (sr searchResult) render() string {
+	style := lipgloss.NewStyle()
+	if sr.Hovered {
+		style = style.Background(theme.Overlay0)
+	}
+	return style.Render(sr.Item.render())
+}
+
+func (sr searchResults) string() string {
+	noResultsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	if len(sr) == 0 {
+		return noResultsStyle.Render("No results found.")
+	}
+
+	var result []string
+	for _, item := range sr {
+		result = append(result, item.render())
+	}
+
+	return strings.Join(result, "\n")
 }

@@ -33,7 +33,7 @@ type schemaModel struct {
 	help help.Model
 }
 
-func InitModel(gvk schema.GroupVersionKind) *schemaModel {
+func newSchemaModel(gvk schema.GroupVersionKind) *schemaModel {
 	fields, err := kube.CreateFieldTree(gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
@@ -94,7 +94,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.curField.Foldable() {
-				m.ToggleFolder()
+				m.toggleFolder()
 			} else { // selectable, for leaf fields
 				if m.curField.Selected {
 					m.curField.Selected = false
@@ -140,11 +140,11 @@ func (m *schemaModel) View() string {
 }
 
 // utils
-func (m *schemaModel) IsCursor() bool {
+func (m *schemaModel) isCursor() bool {
 	return m.curLineNo-m.vp.YOffset == m.cursor
 }
 
-func (m *schemaModel) ToggleFolder() {
+func (m *schemaModel) toggleFolder() {
 	if m.curField != nil && m.curField.Foldable() {
 		m.curField.Expanded = !m.curField.Expanded
 	}
@@ -167,7 +167,7 @@ func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 		indent := strings.Repeat(" ", field.Level*2)
 		var cursorStr string
 		cursor := lipgloss.NewStyle().Foreground(theme.Text)
-		if m.IsCursor() {
+		if m.isCursor() {
 			cursorStr = ">"
 			m.curField = field
 		} else {
@@ -225,6 +225,4 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind) {
 	}
 	m.fields = fields
 	m.cursor = 0
-	// m.curLineNo = 0
-	// m.curField = nil
 }
