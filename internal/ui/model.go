@@ -67,7 +67,9 @@ func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 	m.stop = stop
 
 	return func() tea.Msg {
-		return resourceMsg{rows: toRows(m.getInformer(gvk).GetObjects())}
+		return resourceMsg{
+			objs: m.getInformer(gvk).GetObjects(),
+		}
 	}
 }
 
@@ -120,15 +122,16 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case resourceMsg:
+		rows := toRows(msg.objs)
 		m.table.SetColumns(
 			[]table.Column{
 				{
 					Title: "Name",
-					Width: maxColumnWidth(msg.rows, 0),
+					Width: maxColumnWidth(rows, 0),
 				},
 			},
 		)
-		m.table.SetRows(msg.rows)
+		m.table.SetRows(rows)
 		return m, nil
 	case selectGVKMsg:
 		m.curGVK = msg.gvk

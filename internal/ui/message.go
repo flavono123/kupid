@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"github.com/charmbracelet/bubbles/table"
 	"github.com/flavono123/kupid/internal/kube"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -22,5 +22,5 @@ type unpickFieldMsg struct {
 
 // main(table)
 type resourceMsg struct {
-	rows []table.Row
+	objs []*unstructured.Unstructured
 }
