@@ -79,14 +79,6 @@ func (m *schemaModel) ToggleFolder() {
 	}
 }
 
-type pickFieldMsg struct {
-	field kube.Field
-}
-
-type unpickFieldMsg struct {
-	field kube.Field
-}
-
 func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var retCmd tea.Cmd
 	retCmd = nil

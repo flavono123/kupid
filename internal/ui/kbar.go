@@ -173,10 +173,6 @@ func (m *kbarModel) View() string {
 	)
 }
 
-type selectGVKMsg struct {
-	gvk schema.GroupVersionKind
-}
-
 func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 

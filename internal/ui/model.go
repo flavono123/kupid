@@ -26,9 +26,7 @@ type mainModel struct {
 	kbar           *kbarModel
 }
 
-type resourceMsg struct {
-	rows []table.Row
-}
+
 
 func toRows(objs []*unstructured.Unstructured) []table.Row {
 	rows := []table.Row{}
