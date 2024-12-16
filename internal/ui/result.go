@@ -50,7 +50,7 @@ func (m *resultModel) rows(fields []*kube.Field, objs []*unstructured.Unstructur
 	rows := []table.Row{}
 	for _, obj := range objs {
 		row := table.Row{}
-		row = append(row, obj.GetName())
+		row = append(row, displayName(obj))
 		for _, field := range fields {
 			row = append(row, m.val(field, obj))
 		}
@@ -110,4 +110,11 @@ func (m *resultModel) val(field *kube.Field, obj *unstructured.Unstructured) str
 		return "-"
 	}
 	return fmt.Sprintf("%v", val)
+}
+
+func displayName(obj *unstructured.Unstructured) string {
+	if obj.GetNamespace() != "" {
+		return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
+	}
+	return obj.GetName()
 }
