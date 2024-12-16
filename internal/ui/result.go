@@ -10,7 +10,8 @@ import (
 )
 
 type resultModel struct {
-	table table.Model
+	focused bool
+	table   table.Model
 }
 
 func newResultModel(objs []*unstructured.Unstructured) *resultModel {
@@ -24,8 +25,14 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 			Width: maxColumnWidth("Name", rows, 0),
 		},
 	}
+	t := table.New(
+		table.WithColumns(cols),
+		table.WithRows(rows),
+		table.WithFocused(false),
+	)
 	return &resultModel{
-		table: table.New(table.WithColumns(cols), table.WithRows(rows)),
+		focused: false,
+		table:   t,
 	}
 }
 
@@ -34,11 +41,19 @@ func (m *resultModel) Init() tea.Cmd {
 }
 
 func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case resultMsg:
 		m.setTable(msg.fields, msg.objs, msg.add)
+	case tea.KeyMsg:
+		if m.focused {
+			tm, tCmd := m.table.Update(msg)
+			m.table = tm
+			cmds = append(cmds, tCmd)
+		}
 	}
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 func (m *resultModel) View() string {
@@ -117,4 +132,14 @@ func displayName(obj *unstructured.Unstructured) string {
 		return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
 	}
 	return obj.GetName()
+}
+
+func (m *resultModel) focus() {
+	m.focused = true
+	m.table.Focus()
+}
+
+func (m *resultModel) blur() {
+	m.focused = false
+	m.table.Blur()
 }

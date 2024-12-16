@@ -6,6 +6,7 @@ import "github.com/charmbracelet/bubbles/key"
 type keyMap struct {
 	hideKbar key.Binding
 	showKbar key.Binding
+	tabView  key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -14,6 +15,10 @@ func newKeyMap() keyMap {
 		showKbar: key.NewBinding(
 			key.WithKeys("alt+k"),
 			key.WithHelp("alt(opt)+k", "kinds"),
+		),
+		tabView: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "switch schema/result"),
 		),
 	}
 }

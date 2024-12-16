@@ -3,6 +3,7 @@ package ui
 import (
 	"log"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -11,7 +12,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+type sessionState uint
+
+const (
+	schemaView sessionState = iota
+	resultView
+)
+
 type mainModel struct {
+	state          sessionState
 	keys           keyMap
 	vp             viewport.Model
 	schema         *schemaModel
@@ -38,6 +47,7 @@ func InitModel() *mainModel {
 	}
 
 	return &mainModel{
+		state:          schemaView,
 		keys:           newKeyMap(),
 		schema:         newSchemaModel(initGvk),
 		result:         newResultModel(informers[initGvk].GetObjects()),
@@ -55,12 +65,41 @@ func (m *mainModel) Init() tea.Cmd {
 }
 
 func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	sm, sCmd := m.schema.Update(msg)
-	m.schema = sm.(*schemaModel)
+	var cmds []tea.Cmd
+
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if m.state == schemaView {
+			sm, sCmd := m.schema.Update(msg)
+			m.schema = sm.(*schemaModel)
+			cmds = append(cmds, sCmd)
+		} else if m.state == resultView && m.result.focused {
+			rm, rCmd := m.result.Update(msg)
+			m.result = rm.(*resultModel)
+			cmds = append(cmds, rCmd)
+		}
+
+		if key.Matches(keyMsg, m.keys.tabView) {
+			if m.state == schemaView {
+				m.state = resultView
+				m.result.focus()
+			} else {
+				m.state = schemaView
+				m.result.blur()
+			}
+		}
+	} else {
+		rm, rCmd := m.result.Update(msg)
+		m.result = rm.(*resultModel)
+		cmds = append(cmds, rCmd)
+
+		sm, sCmd := m.schema.Update(msg)
+		m.schema = sm.(*schemaModel)
+		cmds = append(cmds, sCmd)
+	}
+
 	km, kCmd := m.kbar.Update(msg)
 	m.kbar = km.(*kbarModel)
-	rm, rCmd := m.result.Update(msg)
-	m.result = rm.(*resultModel)
+	cmds = append(cmds, kCmd)
 
 	switch msg := msg.(type) {
 	case resourceMsg:
@@ -72,11 +111,9 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
-		// reset
 		m.schema.Reset(msg.gvk)
 		m.kbar.visible = false
 		m.selectedFields = []*kube.Field{}
-		// TODO: spinner status bar for long inform operation
 		return m, m.inform(msg.gvk)
 	case pickFieldMsg:
 		m.selectedFields = append(m.selectedFields, &msg.field)
@@ -89,7 +126,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case unpickFieldMsg:
 		for idx, field := range m.selectedFields {
-			if field.Name == msg.field.Name { // HACK: maybe uuid needed?
+			if field.Name == msg.field.Name {
 				m.selectedFields = append(m.selectedFields[:idx], m.selectedFields[idx+1:]...)
 				break
 			}
@@ -103,7 +140,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, tea.Batch(sCmd, kCmd, rCmd)
+	return m, tea.Batch(cmds...)
 }
 
 func (m *mainModel) View() string {
@@ -129,16 +166,15 @@ func (m *mainModel) View() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.vp.View(),
+		m.currentFocusedView(),
 	)
 }
-
-// utils
 
 func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
 	if m.informers[gvk] == nil {
 		gvr, err := kube.GetGVR(gvk)
 		if err != nil {
-			return nil // HACK: to be treated
+			return nil
 		}
 		m.informers[gvk] = kube.NewInformer(gvr)
 	}
@@ -147,7 +183,6 @@ func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
 
 func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 	if m.stop != nil {
-		// inform a single gvk at a time for now
 		close(m.stop)
 	}
 
@@ -162,4 +197,11 @@ func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 			objs: m.getInformer(gvk).GetObjects(),
 		}
 	}
+}
+
+func (m *mainModel) currentFocusedView() string {
+	if m.state == resultView {
+		return "result"
+	}
+	return "schema"
 }
