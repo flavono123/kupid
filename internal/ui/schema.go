@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -187,7 +186,7 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 			indent,
 			cursor.Render(cursorStr),
 			folder.Render(foldStr),
-			renderNode(node),
+			node.render(),
 		)) + "\n")
 		m.curLineNo++
 
@@ -197,17 +196,6 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 	}
 
 	return result.String()
-}
-
-// TODO: move to node's method
-func renderNode(node *Node) string {
-	n := lipgloss.NewStyle().Foreground(theme.Green)
-	t := lipgloss.NewStyle().Foreground(theme.Peach)
-	return lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		n.Render(node.Name()),
-		t.Render(fmt.Sprintf("<%s>", node.Type())),
-	)
 }
 
 func (m *schemaModel) Reset(gvk schema.GroupVersionKind) {

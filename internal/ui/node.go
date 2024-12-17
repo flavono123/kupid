@@ -1,6 +1,12 @@
 package ui
 
-import "github.com/flavono123/kupid/internal/kube"
+import (
+	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/theme"
+)
 
 type Node struct {
 	Expanded bool
@@ -12,6 +18,16 @@ type Node struct {
 
 func (n *Node) Foldable() bool {
 	return n.children != nil
+}
+
+func (n *Node) render() string {
+	name := lipgloss.NewStyle().Foreground(theme.Green)
+	displayType := lipgloss.NewStyle().Foreground(theme.Peach)
+	return lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		name.Render(n.Name()),
+		displayType.Render(fmt.Sprintf("<%s>", n.Type())),
+	)
 }
 
 // delegate to kube.Field's field
@@ -53,8 +69,6 @@ func (n *Node) FullPath() []string {
 	fullPath = append(fullPath, n.field.Name)
 	return fullPath
 }
-
-// END: THIS SHOULD BE NODE's FIELD
 
 func createNodeTree(fieldTree map[string]*kube.Field) map[string]*Node {
 	result := make(map[string]*Node)
