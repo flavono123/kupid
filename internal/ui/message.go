@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"github.com/flavono123/kupid/internal/kube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -13,11 +12,11 @@ type selectGVKMsg struct {
 
 // schema
 type pickFieldMsg struct {
-	field kube.Field
+	node *Node
 }
 
 type unpickFieldMsg struct {
-	field kube.Field
+	node *Node
 }
 
 // main
@@ -27,7 +26,7 @@ type resourceMsg struct {
 
 // result
 type resultMsg struct {
-	fields []*kube.Field
-	objs   []*unstructured.Unstructured
-	add    bool // HACK: to avoid previous table's index out of range
+	nodes []*Node
+	objs  []*unstructured.Unstructured
+	add   bool // HACK: to avoid previous table's index out of range
 }

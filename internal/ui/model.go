@@ -20,16 +20,16 @@ const (
 )
 
 type mainModel struct {
-	state          sessionState
-	keys           keyMap
-	vp             viewport.Model
-	schema         *schemaModel
-	result         *resultModel
-	curGVK         schema.GroupVersionKind
-	informers      map[schema.GroupVersionKind]*kube.Informer
-	stop           chan struct{}
-	selectedFields []*kube.Field
-	kbar           *kbarModel
+	state         sessionState
+	keys          keyMap
+	vp            viewport.Model
+	schema        *schemaModel
+	result        *resultModel
+	curGVK        schema.GroupVersionKind
+	informers     map[schema.GroupVersionKind]*kube.Informer
+	stop          chan struct{}
+	selectedNodes []*Node
+	kbar          *kbarModel
 }
 
 func InitModel() *mainModel {
@@ -47,16 +47,16 @@ func InitModel() *mainModel {
 	}
 
 	return &mainModel{
-		state:          schemaView,
-		keys:           newKeyMap(),
-		schema:         newSchemaModel(initGvk),
-		result:         newResultModel(informers[initGvk].GetObjects()),
-		vp:             viewport.New(WIDTH, HEIGHT),
-		curGVK:         initGvk,
-		kbar:           newKbarModel(),
-		informers:      informers,
-		stop:           nil,
-		selectedFields: []*kube.Field{},
+		state:         schemaView,
+		keys:          newKeyMap(),
+		schema:        newSchemaModel(initGvk),
+		result:        newResultModel(informers[initGvk].GetObjects()),
+		vp:            viewport.New(WIDTH, HEIGHT),
+		curGVK:        initGvk,
+		kbar:          newKbarModel(),
+		informers:     informers,
+		stop:          nil,
+		selectedNodes: []*Node{},
 	}
 }
 
@@ -108,37 +108,37 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case resourceMsg:
 		return m, func() tea.Msg {
 			return resultMsg{
-				fields: m.selectedFields,
-				objs:   msg.objs,
+				nodes: m.selectedNodes,
+				objs:  msg.objs,
 			}
 		}
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
 		m.schema.Reset(msg.gvk)
 		m.kbar.visible = false
-		m.selectedFields = []*kube.Field{}
+		m.selectedNodes = []*Node{}
 		return m, m.inform(msg.gvk)
 	case pickFieldMsg:
-		m.selectedFields = append(m.selectedFields, &msg.field)
+		m.selectedNodes = append(m.selectedNodes, msg.node)
 		return m, func() tea.Msg {
 			return resultMsg{
-				fields: m.selectedFields,
-				objs:   m.informers[m.curGVK].GetObjects(),
-				add:    true,
+				nodes: m.selectedNodes,
+				objs:  m.informers[m.curGVK].GetObjects(),
+				add:   true,
 			}
 		}
 	case unpickFieldMsg:
-		for idx, field := range m.selectedFields {
-			if field.Name == msg.field.Name {
-				m.selectedFields = append(m.selectedFields[:idx], m.selectedFields[idx+1:]...)
+		for idx, node := range m.selectedNodes {
+			if node.Name() == msg.node.Name() {
+				m.selectedNodes = append(m.selectedNodes[:idx], m.selectedNodes[idx+1:]...)
 				break
 			}
 		}
 		return m, func() tea.Msg {
 			return resultMsg{
-				fields: m.selectedFields,
-				objs:   m.informers[m.curGVK].GetObjects(),
-				add:    false,
+				nodes: m.selectedNodes,
+				objs:  m.informers[m.curGVK].GetObjects(),
+				add:   false,
 			}
 		}
 	}

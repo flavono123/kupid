@@ -18,7 +18,9 @@ import (
 )
 
 type schemaModel struct {
-	fields map[string]*kube.Field
+	// fields map[string]*kube.Field
+	nodes map[string]*Node
+
 	vp     viewport.Model
 	width  int
 	height int
@@ -26,8 +28,10 @@ type schemaModel struct {
 	style     lipgloss.Style
 	cursor    int
 	curLineNo int
-	curField  *kube.Field
-	curGVK    schema.GroupVersionKind
+	// curField  *kube.Field
+	curNode *Node
+
+	curGVK schema.GroupVersionKind
 
 	keys schemaKeyMap
 	help help.Model
@@ -35,6 +39,7 @@ type schemaModel struct {
 
 func newSchemaModel(gvk schema.GroupVersionKind) *schemaModel {
 	fields, err := kube.CreateFieldTree(gvk)
+	nodes := createNodeTree(fields)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
@@ -48,7 +53,7 @@ func newSchemaModel(gvk schema.GroupVersionKind) *schemaModel {
 	height := SCHEMA_HEIGHT - vMargin
 	vp := viewport.New(width, height)
 	m := &schemaModel{
-		fields: fields,
+		nodes:  nodes,
 		vp:     vp,
 		width:  width,
 		height: height,
@@ -58,7 +63,7 @@ func newSchemaModel(gvk schema.GroupVersionKind) *schemaModel {
 		keys:   newSchemaKeyMap(),
 		help:   help.New(),
 	}
-	content := m.renderRecursive(m.fields)
+	content := m.renderRecursive(m.nodes)
 	content = strings.TrimSuffix(content, "\n")
 	vp.SetContent(content)
 
@@ -89,22 +94,22 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.vp.LineDown(SCHEMA_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.action):
-			if m.curField == nil {
+			if m.curNode == nil {
 				break
 			}
 
-			if m.curField.Foldable() {
+			if m.curNode.Foldable() {
 				m.toggleFolder()
 			} else { // selectable, for leaf fields
-				if m.curField.Selected {
-					m.curField.Selected = false
+				if m.curNode.Selected() {
+					m.curNode.field.Selected = false
 					retCmd = func() tea.Msg {
-						return unpickFieldMsg{field: *m.curField}
+						return unpickFieldMsg{node: m.curNode}
 					}
 				} else {
-					m.curField.Selected = true
+					m.curNode.field.Selected = true
 					retCmd = func() tea.Msg {
-						return pickFieldMsg{field: *m.curField}
+						return pickFieldMsg{node: m.curNode}
 					}
 				}
 			}
@@ -116,7 +121,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *schemaModel) View() string {
 	m.curLineNo = 0 // to avoid accumulating line number infinitely
-	content := m.renderRecursive(m.fields)
+	content := m.renderRecursive(m.nodes)
 	content = strings.TrimSuffix(content, "\n")
 	m.vp.SetContent(content)
 
@@ -132,15 +137,16 @@ func (m *schemaModel) isCursor() bool {
 }
 
 func (m *schemaModel) toggleFolder() {
-	if m.curField != nil && m.curField.Foldable() {
-		m.curField.Expanded = !m.curField.Expanded
+	if m.curNode != nil && m.curNode.Foldable() {
+		// TODO: move to node's field
+		m.curNode.field.Expanded = !m.curNode.field.Expanded
 	}
 }
 
-func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
+func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 	var result strings.Builder
 	keys := []string{}
-	for key := range fields {
+	for key := range nodes {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -149,27 +155,27 @@ func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 		if key == "apiVersion" || key == "kind" || key == "metadata" {
 			continue
 		}
-		field := fields[key]
+		node := nodes[key]
 
-		indent := strings.Repeat(" ", field.Level*2)
+		indent := strings.Repeat(" ", node.field.Level*2)
 		var cursorStr string
 		cursor := lipgloss.NewStyle().Foreground(theme.Text)
 		if m.isCursor() {
 			cursorStr = ">"
-			m.curField = field
+			m.curNode = node
 		} else {
 			cursorStr = " "
 		}
 		folder := lipgloss.NewStyle().Foreground(theme.Subtext1)
 		var foldStr string
-		if field.Foldable() {
-			if field.Expanded {
+		if node.Foldable() {
+			if node.Expanded() {
 				foldStr = "-"
 			} else {
 				foldStr = "+"
 			}
 		} else { // selectable
-			if field.Selected {
+			if node.Selected() {
 				foldStr = "◉"
 			} else {
 				foldStr = "○"
@@ -182,25 +188,26 @@ func (m *schemaModel) renderRecursive(fields map[string]*kube.Field) string {
 			indent,
 			cursor.Render(cursorStr),
 			folder.Render(foldStr),
-			renderField(field),
+			renderNode(node),
 		)) + "\n")
 		m.curLineNo++
 
-		if field.Children != nil && field.Expanded {
-			result.WriteString(m.renderRecursive(field.Children))
+		if node.children != nil && node.Expanded() {
+			result.WriteString(m.renderRecursive(node.children))
 		}
 	}
 
 	return result.String()
 }
 
-func renderField(field *kube.Field) string {
+// TODO: move to node's method
+func renderNode(node *Node) string {
 	n := lipgloss.NewStyle().Foreground(theme.Green)
 	t := lipgloss.NewStyle().Foreground(theme.Peach)
 	return lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		n.Render(field.Name),
-		t.Render(fmt.Sprintf("<%s>", field.Type)),
+		n.Render(node.Name()),
+		t.Render(fmt.Sprintf("<%s>", node.Type())),
 	)
 }
 
@@ -210,6 +217,7 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind) {
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	m.fields = fields
+	nodes := createNodeTree(fields)
+	m.nodes = nodes
 	m.cursor = 0
 }
