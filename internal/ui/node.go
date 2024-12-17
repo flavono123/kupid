@@ -3,9 +3,15 @@ package ui
 import "github.com/flavono123/kupid/internal/kube"
 
 type Node struct {
-	field *kube.Field
+	Expanded bool
+	Selected bool
 
+	field    *kube.Field
 	children map[string]*Node
+}
+
+func (n *Node) Foldable() bool {
+	return n.children != nil
 }
 
 // delegate to kube.Field's field
@@ -38,33 +44,17 @@ func (n *Node) Required() bool {
 	return n.field.Required
 }
 
-// START: THIS SHOULD BE NODE's FIELD
-func (n *Node) Expanded() bool {
-	if n.field == nil {
-		return false
-	}
-	return n.field.Expanded
-}
-
-func (n *Node) Selected() bool {
-	if n.field == nil {
-		return false
-	}
-	return n.field.Selected
-}
-
 func (n *Node) FullPath() []string {
 	if n.field == nil {
-		return nil
+		return []string{}
 	}
-	return n.field.FullPath()
+	fullPath := []string{}
+	fullPath = append(fullPath, n.field.Prefix...)
+	fullPath = append(fullPath, n.field.Name)
+	return fullPath
 }
 
 // END: THIS SHOULD BE NODE's FIELD
-
-func (n *Node) Foldable() bool {
-	return n.children != nil
-}
 
 func createNodeTree(fieldTree map[string]*kube.Field) map[string]*Node {
 	result := make(map[string]*Node)

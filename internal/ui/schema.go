@@ -101,13 +101,13 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.curNode.Foldable() {
 				m.toggleFolder()
 			} else { // selectable, for leaf fields
-				if m.curNode.Selected() {
-					m.curNode.field.Selected = false
+				if m.curNode.Selected {
+					m.curNode.Selected = false
 					retCmd = func() tea.Msg {
 						return unpickFieldMsg{node: m.curNode}
 					}
 				} else {
-					m.curNode.field.Selected = true
+					m.curNode.Selected = true
 					retCmd = func() tea.Msg {
 						return pickFieldMsg{node: m.curNode}
 					}
@@ -138,8 +138,7 @@ func (m *schemaModel) isCursor() bool {
 
 func (m *schemaModel) toggleFolder() {
 	if m.curNode != nil && m.curNode.Foldable() {
-		// TODO: move to node's field
-		m.curNode.field.Expanded = !m.curNode.field.Expanded
+		m.curNode.Expanded = !m.curNode.Expanded
 	}
 }
 
@@ -169,13 +168,13 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 		folder := lipgloss.NewStyle().Foreground(theme.Subtext1)
 		var foldStr string
 		if node.Foldable() {
-			if node.Expanded() {
+			if node.Expanded {
 				foldStr = "-"
 			} else {
 				foldStr = "+"
 			}
 		} else { // selectable
-			if node.Selected() {
+			if node.Selected {
 				foldStr = "◉"
 			} else {
 				foldStr = "○"
@@ -192,7 +191,7 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 		)) + "\n")
 		m.curLineNo++
 
-		if node.children != nil && node.Expanded() {
+		if node.children != nil && node.Expanded {
 			result.WriteString(m.renderRecursive(node.children))
 		}
 	}
