@@ -182,13 +182,19 @@ func createFieldList(schema *spec.Schema, prefix []string, level int, document *
 		history[refString] = true
 	}
 
+	// copy history to pass for each branch
+	nextHistory := make(map[string]bool)
+	for k, v := range history {
+		nextHistory[k] = v
+	}
+
 	resolvedSchema := schema
 	if resolved := resolveRef(refString, document); resolved != nil {
 		resolvedSchema = resolved
 	}
 
 	for key, prop := range resolvedSchema.Properties {
-		children, err := createFieldList(&prop, append(prefix, key), level+1, document, history)
+		children, err := createFieldList(&prop, append(prefix, key), level+1, document, nextHistory)
 		if err != nil {
 			return nil, err
 		}
@@ -200,7 +206,7 @@ func createFieldList(schema *spec.Schema, prefix []string, level int, document *
 	}
 
 	for _, subSchema := range resolvedSchema.AllOf {
-		nodes, err := createFieldList(&subSchema, prefix, level, document, history)
+		nodes, err := createFieldList(&subSchema, prefix, level, document, nextHistory)
 		if err != nil {
 			return nil, err
 		}
@@ -209,14 +215,14 @@ func createFieldList(schema *spec.Schema, prefix []string, level int, document *
 
 	if resolvedSchema.Items != nil {
 		// HACK: special char might be needed such as `[]`?
-		nodes, err := createFieldList(resolvedSchema.Items.Schema, prefix, level, document, history)
+		nodes, err := createFieldList(resolvedSchema.Items.Schema, prefix, level, document, nextHistory)
 		if err != nil {
 			return nil, err
 		}
 		result = nodes
 	}
-	if resolvedSchema.AdditionalProperties != nil && resolvedSchema.AdditionalProperties.Allows {
-		nodes, err := createFieldList(resolvedSchema.AdditionalProperties.Schema, prefix, level, document, history)
+	if resolvedSchema.AdditionalProperties != nil && resolvedSchema.AdditionalProperties.Schema != nil {
+		nodes, err := createFieldList(resolvedSchema.AdditionalProperties.Schema, prefix, level, document, nextHistory)
 		if err != nil {
 			return nil, err
 		}
