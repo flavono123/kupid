@@ -17,6 +17,7 @@ type Node struct {
 
 	field    *kube.Field
 	name     string
+	prefix   []string
 	level    int
 	children map[string]*Node
 }
@@ -51,6 +52,13 @@ func (n *Node) Prefix() []string {
 	return n.field.Prefix
 }
 
+func (n *Node) NodeFullPath() []string {
+	fullPath := []string{}
+	fullPath = append(fullPath, n.prefix...)
+	fullPath = append(fullPath, n.name)
+	return fullPath
+}
+
 func (n *Node) Type() string {
 	if n.field == nil {
 		return ""
@@ -65,11 +73,12 @@ func (n *Node) Required() bool {
 	return n.field.Required
 }
 
+// TODO: move to kube.Field, use for digging array or map(ref?) val to create node
 func (n *Node) FullPath() []string {
-	if n.field == nil {
-		return []string{}
-	}
 	fullPath := []string{}
+	if n.field == nil {
+		return fullPath
+	}
 	fullPath = append(fullPath, n.field.Prefix...)
 	fullPath = append(fullPath, n.field.Name)
 	return fullPath
@@ -82,40 +91,47 @@ func (n *Node) Level() int {
 	return n.field.Level
 }
 
-func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstructured) map[string]*Node {
+func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
 	result := make(map[string]*Node)
 
 	for key, field := range fieldTree {
+		prefix := field.Prefix
+		if !comparePrefix(nodePrefix, field.Prefix) { // if index has injected
+			prefix = nodePrefix
+		}
+
 		if field.Children == nil {
 			result[key] = &Node{
 				field:    field,
+				prefix:   prefix,
+				name:     key,
 				children: nil,
 			}
 		} else {
+			childPrefix := append(prefix, key)
+			children := make(map[string]*Node)
 			if strings.HasPrefix(field.Type, "[]") {
-				grandChildren := createNodeTree(field.Children, objs)
-				maxLength := 1 //getMaxLength(field.Prefix, objs)
-				children := make(map[string]*Node)
+				maxLength := 1 //getMaxLength(field.Prefix, objs) // TODO:
 				for i := 0; i < maxLength; i++ {
 					idx := strconv.Itoa(i)
+					grandChildren := createNodeTree(field.Children, objs, append(childPrefix, idx))
 					child := Node{
 						field:    nil,
 						name:     idx,
+						prefix:   childPrefix,
 						level:    field.Level + 1,
 						children: grandChildren,
 					}
 					children[idx] = &child
 				}
-				result[key] = &Node{
-					field:    field,
-					children: children,
-				}
 			} else {
-				children := createNodeTree(field.Children, objs)
-				result[key] = &Node{
-					field:    field,
-					children: children,
-				}
+				children = createNodeTree(field.Children, objs, childPrefix)
+			}
+			result[key] = &Node{
+				field:    field,
+				prefix:   prefix,
+				name:     key,
+				children: children,
 			}
 		}
 	}
@@ -137,3 +153,17 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 // 	}
 // 	return maxLength
 // }
+
+func comparePrefix(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}

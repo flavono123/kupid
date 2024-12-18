@@ -61,7 +61,12 @@ func InitModel() *mainModel {
 }
 
 func (m *mainModel) Init() tea.Cmd {
-	return m.inform(m.curGVK)
+	m.inform(m.curGVK)
+	return func() tea.Msg {
+		return resourceMsg{
+			objs: m.informers[m.curGVK].GetObjects(),
+		}
+	}
 }
 
 func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -186,7 +191,6 @@ func (m *mainModel) View() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.vp.View(),
-		m.currentFocusedView(),
 	)
 }
 

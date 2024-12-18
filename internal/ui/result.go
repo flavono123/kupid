@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -116,7 +117,7 @@ func (m *resultModel) val(node *Node, obj *unstructured.Unstructured) string {
 	// TODO: map[string]interface{}: create children field(ui only) with unique set of resources' keys
 	// TODO: array: create children field(ui only) with max length of resources' values
 	// TODO: inject key or index among of path
-	val, found, err := unstructured.NestedFieldNoCopy(obj.Object, node.FullPath()...)
+	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
 	if err != nil {
 		return "-"
 	}
@@ -141,4 +142,41 @@ func (m *resultModel) focus() {
 func (m *resultModel) blur() {
 	m.focused = false
 	m.table.Blur()
+}
+
+func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
+	var current interface{} = obj
+
+	for i, field := range fields {
+		// 숫자인지 확인 (배열 인덱스)
+		if index, err := strconv.Atoi(field); err == nil {
+			// 현재 값이 슬라이스인지 확인
+			if slice, ok := current.([]interface{}); ok {
+				if index >= len(slice) {
+					return nil, false, fmt.Errorf("index %d out of bounds", index)
+				}
+				current = slice[index]
+			} else {
+				return nil, false, fmt.Errorf("expected array, got %T", current)
+			}
+		} else {
+			// 맵인지 확인
+			if m, ok := current.(map[string]interface{}); ok {
+				var exists bool
+				current, exists = m[field]
+				if !exists {
+					return nil, false, nil
+				}
+			} else {
+				return nil, false, fmt.Errorf("expected map, got %T", current)
+			}
+		}
+
+		// 마지막 필드면 현재 값 반환
+		if i == len(fields)-1 {
+			return current, true, nil
+		}
+	}
+
+	return current, true, nil
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -39,7 +40,7 @@ type schemaModel struct {
 
 func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *schemaModel {
 	fields, err := kube.CreateFieldTree(gvk)
-	nodes := createNodeTree(fields, objs)
+	nodes := createNodeTree(fields, objs, []string{})
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
@@ -127,7 +128,9 @@ func (m *schemaModel) View() string {
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.style.Render(m.vp.View()),
-		m.help.View(m.keys),
+		// m.help.View(m.keys),
+		fmt.Sprintf("%v", m.curNode.FullPath()),
+		fmt.Sprintf("%v", m.curNode.NodeFullPath()),
 	)
 }
 
@@ -205,7 +208,7 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Un
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	nodes := createNodeTree(fields, objs)
+	nodes := createNodeTree(fields, objs, []string{})
 	m.nodes = nodes
 	m.cursor = 0
 }
