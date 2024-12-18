@@ -215,7 +215,7 @@ func createFieldList(schema *spec.Schema, prefix []string, level int, document *
 
 	if resolvedSchema.Items != nil {
 		// HACK: special char might be needed such as `[]`?
-		nodes, err := createFieldList(resolvedSchema.Items.Schema, prefix, level, document, nextHistory)
+		nodes, err := createFieldList(resolvedSchema.Items.Schema, append(prefix, "[]"), level+1, document, nextHistory)
 		if err != nil {
 			return nil, err
 		}

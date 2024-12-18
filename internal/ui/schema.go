@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -36,9 +37,9 @@ type schemaModel struct {
 	help help.Model
 }
 
-func newSchemaModel(gvk schema.GroupVersionKind) *schemaModel {
+func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *schemaModel {
 	fields, err := kube.CreateFieldTree(gvk)
-	nodes := createNodeTree(fields)
+	nodes := createNodeTree(fields, objs)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
@@ -155,7 +156,7 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 		}
 		node := nodes[key]
 
-		indent := strings.Repeat(" ", node.field.Level*2)
+		indent := strings.Repeat(" ", node.Level()*2)
 		var cursorStr string
 		cursor := lipgloss.NewStyle().Foreground(theme.Text)
 		if m.isCursor() {
@@ -198,13 +199,13 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 	return result.String()
 }
 
-func (m *schemaModel) Reset(gvk schema.GroupVersionKind) {
+func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
 	m.curGVK = gvk // TODO: check if this is necessary
 	fields, err := kube.CreateFieldTree(m.curGVK)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	nodes := createNodeTree(fields)
+	nodes := createNodeTree(fields, objs)
 	m.nodes = nodes
 	m.cursor = 0
 }

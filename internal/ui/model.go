@@ -49,7 +49,7 @@ func InitModel() *mainModel {
 	return &mainModel{
 		state:         schemaView,
 		keys:          newKeyMap(),
-		schema:        newSchemaModel(initGvk),
+		schema:        newSchemaModel(initGvk, informers[initGvk].GetObjects()),
 		result:        newResultModel(informers[initGvk].GetObjects()),
 		vp:            viewport.New(WIDTH, HEIGHT),
 		curGVK:        initGvk,
@@ -114,10 +114,15 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
-		m.schema.Reset(msg.gvk)
+		m.inform(msg.gvk)
+		m.schema.Reset(msg.gvk, m.informers[msg.gvk].GetObjects())
 		m.kbar.visible = false
 		m.selectedNodes = []*Node{}
-		return m, m.inform(msg.gvk)
+		return m, func() tea.Msg {
+			return resourceMsg{
+				objs: m.getInformer(msg.gvk).GetObjects(),
+			}
+		}
 	case pickFieldMsg:
 		m.selectedNodes = append(m.selectedNodes, msg.node)
 		return m, func() tea.Msg {
@@ -207,11 +212,7 @@ func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
 	}
 	m.stop = stop
 
-	return func() tea.Msg {
-		return resourceMsg{
-			objs: m.getInformer(gvk).GetObjects(),
-		}
-	}
+	return nil
 }
 
 func (m *mainModel) currentFocusedView() string {

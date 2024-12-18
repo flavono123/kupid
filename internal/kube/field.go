@@ -2,11 +2,11 @@ package kube
 
 type Field struct {
 	Name     string
-	Prefix   []string
-	Level    int
+	Prefix   []string // TODO: move to node
+	Level    int      // ? move to node?
 	Type     string
 	Required bool
-
-	Enum     []string          // optional
-	Children map[string]*Field // optional
+	// optional
+	Enum     []string
+	Children map[string]*Field
 }
