@@ -118,12 +118,14 @@ func (m *resultModel) val(node *Node, obj *unstructured.Unstructured) string {
 	// TODO: array: create children field(ui only) with max length of resources' values
 	// TODO: inject key or index among of path
 	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
-	if err != nil {
+	if err != nil || !found {
 		return "-"
 	}
-	if !found {
-		return "-"
+
+	if str, ok := val.(string); ok && len(str) == 0 { // edge case `""`
+		return "\"\""
 	}
+
 	return fmt.Sprintf("%v", val)
 }
 

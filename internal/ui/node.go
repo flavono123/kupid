@@ -101,11 +101,33 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 		}
 
 		if field.Children == nil {
-			result[key] = &Node{
-				field:    field,
-				prefix:   prefix,
-				name:     key,
-				children: nil,
+			if strings.HasPrefix(field.Type, "[]") {
+				childPrefix := append(prefix, key)
+				maxLength := getMaxLength(childPrefix, objs)
+				children := make(map[string]*Node)
+				for i := 0; i < maxLength; i++ {
+					idx := strconv.Itoa(i)
+					children[idx] = &Node{
+						field:    nil,
+						name:     idx,
+						prefix:   childPrefix,
+						level:    field.Level + 1,
+						children: nil, // TODO: refactor, grandChildren is just a nil
+					}
+				}
+				result[key] = &Node{
+					field:    field,
+					prefix:   prefix,
+					name:     key,
+					children: children,
+				}
+			} else {
+				result[key] = &Node{
+					field:    field,
+					prefix:   prefix,
+					name:     key,
+					children: nil,
+				}
 			}
 		} else {
 			childPrefix := append(prefix, key)
