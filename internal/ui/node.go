@@ -143,12 +143,13 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 func getMaxLength(arrayPath []string, objs []*unstructured.Unstructured) int {
 	maxLength := 1 // if no array, return 1 to render only fields
 	for _, obj := range objs {
-		val, found, err := unstructured.NestedSlice(obj.Object, arrayPath...)
+		val, found, err := GetNestedValueWithIndex(obj.Object, arrayPath...)
 		if err != nil || !found {
 			continue
 		}
-		if len(val) > maxLength {
-			maxLength = len(val)
+		arr := val.([]interface{})
+		if len(arr) > maxLength {
+			maxLength = len(arr)
 		}
 	}
 	return maxLength

@@ -46,6 +46,8 @@ func InitModel() *mainModel {
 		initGvk: kube.NewInformer(gvr),
 	}
 
+	informers[initGvk].Inform()
+
 	return &mainModel{
 		state:         schemaView,
 		keys:          newKeyMap(),
