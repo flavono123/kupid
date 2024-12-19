@@ -96,66 +96,41 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 
 	for key, field := range fieldTree {
 		prefix := field.Prefix
-		if !comparePrefix(nodePrefix, field.Prefix) { // if index has injected
+		if !comparePrefix(nodePrefix, field.Prefix) {
 			prefix = nodePrefix
 		}
 
-		if field.Children == nil {
-			if strings.HasPrefix(field.Type, "[]") {
-				childPrefix := append(prefix, key)
-				maxLength := getMaxLength(childPrefix, objs)
-				children := make(map[string]*Node)
-				for i := 0; i < maxLength; i++ {
-					idx := strconv.Itoa(i)
-					children[idx] = &Node{
-						field:    nil,
-						name:     idx,
-						prefix:   childPrefix,
-						level:    field.Level + 1,
-						children: nil, // TODO: refactor, grandChildren is just a nil
-					}
+		childPrefix := append(prefix, key)
+		children := map[string]*Node(nil)
+
+		if strings.HasPrefix(field.Type, "[]") { // array; inject index keys
+			maxLength := getMaxLength(childPrefix, objs)
+			children = make(map[string]*Node)
+
+			for i := 0; i < maxLength; i++ {
+				idx := strconv.Itoa(i)
+				grandChildren := map[string]*Node(nil)
+				if field.Children != nil {
+					grandChildren = createNodeTree(field.Children, objs, append(childPrefix, idx))
 				}
-				result[key] = &Node{
-					field:    field,
-					prefix:   prefix,
-					name:     key,
-					children: children,
-				}
-			} else {
-				result[key] = &Node{
-					field:    field,
-					prefix:   prefix,
-					name:     key,
-					children: nil,
+
+				children[idx] = &Node{
+					field:    nil,
+					name:     idx,
+					prefix:   childPrefix,
+					level:    field.Level + 1,
+					children: grandChildren,
 				}
 			}
-		} else {
-			childPrefix := append(prefix, key)
-			children := make(map[string]*Node)
-			if strings.HasPrefix(field.Type, "[]") {
-				// childPrefix is the path of node itself
-				maxLength := getMaxLength(childPrefix, objs)
-				for i := 0; i < maxLength; i++ {
-					idx := strconv.Itoa(i)
-					grandChildren := createNodeTree(field.Children, objs, append(childPrefix, idx))
-					child := Node{
-						field:    nil,
-						name:     idx,
-						prefix:   childPrefix,
-						level:    field.Level + 1,
-						children: grandChildren,
-					}
-					children[idx] = &child
-				}
-			} else {
-				children = createNodeTree(field.Children, objs, childPrefix)
-			}
-			result[key] = &Node{
-				field:    field,
-				prefix:   prefix,
-				name:     key,
-				children: children,
-			}
+		} else if field.Children != nil {
+			children = createNodeTree(field.Children, objs, childPrefix)
+		}
+
+		result[key] = &Node{
+			field:    field,
+			prefix:   prefix,
+			name:     key,
+			children: children,
 		}
 	}
 
