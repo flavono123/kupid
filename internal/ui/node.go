@@ -122,6 +122,24 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 					children: grandChildren,
 				}
 			}
+		} else if strings.HasPrefix(field.Type, "map[string]") { // map; inject string keys
+			keys := getDistinctKeys(childPrefix, objs)
+			children = make(map[string]*Node)
+			for _, key := range keys {
+				grandChildren := map[string]*Node(nil)
+				if field.Children != nil {
+					grandChildren = createNodeTree(field.Children, objs, append(childPrefix, key))
+				}
+
+				children[key] = &Node{
+					field:    nil,
+					name:     key,
+					prefix:   childPrefix,
+					level:    field.Level + 1,
+					children: grandChildren,
+				}
+			}
+
 		} else if field.Children != nil {
 			children = createNodeTree(field.Children, objs, childPrefix)
 		}
@@ -164,4 +182,25 @@ func comparePrefix(a, b []string) bool {
 	}
 
 	return true
+}
+
+func getDistinctKeys(mapPath []string, objs []*unstructured.Unstructured) []string {
+	keys := []string{}
+	exists := map[string]struct{}{}
+
+	for _, obj := range objs {
+		val, found, err := GetNestedValueWithIndex(obj.Object, mapPath...)
+		if err != nil || !found {
+			continue
+		}
+		mapString := val.(map[string]interface{})
+		for k := range mapString {
+			if _, ok := exists[k]; !ok {
+				exists[k] = struct{}{}
+				keys = append(keys, k)
+			}
+		}
+	}
+
+	return keys
 }

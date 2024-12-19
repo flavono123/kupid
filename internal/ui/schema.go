@@ -154,7 +154,7 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 	sort.Strings(keys)
 
 	for _, key := range keys {
-		if key == "apiVersion" || key == "kind" || key == "metadata" {
+		if key == "apiVersion" || key == "kind" {
 			continue
 		}
 		node := nodes[key]
