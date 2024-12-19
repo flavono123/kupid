@@ -111,7 +111,8 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 			childPrefix := append(prefix, key)
 			children := make(map[string]*Node)
 			if strings.HasPrefix(field.Type, "[]") {
-				maxLength := 1 //getMaxLength(field.Prefix, objs) // TODO:
+				// childPrefix is the path of node itself
+				maxLength := getMaxLength(childPrefix, objs)
 				for i := 0; i < maxLength; i++ {
 					idx := strconv.Itoa(i)
 					grandChildren := createNodeTree(field.Children, objs, append(childPrefix, idx))
@@ -139,20 +140,19 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 	return result
 }
 
-// func getMaxLength(arrayPath []string, objs []*unstructured.Unstructured) int {
-// 	maxLength := 1 // if no array, return 1 to render only fields
-// 	for _, obj := range objs {
-// 		val, found, err := unstructured.NestedFieldNoCopy(obj.Object, arrayPath...)
-// 		if err != nil || !found {
-// 			continue
-// 		}
-// 		arr := val.([]interface{})
-// 		if len(arr) > maxLength {
-// 			maxLength = len(arr)
-// 		}
-// 	}
-// 	return maxLength
-// }
+func getMaxLength(arrayPath []string, objs []*unstructured.Unstructured) int {
+	maxLength := 1 // if no array, return 1 to render only fields
+	for _, obj := range objs {
+		val, found, err := unstructured.NestedSlice(obj.Object, arrayPath...)
+		if err != nil || !found {
+			continue
+		}
+		if len(val) > maxLength {
+			maxLength = len(val)
+		}
+	}
+	return maxLength
+}
 
 func comparePrefix(a, b []string) bool {
 	if len(a) != len(b) {
