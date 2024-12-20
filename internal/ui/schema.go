@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -151,7 +152,7 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 	for key := range nodes {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	sortKeys(keys)
 
 	for _, key := range keys {
 		if key == "apiVersion" || key == "kind" {
@@ -211,4 +212,17 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Un
 	nodes := createNodeTree(fields, objs, []string{})
 	m.nodes = nodes
 	m.cursor = 0
+}
+
+func sortKeys(keys []string) {
+	_, err := strconv.Atoi(keys[0])
+	if err != nil {
+		sort.Strings(keys)
+	} else {
+		sort.Slice(keys, func(i, j int) bool {
+			numI, _ := strconv.Atoi(keys[i])
+			numJ, _ := strconv.Atoi(keys[j])
+			return numI < numJ
+		})
+	}
 }
