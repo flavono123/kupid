@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"log"
 	"sort"
 	"strconv"
@@ -130,8 +129,6 @@ func (m *schemaModel) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.style.Render(m.vp.View()),
 		// m.help.View(m.keys),
-		fmt.Sprintf("%v", m.curNode.FullPath()),
-		fmt.Sprintf("%v", m.curNode.NodeFullPath()),
 	)
 }
 
