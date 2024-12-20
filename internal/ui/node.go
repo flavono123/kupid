@@ -29,6 +29,11 @@ func (n *Node) Foldable() bool {
 func (n *Node) render() string {
 	name := lipgloss.NewStyle().Foreground(theme.Green)
 	displayType := lipgloss.NewStyle().Foreground(theme.Peach)
+
+	if n.Type() == "" {
+		return name.Render(n.Name())
+	}
+
 	return lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		name.Render(n.Name()),
