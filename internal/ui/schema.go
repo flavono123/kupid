@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"log"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,7 +31,9 @@ type schemaModel struct {
 	style     lipgloss.Style
 	cursor    int
 	curLineNo int
+	prevNode  *Node
 	curNode   *Node
+	curLines  []*Line
 	curGVK    schema.GroupVersionKind
 
 	keys schemaKeyMap
@@ -39,10 +42,10 @@ type schemaModel struct {
 
 func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *schemaModel {
 	fields, err := kube.CreateFieldTree(gvk)
-	nodes := createNodeTree(fields, objs, []string{})
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
+	nodes := createNodeTree(fields, objs, []string{})
 
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -53,17 +56,21 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 	height := SCHEMA_HEIGHT - vMargin
 	vp := viewport.New(width, height)
 	m := &schemaModel{
-		nodes:  nodes,
-		vp:     vp,
-		width:  width,
-		height: height,
-		style:  style,
-		cursor: 0,
-		curGVK: gvk,
-		keys:   newSchemaKeyMap(),
-		help:   help.New(),
+		nodes:    nodes,
+		vp:       vp,
+		width:    width,
+		height:   height,
+		style:    style,
+		cursor:   0,
+		curGVK:   gvk,
+		curLines: []*Line{},
+		prevNode: nil,
+		curNode:  nil,
+		keys:     newSchemaKeyMap(),
+		help:     help.New(),
 	}
-	content := m.renderRecursive(m.nodes)
+	m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+	content := m.renderRecursive(m.curLines)
 	content = strings.TrimSuffix(content, "\n")
 	vp.SetContent(content)
 
@@ -100,6 +107,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curNode.Foldable() {
 				m.toggleCurrentNodeFolder()
+				m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
 			} else { // selectable, for leaf fields
 				if m.curNode.Selected {
 					m.curNode.Selected = false
@@ -113,15 +121,25 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+
+		// BUG: when viewport is adjusted by expland all/level then fold back, the cursor is not rendered
+		// reproduce - expand level of status in kind Pod(long enough) and fold
 		case key.Matches(msg, m.keys.levelExpand):
 			if m.curNode != nil && m.curNode.Foldable() {
 				toggledExpanded := !m.curNode.Expanded
+				prevNode := m.curNode
 				m.toggleExpandRecursive(m.nodes, toggledExpanded, false)
+				m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+				m.setCursor(prevNode.FullPath())
+
 			}
 		case key.Matches(msg, m.keys.allExpand):
 			if m.curNode != nil && m.curNode.Foldable() {
 				toggledExpanded := !m.curNode.Expanded
+				prevNode := m.curNode
 				m.toggleExpandRecursive(m.nodes, toggledExpanded, true)
+				m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+				m.setCursor(prevNode.FullPath())
 			}
 		}
 	}
@@ -130,26 +148,36 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *schemaModel) View() string {
-	m.curLineNo = 0 // to avoid accumulating line number infinitely
-	content := m.renderRecursive(m.nodes)
+	content := m.renderRecursive(m.curLines)
 	content = strings.TrimSuffix(content, "\n")
 	m.vp.SetContent(content)
-
-	// TODO: responsibility of rendering cursor is up to the new struct, line
-	// if m.cursor > m.curLineNo-1 {
-	// 	m.cursor = min(m.curLineNo-1, SCHEMA_CURSOR_BOTTOM)
-	// }
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.style.Render(m.vp.View()),
 		// m.help.View(m.keys),
-		fmt.Sprintf("cursor: %d, curLineNo: %d", m.cursor, m.curLineNo),
+		fmt.Sprintf("cursor: %d, curLineNo: %d, vpYOffset: %d", m.cursor, m.curLineNo, m.vp.YOffset),
 	)
 }
 
 // utils
-func (m *schemaModel) isCursor() bool {
-	return m.curLineNo-m.vp.YOffset == m.cursor
+func (m *schemaModel) isCursor(curLineNo int) bool {
+	return m.cursor == curLineNo-m.vp.YOffset
+}
+
+func (m *schemaModel) setCursor(path []string) {
+	for _, line := range m.curLines {
+		if reflect.DeepEqual(line.node.FullPath(), path) {
+			actualIndex := line.index
+			if actualIndex > SCHEMA_CURSOR_BOTTOM {
+				m.vp.YOffset = actualIndex - SCHEMA_EXPAND_MULTI_MARGIN
+				actualIndex = SCHEMA_EXPAND_MULTI_MARGIN
+			}
+
+			m.cursor = actualIndex
+
+			return
+		}
+	}
 }
 
 func (m *schemaModel) toggleCurrentNodeFolder() {
@@ -170,8 +198,8 @@ func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool,
 	}
 }
 
-func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
-	var result strings.Builder
+func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) ([]*Line, int) {
+	lines := []*Line{}
 	keys := []string{}
 	for key := range nodes {
 		keys = append(keys, key)
@@ -182,46 +210,29 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 		if key == "apiVersion" || key == "kind" {
 			continue
 		}
+
 		node := nodes[key]
-
-		indent := strings.Repeat(" ", node.Level()*2)
-		var cursorStr string
-		cursor := lipgloss.NewStyle().Foreground(theme.Text)
-		if m.isCursor() {
-			cursorStr = ">"
-			m.curNode = node
-		} else {
-			cursorStr = " "
-		}
-		folder := lipgloss.NewStyle().Foreground(theme.Subtext1)
-		var foldStr string
-		if node.Foldable() {
-			if node.Expanded {
-				foldStr = "-"
-			} else {
-				foldStr = "+"
-			}
-		} else { // selectable
-			if node.Selected {
-				foldStr = "◉"
-			} else {
-				foldStr = "○"
-			}
-		}
-		line := lipgloss.NewStyle().MaxWidth(m.width)
-
-		result.WriteString(line.Render(lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			indent,
-			cursor.Render(cursorStr),
-			folder.Render(foldStr),
-			node.render(),
-		)) + "\n")
-		m.curLineNo++
-
+		line := newLine(node, width, lineNo)
+		lineNo++
+		lines = append(lines, line)
 		if node.Expanded {
-			result.WriteString(m.renderRecursive(node.children))
+			childrenLines, childrenLineNo := m.buildLines(node.children, width, lineNo)
+			lines = append(lines, childrenLines...)
+			lineNo = childrenLineNo
 		}
+	}
+
+	return lines, lineNo
+}
+
+func (m *schemaModel) renderRecursive(lines []*Line) string {
+	var result strings.Builder
+
+	for _, line := range lines {
+		if m.isCursor(line.index) {
+			m.curNode = line.node
+		}
+		result.WriteString(line.render(m.isCursor(line.index)) + "\n")
 	}
 
 	return result.String()
@@ -236,6 +247,7 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Un
 	nodes := createNodeTree(fields, objs, []string{})
 	m.nodes = nodes
 	m.cursor = 0
+	m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
 }
 
 func sortKeys(keys []string) {

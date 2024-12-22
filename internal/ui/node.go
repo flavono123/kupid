@@ -17,13 +17,14 @@ type Node struct {
 	Expanded bool
 	Selected bool
 
-	field    *kube.Field
-	name     string
-	prefix   []string
-	level    int
-	children map[string]*Node
+	field     *kube.Field
+	name      string
+	ancestors []string
+	level     int
+	children  map[string]*Node
 }
 
+// line things
 func (n *Node) toggleFolder() {
 	if n.Foldable() {
 		n.Expanded = !n.Expanded
@@ -37,6 +38,8 @@ func (n *Node) setExpanded(expanded bool) {
 func (n *Node) Foldable() bool {
 	return n.children != nil
 }
+
+// line things end
 
 func (n *Node) render() string {
 	name := lipgloss.NewStyle().Foreground(theme.Green)
@@ -71,7 +74,7 @@ func (n *Node) Prefix() []string {
 
 func (n *Node) NodeFullPath() []string {
 	fullPath := []string{}
-	fullPath = append(fullPath, n.prefix...)
+	fullPath = append(fullPath, n.ancestors...)
 	fullPath = append(fullPath, n.name)
 	return fullPath
 }
@@ -132,11 +135,11 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 				}
 
 				children[idx] = &Node{
-					field:    nil,
-					name:     idx,
-					prefix:   childPrefix,
-					level:    field.Level + 1,
-					children: grandChildren,
+					field:     nil,
+					name:      idx,
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  grandChildren,
 				}
 			}
 		} else if strings.HasPrefix(field.Type, "map[string]") { // map; inject string keys
@@ -149,11 +152,11 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 				}
 
 				children[key] = &Node{
-					field:    nil,
-					name:     key,
-					prefix:   childPrefix,
-					level:    field.Level + 1,
-					children: grandChildren,
+					field:     nil,
+					name:      key,
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  grandChildren,
 				}
 			}
 
@@ -162,10 +165,10 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 		}
 
 		result[key] = &Node{
-			field:    field,
-			prefix:   prefix,
-			name:     key,
-			children: children,
+			field:     field,
+			ancestors: prefix,
+			name:      key,
+			children:  children,
 		}
 	}
 
