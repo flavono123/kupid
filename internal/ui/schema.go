@@ -29,10 +29,8 @@ type schemaModel struct {
 	style     lipgloss.Style
 	cursor    int
 	curLineNo int
-	// curField  *kube.Field
-	curNode *Node
-
-	curGVK schema.GroupVersionKind
+	curNode   *Node
+	curGVK    schema.GroupVersionKind
 
 	keys schemaKeyMap
 	help help.Model
@@ -100,7 +98,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.curNode.Foldable() {
-				m.toggleFolder()
+				m.toggleCurrentNodeFolder()
 			} else { // selectable, for leaf fields
 				if m.curNode.Selected {
 					m.curNode.Selected = false
@@ -113,6 +111,10 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return pickFieldMsg{node: m.curNode}
 					}
 				}
+			}
+		case key.Matches(msg, m.keys.levelExpand):
+			if m.curNode != nil && m.curNode.Foldable() {
+				m.toggleExpandLevel(m.nodes)
 			}
 		}
 	}
@@ -137,9 +139,25 @@ func (m *schemaModel) isCursor() bool {
 	return m.curLineNo-m.vp.YOffset == m.cursor
 }
 
-func (m *schemaModel) toggleFolder() {
-	if m.curNode != nil && m.curNode.Foldable() {
-		m.curNode.Expanded = !m.curNode.Expanded
+func (m *schemaModel) toggleCurrentNodeFolder() {
+	if m.curNode != nil {
+		m.curNode.toggleFolder()
+	}
+}
+
+func (m *schemaModel) toggleExpandLevel(nodes map[string]*Node) {
+	if m.curNode == nil {
+		return
+	}
+
+	toggledExpanded := !m.curNode.Expanded
+
+	for _, node := range nodes {
+		if node.Level() == m.curNode.Level() {
+			node.setExpanded(toggledExpanded)
+		} else if node.Foldable() {
+			m.toggleExpandLevel(node.children)
+		}
 	}
 }
 
@@ -192,7 +210,7 @@ func (m *schemaModel) renderRecursive(nodes map[string]*Node) string {
 		)) + "\n")
 		m.curLineNo++
 
-		if node.children != nil && node.Expanded {
+		if node.Expanded {
 			result.WriteString(m.renderRecursive(node.children))
 		}
 	}
@@ -212,6 +230,10 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Un
 }
 
 func sortKeys(keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+
 	_, err := strconv.Atoi(keys[0])
 	if err != nil {
 		sort.Strings(keys)

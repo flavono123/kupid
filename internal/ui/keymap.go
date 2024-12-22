@@ -39,9 +39,10 @@ func (k keyMap) FullHelp() [][]key.Binding {
 
 // schema
 type schemaKeyMap struct {
-	up     key.Binding
-	down   key.Binding
-	action key.Binding
+	up          key.Binding
+	down        key.Binding
+	action      key.Binding
+	levelExpand key.Binding
 }
 
 func newSchemaKeyMap() schemaKeyMap {
@@ -51,6 +52,10 @@ func newSchemaKeyMap() schemaKeyMap {
 		action: key.NewBinding(
 			key.WithKeys(" "),
 			key.WithHelp("space", "fold/pick"),
+		),
+		levelExpand: key.NewBinding(
+			key.WithKeys("ctrl+@"),
+			key.WithHelp("ctrl+space", "expand level"),
 		),
 	}
 }

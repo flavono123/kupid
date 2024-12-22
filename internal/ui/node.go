@@ -22,6 +22,16 @@ type Node struct {
 	children map[string]*Node
 }
 
+func (n *Node) toggleFolder() {
+	if n.Foldable() {
+		n.setExpanded(!n.Expanded)
+	}
+}
+
+func (n *Node) setExpanded(expanded bool) {
+	n.Expanded = expanded
+}
+
 func (n *Node) Foldable() bool {
 	return n.children != nil
 }
