@@ -228,11 +228,13 @@ func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) 
 func (m *schemaModel) renderRecursive(lines []*Line) string {
 	var result strings.Builder
 
+	leftPadding := len(strconv.Itoa(len(lines) - 1))
+
 	for _, line := range lines {
 		if m.isCursor(line.index) {
 			m.curNode = line.node
 		}
-		result.WriteString(line.render(m.isCursor(line.index)) + "\n")
+		result.WriteString(line.render(leftPadding, m.isCursor(line.index)) + "\n")
 	}
 
 	return result.String()

@@ -21,10 +21,10 @@ func newLine(node *Node, width int, index int) *Line {
 	return &Line{node: node, style: style, index: index}
 }
 
-func (l *Line) render(cursored bool) string {
+func (l *Line) render(leftPadding int, cursored bool) string {
 	return lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		l.number(),
+		l.number(leftPadding),
 		l.indent(),
 		l.cursor(cursored),
 		l.action(),
@@ -33,9 +33,10 @@ func (l *Line) render(cursored bool) string {
 	)
 }
 
-func (l *Line) number() string {
+func (l *Line) number(leftPadding int) string {
 	number := lipgloss.NewStyle().Foreground(theme.Overlay0)
-	return number.Render(fmt.Sprintf("%d ", l.index+1))
+	fmtStr := fmt.Sprintf("%%%dd ", leftPadding)
+	return number.Render(fmt.Sprintf(fmtStr, l.index+1))
 }
 
 func (l *Line) indent() string {
