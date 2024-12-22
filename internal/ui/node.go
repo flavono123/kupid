@@ -6,9 +6,11 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type Node struct {
@@ -24,7 +26,7 @@ type Node struct {
 
 func (n *Node) toggleFolder() {
 	if n.Foldable() {
-		n.setExpanded(!n.Expanded)
+		n.Expanded = !n.Expanded
 	}
 }
 

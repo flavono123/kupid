@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"log"
 	"sort"
 	"strconv"
@@ -114,7 +115,13 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.levelExpand):
 			if m.curNode != nil && m.curNode.Foldable() {
-				m.toggleExpandLevel(m.nodes)
+				toggledExpanded := !m.curNode.Expanded
+				m.toggleExpandRecursive(m.nodes, toggledExpanded, false)
+			}
+		case key.Matches(msg, m.keys.allExpand):
+			if m.curNode != nil && m.curNode.Foldable() {
+				toggledExpanded := !m.curNode.Expanded
+				m.toggleExpandRecursive(m.nodes, toggledExpanded, true)
 			}
 		}
 	}
@@ -128,9 +135,15 @@ func (m *schemaModel) View() string {
 	content = strings.TrimSuffix(content, "\n")
 	m.vp.SetContent(content)
 
+	// TODO: responsibility of rendering cursor is up to the new struct, line
+	// if m.cursor > m.curLineNo-1 {
+	// 	m.cursor = min(m.curLineNo-1, SCHEMA_CURSOR_BOTTOM)
+	// }
+
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.style.Render(m.vp.View()),
 		// m.help.View(m.keys),
+		fmt.Sprintf("cursor: %d, curLineNo: %d", m.cursor, m.curLineNo),
 	)
 }
 
@@ -140,24 +153,20 @@ func (m *schemaModel) isCursor() bool {
 }
 
 func (m *schemaModel) toggleCurrentNodeFolder() {
-	if m.curNode != nil {
-		m.curNode.toggleFolder()
-	}
+	m.curNode.toggleFolder()
 }
 
-func (m *schemaModel) toggleExpandLevel(nodes map[string]*Node) {
+func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool, all bool) {
 	if m.curNode == nil {
 		return
 	}
 
-	toggledExpanded := !m.curNode.Expanded
-
 	for _, node := range nodes {
-		if node.Level() == m.curNode.Level() {
-			node.setExpanded(toggledExpanded)
-		} else if node.Foldable() {
-			m.toggleExpandLevel(node.children)
+		if all || (node.Level() == m.curNode.Level()) {
+			node.setExpanded(expand)
 		}
+
+		m.toggleExpandRecursive(node.children, expand, all)
 	}
 }
 

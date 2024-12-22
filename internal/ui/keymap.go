@@ -43,6 +43,7 @@ type schemaKeyMap struct {
 	down        key.Binding
 	action      key.Binding
 	levelExpand key.Binding
+	allExpand   key.Binding
 }
 
 func newSchemaKeyMap() schemaKeyMap {
@@ -56,6 +57,10 @@ func newSchemaKeyMap() schemaKeyMap {
 		levelExpand: key.NewBinding(
 			key.WithKeys("ctrl+@"),
 			key.WithHelp("ctrl+space", "expand level"),
+		),
+		allExpand: key.NewBinding(
+			key.WithKeys("ctrl+a"),
+			key.WithHelp("ctrl+a", "expand all"),
 		),
 	}
 }
