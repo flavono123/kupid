@@ -60,12 +60,11 @@ func newKbarModel() *kbarModel {
 		keys:    newKbarKeyMap(),
 		visible: false,
 		style: lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
-			Width(KBAR_WIDTH),
+			Border(lipgloss.ThickBorder()),
 		items:      items,
 		input:      ti,
 		cursor:     0,
-		srViewport: viewport.New(KBAR_WIDTH, KBAR_SEARCH_RESULTS_MAX_HEIGHT),
+		srViewport: viewport.New(0, 0),
 	}
 
 	m.setSearchResults(items)
@@ -90,6 +89,9 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.srViewport.Width = msg.Width / KBAR_WIDTH_DIV
+		m.srViewport.Height = KBAR_SEARCH_RESULTS_MAX_HEIGHT
 	case tea.KeyMsg:
 		if m.visible {
 			switch msg.String() {
@@ -135,7 +137,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *kbarModel) View() string {
 	inputStyle := lipgloss.NewStyle().Margin(0, 0, 1, 0)
-	searchResult := strings.TrimSuffix(m.searchResults.string(), "\n")
+	searchResult := strings.TrimSuffix(m.searchResults.string(m.srViewport.Width), "\n")
 	m.srViewport.SetContent(searchResult)
 	return m.style.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
@@ -187,9 +189,9 @@ type searchResult struct {
 
 type searchResults []searchResult
 
-func (i kbarItem) render() string {
+func (i kbarItem) render(width int) string {
 	l := lipgloss.NewStyle().
-		MaxWidth(KBAR_WIDTH).
+		MaxWidth(width).
 		Padding(0, 0, 0, 1)
 	g := lipgloss.NewStyle().Foreground(theme.Subtext1)
 	s := lipgloss.JoinHorizontal(
@@ -219,15 +221,15 @@ func (m kbarItems) filter(inputValue string) kbarItems {
 	return items
 }
 
-func (sr searchResult) render() string {
+func (sr searchResult) render(width int) string {
 	style := lipgloss.NewStyle()
 	if sr.Hovered {
 		style = style.Background(theme.Overlay0)
 	}
-	return style.Render(sr.Item.render())
+	return style.Render(sr.Item.render(width))
 }
 
-func (sr searchResults) string() string {
+func (sr searchResults) string(width int) string {
 	noResultsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	if len(sr) == 0 {
 		return noResultsStyle.Render("No results found.")
@@ -235,7 +237,7 @@ func (sr searchResults) string() string {
 
 	var result []string
 	for _, item := range sr {
-		result = append(result, item.render())
+		result = append(result, item.render(width))
 	}
 
 	return strings.Join(result, "\n")

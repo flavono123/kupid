@@ -24,9 +24,7 @@ type schemaModel struct {
 	// fields map[string]*kube.Field
 	nodes map[string]*Node
 
-	vp     viewport.Model
-	width  int
-	height int
+	vp viewport.Model
 
 	style     lipgloss.Style
 	cursor    int
@@ -51,15 +49,10 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.Overlay0)
 
-	hMargin, vMargin := style.GetFrameSize()
-	width := SCHEMA_WIDTH - hMargin
-	height := SCHEMA_HEIGHT - vMargin
-	vp := viewport.New(width, height)
+	vp := viewport.New(0, 0)
 	m := &schemaModel{
 		nodes:    nodes,
 		vp:       vp,
-		width:    width,
-		height:   height,
 		style:    style,
 		cursor:   0,
 		curGVK:   gvk,
@@ -69,7 +62,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 		keys:     newSchemaKeyMap(),
 		help:     help.New(),
 	}
-	m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	content := m.renderRecursive(m.curLines)
 	content = strings.TrimSuffix(content, "\n")
 	vp.SetContent(content)
@@ -86,6 +79,9 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	retCmd = nil
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.vp.Width = msg.Width / SCHEMA_WIDTH_DIV
+		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.up):
@@ -95,7 +91,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.vp.LineUp(SCHEMA_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.down):
-			if m.cursor < min(SCHEMA_CURSOR_BOTTOM, m.curLineNo-1) {
+			if m.cursor < min(m.vp.Height-1, m.curLineNo-1) {
 				m.cursor++
 			} else {
 				m.vp.LineDown(SCHEMA_SCROLL_STEP)
@@ -107,7 +103,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curNode.Foldable() {
 				m.toggleCurrentNodeFolder()
-				m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 			} else { // selectable, for leaf fields
 				if m.curNode.Selected {
 					m.curNode.Selected = false
@@ -129,7 +125,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				toggledExpanded := !m.curNode.Expanded
 				prevNode := m.curNode
 				m.toggleExpandRecursive(m.nodes, toggledExpanded, false)
-				m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 				m.setCursor(prevNode.FullPath())
 
 			}
@@ -138,7 +134,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				toggledExpanded := !m.curNode.Expanded
 				prevNode := m.curNode
 				m.toggleExpandRecursive(m.nodes, toggledExpanded, true)
-				m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 				m.setCursor(prevNode.FullPath())
 			}
 		}
@@ -168,7 +164,7 @@ func (m *schemaModel) setCursor(path []string) {
 	for _, line := range m.curLines {
 		if reflect.DeepEqual(line.node.FullPath(), path) {
 			actualIndex := line.index
-			if actualIndex > SCHEMA_CURSOR_BOTTOM {
+			if actualIndex > m.vp.Height-1 {
 				m.vp.YOffset = actualIndex - SCHEMA_EXPAND_MULTI_MARGIN
 				actualIndex = SCHEMA_EXPAND_MULTI_MARGIN
 			}
@@ -198,6 +194,7 @@ func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool,
 	}
 }
 
+// TODO: remove arg width
 func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) ([]*Line, int) {
 	lines := []*Line{}
 	keys := []string{}
@@ -249,7 +246,7 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Un
 	nodes := createNodeTree(fields, objs, []string{})
 	m.nodes = nodes
 	m.cursor = 0
-	m.curLines, m.curLineNo = m.buildLines(m.nodes, SCHEMA_WIDTH, 0)
+	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 }
 
 func sortKeys(keys []string) {

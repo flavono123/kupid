@@ -53,7 +53,7 @@ func InitModel() *mainModel {
 		keys:          newKeyMap(),
 		schema:        newSchemaModel(initGvk, informers[initGvk].GetObjects()),
 		result:        newResultModel(informers[initGvk].GetObjects()),
-		vp:            viewport.New(WIDTH, HEIGHT),
+		vp:            viewport.New(0, 0),
 		curGVK:        initGvk,
 		kbar:          newKbarModel(),
 		informers:     informers,
@@ -112,6 +112,9 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, kCmd)
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.vp.Width = msg.Width
+		m.vp.Height = msg.Height
 	case resourceMsg:
 		return m, func() tea.Msg {
 			return resultMsg{
@@ -173,16 +176,19 @@ func (m *mainModel) View() string {
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		topbar,
-		m.schema.View(),
-		m.result.View(),
+		lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			m.schema.View(),
+			m.result.View(),
+		),
 	)
 
 	m.vp.SetContent(mainContent)
 
 	if m.kbar.visible {
 		return lipgloss.Place(
-			WIDTH,
-			HEIGHT,
+			m.vp.Width,
+			m.vp.Height,
 			lipgloss.Center,
 			UPPER_20,
 			m.kbar.View(),
