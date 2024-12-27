@@ -35,9 +35,8 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	// case resultMsg:
-	// 	// TODO: implement
-	// 	// m.setTable(msg.nodes, msg.objs, msg.add)
+	case resultMsg:
+		m.setTable(msg.nodes, msg.objs)
 	case tea.WindowSizeMsg:
 		tm, tCmd := m.table.Update(msg)
 		m.table = tm.(*tableModel)
@@ -58,20 +57,6 @@ func (m *resultModel) View() string {
 }
 
 // utils
-
-// TODO: rename or move to proper module/method
-func (m *resultModel) val(node *Node, obj *unstructured.Unstructured) string {
-	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
-	if err != nil || !found {
-		return "-"
-	}
-
-	if str, ok := val.(string); ok && len(str) == 0 { // edge case `""`
-		return "\"\""
-	}
-
-	return fmt.Sprintf("%v", val)
-}
 
 func displayName(obj *unstructured.Unstructured) string {
 	// TODO: gonna be a toggling feature
@@ -125,4 +110,10 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 	}
 
 	return current, true, nil
+}
+
+func (m *resultModel) setTable(nodes []*Node, objs []*unstructured.Unstructured) {
+	m.table.setHeaders(nodes)
+	m.table.setRows(nodes, objs)
+	m.table.setColumnWidths(m.table.headers, m.table.rows)
 }

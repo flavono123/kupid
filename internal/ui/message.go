@@ -28,5 +28,4 @@ type resourceMsg struct {
 type resultMsg struct {
 	nodes []*Node
 	objs  []*unstructured.Unstructured
-	add   bool // HACK: to avoid previous table's index out of range
 }

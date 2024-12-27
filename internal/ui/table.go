@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/ui/theme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type tableModel struct {
@@ -17,21 +18,22 @@ type tableModel struct {
 	cursor int
 
 	// view
-	headers     []string
-	rows        [][]string
-	rowsView    viewport.Model
-	maxRowWidth int
+	headers   []string
+	rows      [][]string
+	rowsView  viewport.Model
+	colWidths []int
 }
 
 func newTableModel(headers []string, rows [][]string) *tableModel {
-	return &tableModel{
-		keys:        newTableKeyMap(),
-		cursor:      0,
-		headers:     headers,
-		rows:        rows,
-		rowsView:    viewport.New(0, 0),
-		maxRowWidth: maxRowWidth(headers, rows),
+	m := &tableModel{
+		keys:     newTableKeyMap(),
+		cursor:   0,
+		headers:  headers,
+		rows:     rows,
+		rowsView: viewport.New(0, 0),
 	}
+	m.setColumnWidths(headers, rows)
+	return m
 }
 
 func (m *tableModel) Init() tea.Cmd {
@@ -71,15 +73,17 @@ func (m *tableModel) View() string {
 		lipgloss.Left,
 		m.renderHeader(),
 		m.rowsView.View(),
-		fmt.Sprintf("cursor: %d", m.cursor),
+		fmt.Sprintf("cursor: %d, rows: %d, yoffset: %d", m.cursor, len(m.rows), m.rowsView.YOffset),
 	)
 }
 
 func (m *tableModel) renderHeader() string {
-	headerStyle := lipgloss.NewStyle().Bold(true).Width(m.maxRowWidth)
+	headerStyle := lipgloss.NewStyle().Bold(true)
 	var render strings.Builder
 	// headers
-	render.WriteString(lipgloss.NewStyle().Render(strings.Join(m.headers, ",")))
+	for i, header := range m.headers {
+		render.WriteString(m.cellStyle(i).Render(header))
+	}
 
 	return headerStyle.Render(render.String())
 }
@@ -90,7 +94,10 @@ func (m *tableModel) renderRow() string {
 
 	// rows
 	for i, row := range m.rows {
-		line := strings.Join(row, ",")
+		line := ""
+		for j, cell := range row {
+			line += m.cellStyle(j).Render(cell)
+		}
 		if m.isCursor(i) {
 			line = selectedLineStyle.Render(line)
 		}
@@ -105,7 +112,7 @@ func (m *tableModel) isCursor(index int) bool {
 	return index == m.cursor+m.rowsView.YOffset
 }
 
-func maxColumnWidths(headers []string, rows [][]string) []int {
+func (m *tableModel) setColumnWidths(headers []string, rows [][]string) {
 	var result []int
 
 	for col, header := range headers {
@@ -118,32 +125,44 @@ func maxColumnWidths(headers []string, rows [][]string) []int {
 		result = append(result, max)
 	}
 
-	return result
+	m.colWidths = result
 }
 
-// TODO: render for each column
-func maxRowWidth(headers []string, rows [][]string) int {
-	colWidths := maxColumnWidths(headers, rows)
-	sum := 0
-	for _, width := range colWidths {
-		sum += width
+func (m *tableModel) setHeaders(nodes []*Node) {
+	m.headers = []string{
+		"Name",
 	}
-	return sum
+	for _, node := range nodes {
+		m.headers = append(m.headers, node.Name())
+	}
 }
 
-// func (m *resultModel) val(node *Node, obj *unstructured.Unstructured) string {
-// 	// TODO: treat deep pick for map[string]interface{}, array fields
-// 	// TODO: map[string]interface{}: create children field(ui only) with unique set of resources' keys
-// 	// TODO: array: create children field(ui only) with max length of resources' values
-// 	// TODO: inject key or index among of path
-// 	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
-// 	if err != nil || !found {
-// 		return "-"
-// 	}
+func (m *tableModel) setRows(nodes []*Node, objs []*unstructured.Unstructured) {
+	m.rows = [][]string{}
+	for _, obj := range objs {
+		row := []string{
+			displayName(obj),
+		}
+		for _, node := range nodes {
+			row = append(row, m.val(node, obj))
+		}
+		m.rows = append(m.rows, row)
+	}
+}
 
-// 	if str, ok := val.(string); ok && len(str) == 0 { // edge case `""`
-// 		return "\"\""
-// 	}
+func (m *tableModel) val(node *Node, obj *unstructured.Unstructured) string {
+	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
+	if err != nil || !found {
+		return "-"
+	}
 
-// 	return fmt.Sprintf("%v", val)
-// }
+	if str, ok := val.(string); ok && len(str) == 0 { // edge case `""`
+		return "\"\""
+	}
+
+	return fmt.Sprintf("%v", val)
+}
+
+func (m *tableModel) cellStyle(col int) lipgloss.Style {
+	return lipgloss.NewStyle().Margin(0, 1).Width(m.colWidths[col])
+}

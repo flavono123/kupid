@@ -139,7 +139,6 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return resultMsg{
 				nodes: m.selectedNodes,
 				objs:  m.informers[m.curGVK].GetObjects(),
-				add:   true,
 			}
 		}
 	case unpickFieldMsg:
@@ -153,7 +152,6 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return resultMsg{
 				nodes: m.selectedNodes,
 				objs:  m.informers[m.curGVK].GetObjects(),
-				add:   false,
 			}
 		}
 	}
