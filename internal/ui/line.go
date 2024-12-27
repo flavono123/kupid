@@ -21,8 +21,8 @@ func newLine(node *Node, width int, index int) *Line {
 	return &Line{node: node, style: style, index: index}
 }
 
-func (l *Line) render(leftPadding int, cursored bool) string {
-	return lipgloss.JoinHorizontal(
+func (l *Line) render(leftPadding int, cursored bool, maxWidth int) string {
+	line := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		l.number(leftPadding),
 		l.indent(),
@@ -31,6 +31,8 @@ func (l *Line) render(leftPadding int, cursored bool) string {
 		l.node.render(),
 		// fmt.Sprintf("(%d)", l.node.Level()),
 	)
+
+	return lipgloss.NewStyle().MaxWidth(maxWidth).Render(line)
 }
 
 func (l *Line) number(leftPadding int) string {

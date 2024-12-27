@@ -130,9 +130,11 @@ func (m *resultModel) val(node *Node, obj *unstructured.Unstructured) string {
 }
 
 func displayName(obj *unstructured.Unstructured) string {
-	if obj.GetNamespace() != "" {
-		return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
-	}
+	// TODO: gonna be a toggling feature
+	// HACK: to reduce the width of table before viewport supporting horizontal scroll
+	// if obj.GetNamespace() != "" {
+	// 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
+	// }
 	return obj.GetName()
 }
 

@@ -151,7 +151,7 @@ func (m *schemaModel) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.style.Render(m.vp.View()),
 		// m.help.View(m.keys),
-		fmt.Sprintf("cursor: %d, curLineNo: %d, vpYOffset: %d", m.cursor, m.curLineNo, m.vp.YOffset),
+		fmt.Sprintf("cursor: %d, curLineNo: %d, vpYOffset: %d, vpWidth: %d", m.cursor, m.curLineNo, m.vp.YOffset, m.vp.Width),
 	)
 }
 
@@ -231,7 +231,7 @@ func (m *schemaModel) renderRecursive(lines []*Line) string {
 		if m.isCursor(line.index) {
 			m.curNode = line.node
 		}
-		result.WriteString(line.render(leftPadding, m.isCursor(line.index)) + "\n")
+		result.WriteString(line.render(leftPadding, m.isCursor(line.index), m.vp.Width) + "\n")
 	}
 
 	return result.String()
