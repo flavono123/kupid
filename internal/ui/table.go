@@ -18,21 +18,30 @@ type tableModel struct {
 	cursor int
 
 	// view
-	headers   []string
-	rows      [][]string
-	rowsView  viewport.Model
-	colWidths []int
+	nodes         []*Node
+	objs          []*unstructured.Unstructured
+	rowsView      viewport.Model
+	nameMaxWidth  int
+	nodeMaxWidths []int
 }
 
-func newTableModel(headers []string, rows [][]string) *tableModel {
-	m := &tableModel{
-		keys:     newTableKeyMap(),
-		cursor:   0,
-		headers:  headers,
-		rows:     rows,
-		rowsView: viewport.New(0, 0),
+func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel {
+	nameMaxWidth := 4 // Name
+	for _, obj := range objs {
+		if len(displayName(obj)) > nameMaxWidth {
+			nameMaxWidth = len(displayName(obj))
+		}
 	}
-	m.setColumnWidths(headers, rows)
+
+	m := &tableModel{
+		keys:          newTableKeyMap(),
+		cursor:        0,
+		nodes:         nodes,
+		objs:          objs,
+		rowsView:      viewport.New(0, 0),
+		nameMaxWidth:  nameMaxWidth,
+		nodeMaxWidths: []int{},
+	}
 	return m
 }
 
@@ -56,7 +65,7 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.rowsView.LineUp(TABLE_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.down):
-			if m.cursor < min(m.rowsView.Height-1, len(m.rows)-1) {
+			if m.cursor < min(m.rowsView.Height-1, len(m.objs)-1) {
 				m.cursor++
 			} else {
 				m.rowsView.LineDown(TABLE_SCROLL_STEP)
@@ -73,7 +82,7 @@ func (m *tableModel) View() string {
 		lipgloss.Left,
 		m.renderHeader(),
 		m.rowsView.View(),
-		fmt.Sprintf("cursor: %d, rows: %d, yoffset: %d", m.cursor, len(m.rows), m.rowsView.YOffset),
+		fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d", m.cursor, len(m.objs), m.rowsView.YOffset),
 	)
 }
 
@@ -81,8 +90,9 @@ func (m *tableModel) renderHeader() string {
 	headerStyle := lipgloss.NewStyle().Bold(true)
 	var render strings.Builder
 	// headers
-	for i, header := range m.headers {
-		render.WriteString(m.cellStyle(i).Render(header))
+	render.WriteString(m.cellStyle(0).Render("Name"))
+	for i, node := range m.nodes {
+		render.WriteString(m.cellStyle(i).Render(node.Name()))
 	}
 
 	return headerStyle.Render(render.String())
@@ -93,10 +103,10 @@ func (m *tableModel) renderRow() string {
 	var render strings.Builder
 
 	// rows
-	for i, row := range m.rows {
-		line := ""
-		for j, cell := range row {
-			line += m.cellStyle(j).Render(cell)
+	for i, obj := range m.objs {
+		line := m.cellStyle(0).Render(displayName(obj))
+		for j, node := range m.nodes {
+			line += m.cellStyle(j).Render(m.val(node, obj))
 		}
 		if m.isCursor(i) {
 			line = selectedLineStyle.Render(line)
@@ -112,42 +122,20 @@ func (m *tableModel) isCursor(index int) bool {
 	return index == m.cursor+m.rowsView.YOffset
 }
 
-func (m *tableModel) setColumnWidths(headers []string, rows [][]string) {
+func (m *tableModel) setNodeMaxWidths(nodes []*Node) {
 	var result []int
 
-	for col, header := range headers {
-		max := len(header)
-		for _, row := range rows {
-			if len(row[col]) > max {
-				max = len(row[col])
+	for _, node := range nodes {
+		max := len(node.Name())
+		for _, obj := range m.objs {
+			if len(m.val(node, obj)) > max {
+				max = len(m.val(node, obj))
 			}
 		}
 		result = append(result, max)
 	}
 
-	m.colWidths = result
-}
-
-func (m *tableModel) setHeaders(nodes []*Node) {
-	m.headers = []string{
-		"Name",
-	}
-	for _, node := range nodes {
-		m.headers = append(m.headers, node.Name())
-	}
-}
-
-func (m *tableModel) setRows(nodes []*Node, objs []*unstructured.Unstructured) {
-	m.rows = [][]string{}
-	for _, obj := range objs {
-		row := []string{
-			displayName(obj),
-		}
-		for _, node := range nodes {
-			row = append(row, m.val(node, obj))
-		}
-		m.rows = append(m.rows, row)
-	}
+	m.nodeMaxWidths = result
 }
 
 func (m *tableModel) val(node *Node, obj *unstructured.Unstructured) string {
@@ -164,5 +152,18 @@ func (m *tableModel) val(node *Node, obj *unstructured.Unstructured) string {
 }
 
 func (m *tableModel) cellStyle(col int) lipgloss.Style {
-	return lipgloss.NewStyle().Margin(0, 1).Width(m.colWidths[col])
+	return lipgloss.NewStyle().Margin(0, 1).Width(m.colMaxWidth(col))
+}
+
+func (m *tableModel) setNodes(nodes []*Node) {
+	m.setNodeMaxWidths(nodes)
+	m.nodes = nodes
+}
+
+func (m *tableModel) colMaxWidth(index int) int {
+	if index == 0 {
+		return m.nameMaxWidth
+	}
+
+	return m.nodeMaxWidths[index-1]
 }

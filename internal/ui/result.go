@@ -14,13 +14,8 @@ type resultModel struct {
 }
 
 func newResultModel(objs []*unstructured.Unstructured) *resultModel {
-	headers := []string{"Name"}
-	rows := [][]string{}
-	for _, obj := range objs {
-		rows = append(rows, []string{obj.GetName()})
-	}
-
-	t := newTableModel(headers, rows)
+	nodes := []*Node{}
+	t := newTableModel(nodes, objs)
 	return &resultModel{
 		focused: false,
 		table:   t,
@@ -36,13 +31,12 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case resultMsg:
-		m.setTable(msg.nodes, msg.objs)
+		m.setTable(msg.nodes)
 	case tea.WindowSizeMsg:
 		tm, tCmd := m.table.Update(msg)
 		m.table = tm.(*tableModel)
 		cmds = append(cmds, tCmd)
 	case tea.KeyMsg:
-		// TODO: cursor movement
 		if m.focused {
 			tm, tCmd := m.table.Update(msg)
 			m.table = tm.(*tableModel)
@@ -112,8 +106,6 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 	return current, true, nil
 }
 
-func (m *resultModel) setTable(nodes []*Node, objs []*unstructured.Unstructured) {
-	m.table.setHeaders(nodes)
-	m.table.setRows(nodes, objs)
-	m.table.setColumnWidths(m.table.headers, m.table.rows)
+func (m *resultModel) setTable(nodes []*Node) {
+	m.table.setNodes(nodes)
 }
