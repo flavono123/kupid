@@ -3,33 +3,30 @@ package ui
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type resultModel struct {
 	focused bool
-	table   table.Model
+	// TODO: should be a model(component) width its own viewport to render dynamic col max width and style
+	table [][]string
+	vp    *viewport.Model
 }
 
 func newResultModel(objs []*unstructured.Unstructured) *resultModel {
-	rows := []table.Row{}
+	rows := [][]string{}
 	for _, obj := range objs {
-		rows = append(rows, table.Row{obj.GetName()})
+		rows = append(rows, []string{obj.GetName()})
 	}
-	cols := []table.Column{
-		{
-			Title: "Name",
-			Width: maxColumnWidth("Name", rows, 0),
-		},
-	}
-	t := table.New(
-		table.WithColumns(cols),
-		table.WithRows(rows),
-		table.WithFocused(false),
-	)
+	headers := []string{"Name"}
+
+	t := [][]string{headers}
+	t = append(t, rows...)
 	return &resultModel{
 		focused: false,
 		table:   t,
@@ -43,80 +40,29 @@ func (m *resultModel) Init() tea.Cmd {
 func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	switch msg := msg.(type) {
-	case resultMsg:
-		m.setTable(msg.nodes, msg.objs, msg.add)
-	case tea.KeyMsg:
-		if m.focused {
-			tm, tCmd := m.table.Update(msg)
-			m.table = tm
-			cmds = append(cmds, tCmd)
-		}
-	}
+	// switch msg := msg.(type) {
+	// case resultMsg:
+	// 	// TODO: implement
+	// 	// m.setTable(msg.nodes, msg.objs, msg.add)
+	// case tea.KeyMsg:
+	// 	// TODO: cursor movement
+	// }
 	return m, tea.Batch(cmds...)
 }
 
 func (m *resultModel) View() string {
-	return m.table.View()
+	var render strings.Builder
+	for _, row := range m.table {
+		line := strings.Join(row, ",") + "\n"
+		render.WriteString(lipgloss.NewStyle().Render(line))
+	}
+	return render.String()
 }
 
 // utils
-func (m *resultModel) rows(nodes []*Node, objs []*unstructured.Unstructured) []table.Row {
-	rows := []table.Row{}
-	for _, obj := range objs {
-		row := table.Row{}
-		row = append(row, displayName(obj))
-		for _, node := range nodes {
-			row = append(row, m.val(node, obj))
-		}
-		rows = append(rows, row)
-	}
-	return rows
-}
 
-func (m *resultModel) columns(nodes []*Node, rows []table.Row) []table.Column {
-	cols := []table.Column{
-		{
-			Title: "Name",
-			Width: maxColumnWidth("Name", rows, 0),
-		},
-	}
-	for i, node := range nodes {
-		cols = append(cols, table.Column{
-			Title: node.Name(),
-			Width: maxColumnWidth(node.Name(), rows, i+1),
-		})
-	}
-	return cols
-}
-
-func (m *resultModel) setTable(nodes []*Node, objs []*unstructured.Unstructured, add bool) {
-	rows := m.rows(nodes, objs)
-	cols := m.columns(nodes, rows)
-	if add {
-		m.table.SetColumns(cols)
-		m.table.SetRows(rows)
-	} else {
-		m.table.SetRows(rows)
-		m.table.SetColumns(cols)
-	}
-}
-
-func maxColumnWidth(title string, rows []table.Row, col int) int {
-	max := len(title)
-	for _, row := range rows {
-		if len(row[col]) > max {
-			max = len(row[col])
-		}
-	}
-	return max
-}
-
+// TODO: rename or move to proper module/method
 func (m *resultModel) val(node *Node, obj *unstructured.Unstructured) string {
-	// TODO: treat deep pick for map[string]interface{}, array fields
-	// TODO: map[string]interface{}: create children field(ui only) with unique set of resources' keys
-	// TODO: array: create children field(ui only) with max length of resources' values
-	// TODO: inject key or index among of path
 	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
 	if err != nil || !found {
 		return "-"
@@ -140,12 +86,10 @@ func displayName(obj *unstructured.Unstructured) string {
 
 func (m *resultModel) focus() {
 	m.focused = true
-	m.table.Focus()
 }
 
 func (m *resultModel) blur() {
 	m.focused = false
-	m.table.Blur()
 }
 
 func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
