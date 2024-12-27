@@ -32,6 +32,8 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case resultMsg:
 		m.setTable(msg.nodes)
+	case candidateMsg:
+		m.setCandidate(msg.candidate)
 	case tea.WindowSizeMsg:
 		tm, tCmd := m.table.Update(msg)
 		m.table = tm.(*tableModel)
@@ -108,4 +110,8 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 
 func (m *resultModel) setTable(nodes []*Node) {
 	m.table.setNodes(nodes)
+}
+
+func (m *resultModel) setCandidate(candidate *Node) {
+	m.table.setCandidate(candidate)
 }

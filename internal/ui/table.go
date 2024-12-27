@@ -12,17 +12,22 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type tableModel struct {
-	// msg
-	keys   tableKeyMap
-	cursor int
+type tableStyles struct {
+	header    lipgloss.Style
+	selected  lipgloss.Style
+	candidate lipgloss.Style
+}
 
-	// view
+type tableModel struct {
+	keys          tableKeyMap
+	cursor        int
 	nodes         []*Node
 	objs          []*unstructured.Unstructured
 	rowsView      viewport.Model
 	nameMaxWidth  int
 	nodeMaxWidths []int
+	candidate     *Node
+	styles        tableStyles
 }
 
 func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel {
@@ -41,6 +46,11 @@ func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel
 		rowsView:      viewport.New(0, 0),
 		nameMaxWidth:  nameMaxWidth,
 		nodeMaxWidths: []int{},
+		styles: tableStyles{
+			header:    lipgloss.NewStyle().Bold(true),
+			selected:  lipgloss.NewStyle().Bold(true).Foreground(theme.Mauve),
+			candidate: lipgloss.NewStyle().Foreground(theme.Surface2),
+		},
 	}
 	return m
 }
@@ -82,12 +92,11 @@ func (m *tableModel) View() string {
 		lipgloss.Left,
 		m.renderHeader(),
 		m.rowsView.View(),
-		fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d", m.cursor, len(m.objs), m.rowsView.YOffset),
+		fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d, candidate: %v", m.cursor, len(m.objs), m.rowsView.YOffset, m.candidate),
 	)
 }
 
 func (m *tableModel) renderHeader() string {
-	headerStyle := lipgloss.NewStyle().Bold(true)
 	var render strings.Builder
 	// headers
 	render.WriteString(m.cellStyle(0).Render("Name"))
@@ -95,11 +104,18 @@ func (m *tableModel) renderHeader() string {
 		render.WriteString(m.cellStyle(i).Render(node.Name()))
 	}
 
-	return headerStyle.Render(render.String())
+	if m.candidate != nil {
+		return lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			m.styles.header.Render(render.String()),
+			m.styles.candidate.Render(m.candidate.Name()),
+		)
+	}
+
+	return m.styles.header.Render(render.String())
 }
 
 func (m *tableModel) renderRow() string {
-	selectedLineStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Mauve)
 	var render strings.Builder
 
 	// rows
@@ -109,7 +125,10 @@ func (m *tableModel) renderRow() string {
 			line += m.cellStyle(j).Render(m.val(node, obj))
 		}
 		if m.isCursor(i) {
-			line = selectedLineStyle.Render(line)
+			line = m.styles.selected.Render(line)
+		}
+		if m.candidate != nil {
+			line = lipgloss.JoinHorizontal(lipgloss.Left, line, m.styles.candidate.Render(m.val(m.candidate, obj)))
 		}
 		render.WriteString(line)
 		render.WriteString("\n")
@@ -166,4 +185,8 @@ func (m *tableModel) colMaxWidth(index int) int {
 	}
 
 	return m.nodeMaxWidths[index-1]
+}
+
+func (m *tableModel) setCandidate(candidate *Node) {
+	m.candidate = candidate
 }

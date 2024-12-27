@@ -154,6 +154,18 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				objs:  m.informers[m.curGVK].GetObjects(),
 			}
 		}
+	case hoverFieldMsg:
+		return m, func() tea.Msg {
+			return candidateMsg{
+				candidate: msg.candidate,
+			}
+		}
+		// default:
+		// 	return m, func() tea.Msg {
+		// 		return candidateMsg{
+		// 			candidate: nil,
+		// 		}
+		// 	}
 	}
 
 	return m, tea.Batch(cmds...)

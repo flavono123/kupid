@@ -90,11 +90,31 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.vp.LineUp(SCHEMA_SCROLL_STEP)
 			}
+
+			if m.curIsPickable() {
+				retCmd = func() tea.Msg {
+					return hoverFieldMsg{candidate: m.rrrrCurNode()}
+				}
+			} else {
+				retCmd = func() tea.Msg {
+					return candidateMsg{candidate: nil}
+				}
+			}
 		case key.Matches(msg, m.keys.down):
 			if m.cursor < min(m.vp.Height-1, m.curLineNo-1) {
 				m.cursor++
 			} else {
 				m.vp.LineDown(SCHEMA_SCROLL_STEP)
+			}
+
+			if m.curIsPickable() {
+				retCmd = func() tea.Msg {
+					return hoverFieldMsg{candidate: m.rrrrCurNode()}
+				}
+			} else {
+				retCmd = func() tea.Msg {
+					return candidateMsg{candidate: nil}
+				}
 			}
 		case key.Matches(msg, m.keys.action):
 			if m.curNode == nil {
@@ -264,4 +284,12 @@ func sortKeys(keys []string) {
 			return numI < numJ
 		})
 	}
+}
+
+func (m *schemaModel) rrrrCurNode() *Node {
+	return m.curLines[m.cursor+m.vp.YOffset].node
+}
+
+func (m *schemaModel) curIsPickable() bool {
+	return m.rrrrCurNode() != nil && !m.rrrrCurNode().Foldable() && !m.rrrrCurNode().Selected
 }

@@ -19,6 +19,10 @@ type unpickFieldMsg struct {
 	node *Node
 }
 
+type hoverFieldMsg struct {
+	candidate *Node
+}
+
 // main
 type resourceMsg struct {
 	objs []*unstructured.Unstructured
@@ -26,6 +30,11 @@ type resourceMsg struct {
 
 // result
 type resultMsg struct {
-	nodes []*Node
-	objs  []*unstructured.Unstructured
+	nodes     []*Node
+	objs      []*unstructured.Unstructured
+	candidate *Node
+}
+
+type candidateMsg struct {
+	candidate *Node
 }
