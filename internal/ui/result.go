@@ -3,30 +3,24 @@ package ui
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type resultModel struct {
 	focused bool
-	// TODO: should be a model(component) width its own viewport to render dynamic col max width and style
-	table [][]string
-	vp    *viewport.Model
+	table   *tableModel
 }
 
 func newResultModel(objs []*unstructured.Unstructured) *resultModel {
+	headers := []string{"Name"}
 	rows := [][]string{}
 	for _, obj := range objs {
 		rows = append(rows, []string{obj.GetName()})
 	}
-	headers := []string{"Name"}
 
-	t := [][]string{headers}
-	t = append(t, rows...)
+	t := newTableModel(headers, rows)
 	return &resultModel{
 		focused: false,
 		table:   t,
@@ -40,23 +34,23 @@ func (m *resultModel) Init() tea.Cmd {
 func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	// switch msg := msg.(type) {
+	switch msg := msg.(type) {
 	// case resultMsg:
 	// 	// TODO: implement
 	// 	// m.setTable(msg.nodes, msg.objs, msg.add)
-	// case tea.KeyMsg:
-	// 	// TODO: cursor movement
-	// }
+	case tea.KeyMsg:
+		// TODO: cursor movement
+		if m.focused {
+			tm, tCmd := m.table.Update(msg)
+			m.table = tm.(*tableModel)
+			cmds = append(cmds, tCmd)
+		}
+	}
 	return m, tea.Batch(cmds...)
 }
 
 func (m *resultModel) View() string {
-	var render strings.Builder
-	for _, row := range m.table {
-		line := strings.Join(row, ",") + "\n"
-		render.WriteString(lipgloss.NewStyle().Render(line))
-	}
-	return render.String()
+	return m.table.View()
 }
 
 // utils
