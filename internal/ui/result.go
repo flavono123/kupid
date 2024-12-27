@@ -38,6 +38,10 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// case resultMsg:
 	// 	// TODO: implement
 	// 	// m.setTable(msg.nodes, msg.objs, msg.add)
+	case tea.WindowSizeMsg:
+		tm, tCmd := m.table.Update(msg)
+		m.table = tm.(*tableModel)
+		cmds = append(cmds, tCmd)
 	case tea.KeyMsg:
 		// TODO: cursor movement
 		if m.focused {

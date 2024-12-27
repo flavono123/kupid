@@ -89,3 +89,17 @@ func newKbarKeyMap() kbarKeyMap {
 		hide: key.NewBinding(key.WithKeys("esc", "alt+k")),
 	}
 }
+
+// TODO: seperate to nested package
+// table
+type tableKeyMap struct {
+	up   key.Binding
+	down key.Binding
+}
+
+func newTableKeyMap() tableKeyMap {
+	return tableKeyMap{
+		up:   key.NewBinding(key.WithKeys("up")),
+		down: key.NewBinding(key.WithKeys("down")),
+	}
+}
