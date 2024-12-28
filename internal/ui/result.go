@@ -64,9 +64,9 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.setTable(msg.nodes, msg.objs)
-		cmds = append(cmds, m.setWidthLimitRatio(len(msg.nodes)))
+		cmds = append(cmds, m.setWidthLimitRatio())
 	case candidateMsg:
-		if msg.candidate != nil && m.table.willOverWidth(msg.candidate) {
+		if m.table.willOverWidth(msg.candidate) {
 			// do not render candidate
 			return m, nil
 		}
@@ -168,24 +168,10 @@ func (m *resultModel) renderTopBar() string {
 	return topBarStyle.Render(m.widthLimPB.View())
 }
 
-func (m *resultModel) setWidthLimitRatio(picked int) tea.Cmd {
+func (m *resultModel) setWidthLimitRatio() tea.Cmd {
 	var cmd tea.Cmd
-
 	// TODO: when it exceeds hard (or soft) limit, damping in current percent
-	// HACK: special case for selectGVK
-	// TODO?: seperate message from select and pick/unpick ?
-	if picked == 0 {
-		cmd = m.widthLimPB.SetPercent(0)
-		m.wasPicked = 0
-		return cmd
-	}
-
-	if picked > m.wasPicked { // pickMsg
-		cmd = m.widthLimPB.IncrPercent(1 / PICK_HARD_LIMIT)
-	} else { // unpickMsg
-		cmd = m.widthLimPB.DecrPercent(1 / PICK_HARD_LIMIT)
-	}
-	m.wasPicked = picked
+	cmd = m.widthLimPB.SetPercent(float64(m.table.tableWidth()) / float64(m.width))
 
 	return cmd
 }

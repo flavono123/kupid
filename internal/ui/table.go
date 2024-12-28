@@ -234,6 +234,10 @@ func (m *tableModel) renderDebugBar() string {
 }
 
 func (m *tableModel) willOverWidth(node *Node) bool {
+	if node == nil {
+		return false
+	}
+
 	return m.tableWidth()+m.maxWidth(node) > m.rowsView.Width-9 // magic num again, safty margin
 }
 
