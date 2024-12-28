@@ -169,6 +169,7 @@ func (m *schemaModel) View() string {
 	m.vp.SetContent(content)
 
 	return lipgloss.JoinVertical(lipgloss.Left,
+		m.renderTopBar(),
 		m.style.Render(m.vp.View()),
 		// m.help.View(m.keys),
 		fmt.Sprintf("cursor: %d, curLineNo: %d, vpYOffset: %d, vpWidth: %d", m.cursor, m.curLineNo, m.vp.YOffset, m.vp.Width),
@@ -292,4 +293,17 @@ func (m *schemaModel) rrrrCurNode() *Node {
 
 func (m *schemaModel) curIsPickable() bool {
 	return m.rrrrCurNode() != nil && !m.rrrrCurNode().Foldable() && !m.rrrrCurNode().Selected
+}
+
+func (m *schemaModel) renderTopBar() string {
+	ctx, err := kube.CurrentContext()
+	if err != nil {
+		log.Fatalf("failed to get current context: %v", err)
+	}
+	ctx = lipgloss.NewStyle().Margin(0, 1).Render(ctx)
+	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.curGVK.Kind)
+	return lipgloss.JoinHorizontal(lipgloss.Left,
+		ctx,
+		kind,
+	)
 }

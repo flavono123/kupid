@@ -172,20 +172,8 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *mainModel) View() string {
-	ctx, err := kube.CurrentContext()
-	if err != nil {
-		log.Fatalf("failed to get current context: %v", err)
-	}
-	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.curGVK.Kind)
-	topbar := lipgloss.JoinHorizontal(lipgloss.Left,
-		ctx,
-		" ",
-		kind,
-	)
-
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
-		topbar,
 		lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			m.schema.View(),

@@ -4,13 +4,20 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type resultModel struct {
 	focused bool
 	table   *tableModel
+
+	width      int
+	widthLimPB progress.Model
+	// widthLimitRatio float64
+	wasPicked int
 }
 
 func newResultModel(objs []*unstructured.Unstructured) *resultModel {
@@ -19,6 +26,17 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 	return &resultModel{
 		focused: false,
 		table:   t,
+		width:   0,
+		widthLimPB: progress.New(
+			// ?: catppuccin "latte" yellow to blue,
+			// HACK: with gradient does not support lipgloss.Color weird
+			progress.WithGradient("#df8e1d", "#1e66f5"),
+			progress.WithoutPercentage(),
+			// more speed; default freq, damp is 6, 1(no damping)
+			// TODO: crescendo freq dynamically for more picked like BALATRO
+			progress.WithSpringOptions(120, 1.0),
+		),
+		wasPicked: 0,
 	}
 }
 
@@ -30,11 +48,18 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	// treat width limit bar's animation
+	case progress.FrameMsg:
+		pM, pCmd := m.widthLimPB.Update(msg)
+		m.widthLimPB = pM.(progress.Model)
+		cmds = append(cmds, pCmd)
 	case resultMsg:
 		m.setTable(msg.nodes, msg.objs)
+		cmds = append(cmds, m.setWidthLimitRatio(len(msg.nodes)))
 	case candidateMsg:
 		m.setCandidate(msg.candidate)
 	case tea.WindowSizeMsg:
+		m.width = int(float64(msg.Width) * TABLE_WIDTH_RATIO) // TODO: rename TABLE_WIDTH_RATIO to result's
 		tm, tCmd := m.table.Update(msg)
 		m.table = tm.(*tableModel)
 		cmds = append(cmds, tCmd)
@@ -49,7 +74,10 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *resultModel) View() string {
-	return m.table.View()
+	return lipgloss.JoinVertical(lipgloss.Left,
+		m.renderTopBar(),
+		m.table.View(),
+	)
 }
 
 // utils
@@ -115,4 +143,35 @@ func (m *resultModel) setTable(nodes []*Node, objs []*unstructured.Unstructured)
 
 func (m *resultModel) setCandidate(candidate *Node) {
 	m.table.setCandidate(candidate)
+}
+
+func (m *resultModel) renderTopBar() string {
+	// HACK: safe right padding required how much? idk
+	// but 9 is safe where the point render 120 window width(result 80 width)
+	// TODO: make 120 width as a hard lower limit of the program
+	topBarStyle := lipgloss.NewStyle().Align(lipgloss.Right).Padding(0, 9).Width(m.width)
+
+	return topBarStyle.Render(m.widthLimPB.View())
+}
+
+func (m *resultModel) setWidthLimitRatio(picked int) tea.Cmd {
+	var cmd tea.Cmd
+
+	// TODO: when it exceeds hard (or soft) limit, damping in current percent
+	// HACK: special case for selectGVK
+	// TODO?: seperate message from select and pick/unpick ?
+	if picked == 0 {
+		cmd = m.widthLimPB.SetPercent(0)
+		m.wasPicked = 0
+		return cmd
+	}
+
+	if picked > m.wasPicked { // pickMsg
+		cmd = m.widthLimPB.IncrPercent(1 / PICK_HARD_LIMIT)
+	} else { // unpickMsg
+		cmd = m.widthLimPB.DecrPercent(1 / PICK_HARD_LIMIT)
+	}
+	m.wasPicked = picked
+
+	return cmd
 }

@@ -100,9 +100,9 @@ func (m *tableModel) View() string {
 func (m *tableModel) renderHeader() string {
 	var render strings.Builder
 	// headers
-	render.WriteString(m.cellStyle(0).Render(fmt.Sprintf("Name(%d)", m.colMaxWidth(0))))
+	render.WriteString(m.cellStyle(0).Render("Name"))
 	for i, node := range m.nodes {
-		render.WriteString(m.cellStyle(i).Render(node.Name()))
+		render.WriteString(m.cellStyle(i + 1).Render(node.Name()))
 	}
 
 	if m.candidate != nil {
@@ -123,13 +123,17 @@ func (m *tableModel) renderRow() string {
 	for i, obj := range m.objs {
 		line := m.cellStyle(0).Render(displayName(obj))
 		for j, node := range m.nodes {
-			line += m.cellStyle(j).Render(m.val(node, obj))
+			line += m.cellStyle(j + 1).Render(m.val(node, obj))
 		}
 		if m.isCursor(i) {
 			line = m.styles.selected.Render(line)
 		}
 		if m.candidate != nil {
-			line = lipgloss.JoinHorizontal(lipgloss.Left, line, m.styles.candidate.Render(m.val(m.candidate, obj)))
+			line = lipgloss.JoinHorizontal(
+				lipgloss.Left,
+				line,
+				m.styles.candidate.Render(m.val(m.candidate, obj)),
+			)
 		}
 		render.WriteString(line)
 		render.WriteString("\n")
@@ -193,12 +197,14 @@ func (m *tableModel) setObjs(objs []*unstructured.Unstructured) {
 	m.objs = objs
 }
 
-func (m *tableModel) colMaxWidth(index int) int {
-	if index == 0 {
+func (m *tableModel) colMaxWidth(idxPlusOne int) int {
+	// first col is always name
+	if idxPlusOne < 1 {
 		return m.nameMaxWidth
 	}
 
-	return m.nodeMaxWidths[index-1]
+	// shift left for nodes
+	return m.nodeMaxWidths[idxPlusOne-1]
 }
 
 func (m *tableModel) setCandidate(candidate *Node) {
@@ -221,5 +227,8 @@ func (m *tableModel) setRowsViewSize(msg tea.WindowSizeMsg) {
 }
 
 func (m *tableModel) renderDebugBar() string {
-	return m.styles.debug.Render(fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d, candidate: %v", m.cursor, len(m.objs), m.rowsView.YOffset, m.candidate))
+	return m.styles.debug.Render(
+		fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d, candidate: %v",
+			m.cursor, len(m.objs), m.rowsView.YOffset, m.candidate),
+	)
 }
