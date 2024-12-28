@@ -30,9 +30,8 @@ type resourceMsg struct {
 
 // result
 type resultMsg struct {
-	nodes     []*Node
-	objs      []*unstructured.Unstructured
-	candidate *Node
+	nodes []*Node
+	objs  []*unstructured.Unstructured
 }
 
 type candidateMsg struct {

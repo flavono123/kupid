@@ -16,6 +16,7 @@ type tableStyles struct {
 	header    lipgloss.Style
 	selected  lipgloss.Style
 	candidate lipgloss.Style
+	debug     lipgloss.Style
 }
 
 type tableModel struct {
@@ -50,6 +51,7 @@ func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel
 			header:    lipgloss.NewStyle().Bold(true),
 			selected:  lipgloss.NewStyle().Bold(true).Foreground(theme.Mauve),
 			candidate: lipgloss.NewStyle().Foreground(theme.Surface2),
+			debug:     lipgloss.NewStyle().Italic(true).Foreground(theme.Surface1),
 		},
 	}
 	return m
@@ -64,18 +66,17 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.rowsView.Width = int(float64(msg.Width) * TABLE_WIDTH_RATIO)
-		m.rowsView.Height = msg.Height - 3 // HACK: topbar 1 + debug line 1 + header 1
+		m.setRowsViewSize(msg)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.up):
-			if m.cursor > 0 {
+			if m.isCursorTop() {
 				m.cursor--
 			} else {
 				m.rowsView.LineUp(TABLE_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.down):
-			if m.cursor < min(m.rowsView.Height-1, len(m.objs)-1) {
+			if m.isCursorBottom() {
 				m.cursor++
 			} else {
 				m.rowsView.LineDown(TABLE_SCROLL_STEP)
@@ -92,14 +93,14 @@ func (m *tableModel) View() string {
 		lipgloss.Left,
 		m.renderHeader(),
 		m.rowsView.View(),
-		fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d, candidate: %v", m.cursor, len(m.objs), m.rowsView.YOffset, m.candidate),
+		m.renderDebugBar(),
 	)
 }
 
 func (m *tableModel) renderHeader() string {
 	var render strings.Builder
 	// headers
-	render.WriteString(m.cellStyle(0).Render("Name"))
+	render.WriteString(m.cellStyle(0).Render(fmt.Sprintf("Name(%d)", m.colMaxWidth(0))))
 	for i, node := range m.nodes {
 		render.WriteString(m.cellStyle(i).Render(node.Name()))
 	}
@@ -142,7 +143,16 @@ func (m *tableModel) isCursor(index int) bool {
 }
 
 func (m *tableModel) setNodeMaxWidths(nodes []*Node) {
-	var result []int
+	// name
+	nameMaxWidth := 4
+	for _, obj := range m.objs {
+		if len(displayName(obj)) > nameMaxWidth {
+			nameMaxWidth = len(displayName(obj))
+		}
+	}
+	m.nameMaxWidth = nameMaxWidth
+
+	var nodeMaxWidths []int
 
 	for _, node := range nodes {
 		max := len(node.Name())
@@ -151,10 +161,10 @@ func (m *tableModel) setNodeMaxWidths(nodes []*Node) {
 				max = len(m.val(node, obj))
 			}
 		}
-		result = append(result, max)
+		nodeMaxWidths = append(nodeMaxWidths, max)
 	}
 
-	m.nodeMaxWidths = result
+	m.nodeMaxWidths = nodeMaxWidths
 }
 
 func (m *tableModel) val(node *Node, obj *unstructured.Unstructured) string {
@@ -179,6 +189,10 @@ func (m *tableModel) setNodes(nodes []*Node) {
 	m.nodes = nodes
 }
 
+func (m *tableModel) setObjs(objs []*unstructured.Unstructured) {
+	m.objs = objs
+}
+
 func (m *tableModel) colMaxWidth(index int) int {
 	if index == 0 {
 		return m.nameMaxWidth
@@ -189,4 +203,23 @@ func (m *tableModel) colMaxWidth(index int) int {
 
 func (m *tableModel) setCandidate(candidate *Node) {
 	m.candidate = candidate
+}
+
+func (m *tableModel) isCursorTop() bool {
+	return m.cursor > 0
+}
+
+func (m *tableModel) isCursorBottom() bool {
+	// objs size as an index(-1) and the debug/help bar(-1)
+	// rowsview height as an index(-1); already adjusted for the debug/help bar
+	return m.cursor < min(len(m.objs)-2, m.rowsView.Height-1)
+}
+
+func (m *tableModel) setRowsViewSize(msg tea.WindowSizeMsg) {
+	m.rowsView.Width = int(float64(msg.Width) * TABLE_WIDTH_RATIO)
+	m.rowsView.Height = msg.Height - 3 // HACK: topbar 1 + debug line 1 + header 1
+}
+
+func (m *tableModel) renderDebugBar() string {
+	return m.styles.debug.Render(fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d, candidate: %v", m.cursor, len(m.objs), m.rowsView.YOffset, m.candidate))
 }

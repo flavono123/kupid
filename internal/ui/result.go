@@ -31,7 +31,7 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case resultMsg:
-		m.setTable(msg.nodes)
+		m.setTable(msg.nodes, msg.objs)
 	case candidateMsg:
 		m.setCandidate(msg.candidate)
 	case tea.WindowSizeMsg:
@@ -108,8 +108,9 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 	return current, true, nil
 }
 
-func (m *resultModel) setTable(nodes []*Node) {
-	m.table.setNodes(nodes)
+func (m *resultModel) setTable(nodes []*Node, objs []*unstructured.Unstructured) {
+	m.table.setObjs(objs)
+	m.table.setNodes(nodes) // HACK: update ojbs first, setNodeMaxWidths is dependent on objs
 }
 
 func (m *resultModel) setCandidate(candidate *Node) {
