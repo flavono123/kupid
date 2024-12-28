@@ -30,10 +30,17 @@ type resourceMsg struct {
 
 // result
 type resultMsg struct {
-	nodes []*Node
-	objs  []*unstructured.Unstructured
+	nodes      []*Node
+	objs       []*unstructured.Unstructured
+	picked     bool
+	pickedNode *Node
 }
 
 type candidateMsg struct {
 	candidate *Node
+}
+
+type cancelPickMsg struct {
+	canceled bool
+	node     *Node
 }

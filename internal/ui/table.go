@@ -50,7 +50,7 @@ func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel
 		styles: tableStyles{
 			header:    lipgloss.NewStyle().Bold(true),
 			selected:  lipgloss.NewStyle().Bold(true).Foreground(theme.Mauve),
-			candidate: lipgloss.NewStyle().Foreground(theme.Surface2),
+			candidate: lipgloss.NewStyle().Margin(0, 0, 0, 1).Foreground(theme.Surface2),
 			debug:     lipgloss.NewStyle().Italic(true).Foreground(theme.Surface1),
 		},
 	}
@@ -185,7 +185,7 @@ func (m *tableModel) val(node *Node, obj *unstructured.Unstructured) string {
 }
 
 func (m *tableModel) cellStyle(col int) lipgloss.Style {
-	return lipgloss.NewStyle().Margin(0, 1).Width(m.colMaxWidth(col))
+	return lipgloss.NewStyle().Margin(0, 0, 0, 1).Width(m.colMaxWidth(col))
 }
 
 func (m *tableModel) setNodes(nodes []*Node) {
@@ -228,7 +228,33 @@ func (m *tableModel) setRowsViewSize(msg tea.WindowSizeMsg) {
 
 func (m *tableModel) renderDebugBar() string {
 	return m.styles.debug.Render(
-		fmt.Sprintf("cursor: %d, objs: %d, yoffset: %d, candidate: %v",
-			m.cursor, len(m.objs), m.rowsView.YOffset, m.candidate),
+		fmt.Sprintf("vpwidth: %d, tablewidth: %d, cols: %d",
+			m.rowsView.Width, m.tableWidth(), m.cols()),
 	)
+}
+
+func (m *tableModel) willOverWidth(node *Node) bool {
+	return m.tableWidth()+m.maxWidth(node) > m.rowsView.Width-9 // magic num again, safty margin
+}
+
+func (m *tableModel) maxWidth(node *Node) int {
+	max := len(node.Name())
+	for _, obj := range m.objs {
+		if len(m.val(node, obj)) > max {
+			max = len(m.val(node, obj))
+		}
+	}
+	return max
+}
+
+func (m *tableModel) tableWidth() int {
+	width := 0
+	for col := 0; col < m.cols(); col++ {
+		width += m.colMaxWidth(col) + 1 // margin?
+	}
+	return width
+}
+
+func (m *tableModel) cols() int {
+	return len(m.nodes) + 1 // name + nodes
 }

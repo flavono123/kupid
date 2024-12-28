@@ -118,8 +118,10 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case resourceMsg:
 		return m, func() tea.Msg {
 			return resultMsg{
-				nodes: m.selectedNodes,
-				objs:  msg.objs,
+				nodes:      m.selectedNodes,
+				objs:       msg.objs,
+				picked:     false,
+				pickedNode: nil,
 			}
 		}
 	case selectGVKMsg:
@@ -137,8 +139,10 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selectedNodes = append(m.selectedNodes, msg.node)
 		return m, func() tea.Msg {
 			return resultMsg{
-				nodes: m.selectedNodes,
-				objs:  m.informers[m.curGVK].GetObjects(),
+				nodes:      m.selectedNodes,
+				objs:       m.informers[m.curGVK].GetObjects(),
+				picked:     true,
+				pickedNode: msg.node,
 			}
 		}
 	case unpickFieldMsg:
@@ -150,9 +154,16 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, func() tea.Msg {
 			return resultMsg{
-				nodes: m.selectedNodes,
-				objs:  m.informers[m.curGVK].GetObjects(),
+				nodes:      m.selectedNodes,
+				objs:       m.informers[m.curGVK].GetObjects(),
+				picked:     false,
+				pickedNode: nil,
 			}
+		}
+	case cancelPickMsg:
+		if msg.canceled {
+			msg.node.Selected = false
+			m.selectedNodes = append(m.selectedNodes[:len(m.selectedNodes)-1], m.selectedNodes[len(m.selectedNodes):]...)
 		}
 	case hoverFieldMsg:
 		return m, func() tea.Msg {
@@ -160,12 +171,6 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				candidate: msg.candidate,
 			}
 		}
-		// default:
-		// 	return m, func() tea.Msg {
-		// 		return candidateMsg{
-		// 			candidate: nil,
-		// 		}
-		// 	}
 	}
 
 	return m, tea.Batch(cmds...)

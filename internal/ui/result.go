@@ -54,9 +54,22 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.widthLimPB = pM.(progress.Model)
 		cmds = append(cmds, pCmd)
 	case resultMsg:
+		if msg.picked && m.table.willOverWidth(msg.pickedNode) {
+			return m, func() tea.Msg {
+				return cancelPickMsg{
+					canceled: true,
+					node:     msg.pickedNode,
+				}
+			}
+		}
+
 		m.setTable(msg.nodes, msg.objs)
 		cmds = append(cmds, m.setWidthLimitRatio(len(msg.nodes)))
 	case candidateMsg:
+		if msg.candidate != nil && m.table.willOverWidth(msg.candidate) {
+			// do not render candidate
+			return m, nil
+		}
 		m.setCandidate(msg.candidate)
 	case tea.WindowSizeMsg:
 		m.width = int(float64(msg.Width) * TABLE_WIDTH_RATIO) // TODO: rename TABLE_WIDTH_RATIO to result's
@@ -145,11 +158,12 @@ func (m *resultModel) setCandidate(candidate *Node) {
 	m.table.setCandidate(candidate)
 }
 
+// TODO: move to table
 func (m *resultModel) renderTopBar() string {
 	// HACK: safe right padding required how much? idk
 	// but 9 is safe where the point render 120 window width(result 80 width)
 	// TODO: make 120 width as a hard lower limit of the program
-	topBarStyle := lipgloss.NewStyle().Align(lipgloss.Right).Padding(0, 9).Width(m.width)
+	topBarStyle := lipgloss.NewStyle().Align(lipgloss.Right).Padding(0, 9, 0, 0).Width(m.width)
 
 	return topBarStyle.Render(m.widthLimPB.View())
 }

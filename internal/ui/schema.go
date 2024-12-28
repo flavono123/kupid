@@ -34,6 +34,8 @@ type schemaModel struct {
 	curLines  []*Line
 	curGVK    schema.GroupVersionKind
 
+	tmpTotalWidth int
+
 	keys schemaKeyMap
 	help help.Model
 }
@@ -80,6 +82,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.tmpTotalWidth = msg.Width
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
 	case tea.KeyMsg:
@@ -172,7 +175,7 @@ func (m *schemaModel) View() string {
 		m.renderTopBar(),
 		m.style.Render(m.vp.View()),
 		// m.help.View(m.keys),
-		fmt.Sprintf("cursor: %d, curLineNo: %d, vpYOffset: %d, vpWidth: %d", m.cursor, m.curLineNo, m.vp.YOffset, m.vp.Width),
+		fmt.Sprintf("vpWidth: %d, tmpTotalWidth: %d", m.vp.Width, m.tmpTotalWidth),
 	)
 }
 
