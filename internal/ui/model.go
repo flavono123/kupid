@@ -89,10 +89,12 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(keyMsg, m.keys.tabView):
 			if m.state == schemaView {
 				m.state = resultView
-				m.result.focus()
+				m.schema.blur()
+				cmds = append(cmds, m.result.focus())
 			} else {
 				m.state = schemaView
 				m.result.blur()
+				cmds = append(cmds, m.schema.focus())
 			}
 		case key.Matches(keyMsg, m.keys.quit):
 			return m, tea.Quit

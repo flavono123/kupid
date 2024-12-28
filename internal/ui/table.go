@@ -49,7 +49,7 @@ func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel
 		nodeMaxWidths: []int{},
 		styles: tableStyles{
 			header:    lipgloss.NewStyle().Bold(true),
-			selected:  lipgloss.NewStyle().Bold(true).Foreground(theme.Mauve),
+			selected:  lipgloss.NewStyle().Bold(true).Foreground(theme.Blue),
 			candidate: lipgloss.NewStyle().Margin(0, 0, 0, 1).Foreground(theme.Surface2),
 			debug:     lipgloss.NewStyle().Italic(true).Foreground(theme.Surface1),
 		},

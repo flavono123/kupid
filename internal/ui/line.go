@@ -21,12 +21,12 @@ func newLine(node *Node, width int, index int) *Line {
 	return &Line{node: node, style: style, index: index}
 }
 
-func (l *Line) render(leftPadding int, cursored bool, maxWidth int) string {
+func (l *Line) render(leftPadding int, cursored bool, maxWidth int, schemaBlurred bool) string {
 	line := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		l.number(leftPadding),
 		l.indent(),
-		l.cursor(cursored),
+		l.cursor(cursored, schemaBlurred),
 		l.action(),
 		l.node.render(),
 		// fmt.Sprintf("(%d)", l.node.Level()),
@@ -45,8 +45,11 @@ func (l *Line) indent() string {
 	return strings.Repeat(" ", l.node.Level()*2)
 }
 
-func (l *Line) cursor(cursored bool) string {
-	cursor := lipgloss.NewStyle().Foreground(theme.Text)
+func (l *Line) cursor(cursored bool, schemaBlurred bool) string {
+	cursor := lipgloss.NewStyle().Foreground(theme.Blue).Bold(true)
+	if schemaBlurred {
+		cursor = cursor.Foreground(theme.Overlay0).Bold(false)
+	}
 	if cursored {
 		return cursor.Render(">")
 	}

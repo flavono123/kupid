@@ -5,23 +5,39 @@ import (
 	"strconv"
 
 	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// type filteredRow struct {
+// 	row     string
+// 	indices []int
+// }
+
+// type filteredRows []filteredRow
 type resultModel struct {
 	focused bool
 	table   *tableModel
+	filter  textinput.Model
 
 	width      int
 	widthLimPB progress.Model
-	// widthLimitRatio float64
-	wasPicked int
 }
 
 func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 	nodes := []*Node{}
+	filter := textinput.New()
+	filter.Placeholder = "Filter"
+	filter.SetCursor(0)
+	filter.Width = 20
+	filter.Cursor.Blink = true
+	filter.Prompt = "|"
+	filter.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.Overlay0).Background(theme.Mantle)
+	filter.TextStyle = lipgloss.NewStyle().Foreground(theme.Blue).Background(theme.Mantle)
+
 	t := newTableModel(nodes, objs)
 	return &resultModel{
 		focused: false,
@@ -36,12 +52,13 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 			// TODO: crescendo freq dynamically for more picked like BALATRO
 			progress.WithSpringOptions(120, 1.0),
 		),
-		wasPicked: 0,
+		filter: filter,
 	}
 }
 
 func (m *resultModel) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
+
 }
 
 func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -78,6 +95,10 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tCmd)
 	case tea.KeyMsg:
 		if m.focused {
+			fm, fCmd := m.filter.Update(msg)
+			m.filter = fm
+			cmds = append(cmds, fCmd)
+
 			tm, tCmd := m.table.Update(msg)
 			m.table = tm.(*tableModel)
 			cmds = append(cmds, tCmd)
@@ -104,12 +125,20 @@ func displayName(obj *unstructured.Unstructured) string {
 	return obj.GetName()
 }
 
-func (m *resultModel) focus() {
+func (m *resultModel) focus() tea.Cmd {
 	m.focused = true
+
+	m.filter.PromptStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.Blue)
+	return tea.Batch(
+		textinput.Blink, // ???? not working
+		m.filter.Focus(),
+	)
 }
 
 func (m *resultModel) blur() {
 	m.focused = false
+	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0)
+	m.filter.Blur()
 }
 
 func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
@@ -163,9 +192,15 @@ func (m *resultModel) renderTopBar() string {
 	// HACK: safe right padding required how much? idk
 	// but 9 is safe where the point render 120 window width(result 80 width)
 	// TODO: make 120 width as a hard lower limit of the program
+	// pBarStyle := lipgloss.NewStyle()
 	topBarStyle := lipgloss.NewStyle().Align(lipgloss.Right).Padding(0, 9, 0, 0).Width(m.width)
 
-	return topBarStyle.Render(m.widthLimPB.View())
+	return topBarStyle.Render(
+		lipgloss.JoinHorizontal(lipgloss.Left,
+			m.filter.View(),
+			m.widthLimPB.View(),
+		),
+	)
 }
 
 func (m *resultModel) setWidthLimitRatio() tea.Cmd {

@@ -21,8 +21,8 @@ import (
 )
 
 type schemaModel struct {
-	// fields map[string]*kube.Field
-	nodes map[string]*Node
+	focused bool
+	nodes   map[string]*Node
 
 	vp viewport.Model
 
@@ -48,8 +48,8 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 	nodes := createNodeTree(fields, objs, []string{})
 
 	style := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(theme.Overlay0)
+		Border(lipgloss.ThickBorder()).
+		BorderForeground(theme.Blue)
 
 	vp := viewport.New(0, 0)
 	m := &schemaModel{
@@ -255,7 +255,7 @@ func (m *schemaModel) renderRecursive(lines []*Line) string {
 		if m.isCursor(line.index) {
 			m.curNode = line.node
 		}
-		result.WriteString(line.render(leftPadding, m.isCursor(line.index), m.vp.Width) + "\n")
+		result.WriteString(line.render(leftPadding, m.isCursor(line.index), m.vp.Width, !m.focused) + "\n")
 	}
 
 	return result.String()
@@ -309,4 +309,16 @@ func (m *schemaModel) renderTopBar() string {
 		ctx,
 		kind,
 	)
+}
+
+func (m *schemaModel) focus() tea.Cmd {
+	m.focused = true
+	m.style = m.style.Border(lipgloss.ThickBorder()).BorderForeground(theme.Blue)
+	// nothing to send
+	return nil
+}
+
+func (m *schemaModel) blur() {
+	m.focused = false
+	m.style = m.style.Border(lipgloss.NormalBorder()).BorderForeground(theme.Overlay0)
 }
