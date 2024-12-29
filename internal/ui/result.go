@@ -71,6 +71,10 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.widthLimPB = pM.(progress.Model)
 		cmds = append(cmds, pCmd)
 	case resultMsg:
+		if msg.picked {
+			m.setCandidate(nil)
+		}
+
 		if msg.picked && m.table.willOverWidth(msg.pickedNode) {
 			return m, func() tea.Msg {
 				return cancelPickMsg{
@@ -118,7 +122,7 @@ func (m *resultModel) View() string {
 // utils
 
 func displayName(obj *unstructured.Unstructured) string {
-	// TODO: gonna be a toggling feature
+	// TODO: gonna be namespace toggling feature
 	// HACK: to reduce the width of table before viewport supporting horizontal scroll
 	// if obj.GetNamespace() != "" {
 	// 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())

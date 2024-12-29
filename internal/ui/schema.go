@@ -30,9 +30,9 @@ type schemaModel struct {
 	cursor    int
 	curLineNo int
 	prevNode  *Node
-	curNode   *Node
-	curLines  []*Line
-	curGVK    schema.GroupVersionKind
+	// curNode   *Node
+	curLines []*Line
+	curGVK   schema.GroupVersionKind
 
 	tmpTotalWidth int
 
@@ -60,9 +60,9 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 		curGVK:   gvk,
 		curLines: []*Line{},
 		prevNode: nil,
-		curNode:  nil,
-		keys:     newSchemaKeyMap(),
-		help:     help.New(),
+		// curNode:  nil,
+		keys: newSchemaKeyMap(),
+		help: help.New(),
 	}
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	content := m.renderRecursive(m.curLines)
@@ -96,7 +96,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return hoverFieldMsg{candidate: m.rrrrCurNode()}
+					return hoverFieldMsg{candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
@@ -112,7 +112,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return hoverFieldMsg{candidate: m.rrrrCurNode()}
+					return hoverFieldMsg{candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
@@ -120,23 +120,23 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, m.keys.action):
-			if m.curNode == nil {
+			if m.curNode() == nil {
 				break
 			}
 
-			if m.curNode.Foldable() {
+			if m.curNode().Foldable() {
 				m.toggleCurrentNodeFolder()
 				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 			} else { // selectable, for leaf fields
-				if m.curNode.Selected {
-					m.curNode.Selected = false
+				if m.curNode().Selected {
+					m.curNode().Selected = false
 					retCmd = func() tea.Msg {
-						return unpickFieldMsg{node: m.curNode}
+						return unpickFieldMsg{node: m.curNode()}
 					}
 				} else {
-					m.curNode.Selected = true
+					m.curNode().Selected = true
 					retCmd = func() tea.Msg {
-						return pickFieldMsg{node: m.curNode}
+						return pickFieldMsg{node: m.curNode()}
 					}
 				}
 			}
@@ -144,18 +144,19 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// BUG: when viewport is adjusted by expland all/level then fold back, the cursor is not rendered
 		// reproduce - expand level of status in kind Pod(long enough) and fold
 		case key.Matches(msg, m.keys.levelExpand):
-			if m.curNode != nil && m.curNode.Foldable() {
-				toggledExpanded := !m.curNode.Expanded
-				prevNode := m.curNode
+			node := m.curNode()
+			if node != nil && node.Foldable() {
+				toggledExpanded := !node.Expanded
+				prevNode := node
 				m.toggleExpandRecursive(m.nodes, toggledExpanded, false)
 				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 				m.setCursor(prevNode.FullPath())
-
 			}
 		case key.Matches(msg, m.keys.allExpand):
-			if m.curNode != nil && m.curNode.Foldable() {
-				toggledExpanded := !m.curNode.Expanded
-				prevNode := m.curNode
+			node := m.curNode()
+			if node != nil && node.Foldable() {
+				toggledExpanded := !node.Expanded
+				prevNode := node
 				m.toggleExpandRecursive(m.nodes, toggledExpanded, true)
 				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 				m.setCursor(prevNode.FullPath())
@@ -201,20 +202,23 @@ func (m *schemaModel) setCursor(path []string) {
 }
 
 func (m *schemaModel) toggleCurrentNodeFolder() {
-	m.curNode.toggleFolder()
+	if node := m.curNode(); node != nil {
+		node.toggleFolder()
+	}
 }
 
 func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool, all bool) {
-	if m.curNode == nil {
+	node := m.curNode()
+	if node == nil {
 		return
 	}
 
-	for _, node := range nodes {
-		if all || (node.Level() == m.curNode.Level()) {
-			node.setExpanded(expand)
+	for _, n := range nodes {
+		if all || (n.Level() == node.Level()) {
+			n.setExpanded(expand)
 		}
 
-		m.toggleExpandRecursive(node.children, expand, all)
+		m.toggleExpandRecursive(n.children, expand, all)
 	}
 }
 
@@ -248,13 +252,9 @@ func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) 
 
 func (m *schemaModel) renderRecursive(lines []*Line) string {
 	var result strings.Builder
-
 	leftPadding := len(strconv.Itoa(len(lines) - 1))
 
 	for _, line := range lines {
-		if m.isCursor(line.index) {
-			m.curNode = line.node
-		}
 		result.WriteString(line.render(leftPadding, m.isCursor(line.index), m.vp.Width, !m.focused) + "\n")
 	}
 
@@ -290,12 +290,12 @@ func sortKeys(keys []string) {
 	}
 }
 
-func (m *schemaModel) rrrrCurNode() *Node {
+func (m *schemaModel) curNode() *Node {
 	return m.curLines[m.cursor+m.vp.YOffset].node
 }
 
 func (m *schemaModel) curIsPickable() bool {
-	return m.rrrrCurNode() != nil && !m.rrrrCurNode().Foldable() && !m.rrrrCurNode().Selected
+	return m.curNode() != nil && !m.curNode().Foldable() && !m.curNode().Selected
 }
 
 func (m *schemaModel) renderTopBar() string {
