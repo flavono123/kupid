@@ -19,6 +19,7 @@ type ResourceController struct {
 	client dynamic.Interface
 	gvr    schema.GroupVersionResource
 	store  cache.Store
+	emitCh chan struct{}
 }
 
 func NewResourceController(gvr schema.GroupVersionResource) *ResourceController {
@@ -60,13 +61,13 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 		ObjectType:    &unstructured.Unstructured{},
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				// nothing yet
+				go func() { i.emitCh <- struct{}{} }()
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				// nothing yet
+				go func() { i.emitCh <- struct{}{} }()
 			},
 			DeleteFunc: func(obj interface{}) {
-				// nothing yet
+				go func() { i.emitCh <- struct{}{} }()
 			},
 		},
 	}
@@ -84,4 +85,8 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 	}
 
 	return stop, nil
+}
+
+func (i *ResourceController) EventEmitted() <-chan struct{} {
+	return i.emitCh
 }

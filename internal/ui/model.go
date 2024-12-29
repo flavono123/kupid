@@ -61,11 +61,7 @@ func InitModel() *mainModel {
 
 func (m *mainModel) Init() tea.Cmd {
 	m.inform()
-	return func() tea.Msg {
-		return updateObjsMsg{
-			objs: m.controller.GetObjects(),
-		}
-	}
+	return m.listenController()
 }
 
 func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -115,7 +111,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.vp.Width = msg.Width
 		m.vp.Height = msg.Height
 	case updateObjsMsg:
-		return m, func() tea.Msg {
+		setResultCmd := func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
 				objs:       msg.objs,
@@ -123,10 +119,14 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				pickedNode: nil,
 			}
 		}
+		return m, tea.Batch(
+			setResultCmd,
+			m.listenController(),
+		)
 	case selectGVKMsg:
 		m.gvk = msg.gvk
 		m.setController(msg.gvk)
-		m.inform()
+
 		m.schema.Reset(msg.gvk, m.getController().GetObjects())
 		m.kbar.visible = false
 		m.selectedNodes = []*Node{}
@@ -237,4 +237,18 @@ func (m *mainModel) currentFocusedView() string {
 		return "result"
 	}
 	return "schema"
+}
+
+// BUG: listen event only when selectgvk(or just once?)
+func (m *mainModel) listenController() tea.Cmd {
+	return func() tea.Msg {
+		match, ok := <-m.getController().EventEmitted()
+		if !ok || match != struct{}{} {
+			return nil
+		}
+
+		return updateObjsMsg{
+			objs: m.getController().GetObjects(),
+		}
+	}
 }

@@ -103,6 +103,7 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tCmd)
 		}
 	}
+
 	return m, tea.Batch(cmds...)
 }
 
