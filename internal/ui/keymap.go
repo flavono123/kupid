@@ -90,7 +90,7 @@ func newKbarKeyMap() kbarKeyMap {
 	}
 }
 
-// TODO: seperate to nested package
+// TODO: seperate to nested package, not only this but all submodels
 // table
 type tableKeyMap struct {
 	up   key.Binding

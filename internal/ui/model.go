@@ -26,7 +26,7 @@ type mainModel struct {
 	schema        *schemaModel
 	result        *resultModel
 	curGVK        schema.GroupVersionKind
-	curInformer   *kube.Informer
+	curController *kube.ResourceController
 	stop          chan struct{}
 	selectedNodes []*Node
 	kbar          *kbarModel
@@ -42,29 +42,28 @@ func InitModel() *mainModel {
 	if err != nil {
 		log.Fatalf("failed to get gvr: %v", err)
 	}
-	informer := kube.NewInformer(gvr)
-
-	informer.Inform()
+	controller := kube.NewResourceController(gvr)
+	controller.Inform()
 
 	return &mainModel{
 		state:         schemaView,
 		keys:          newKeyMap(),
-		schema:        newSchemaModel(initGvk, informer.GetObjects()),
-		result:        newResultModel(informer.GetObjects()),
+		schema:        newSchemaModel(initGvk, controller.GetObjects()),
+		result:        newResultModel(controller.GetObjects()),
 		vp:            viewport.New(0, 0),
 		curGVK:        initGvk,
 		kbar:          newKbarModel(),
-		curInformer:   informer,
+		curController: controller,
 		stop:          nil,
 		selectedNodes: []*Node{},
 	}
 }
 
 func (m *mainModel) Init() tea.Cmd {
-	m.inform(m.curGVK)
+	m.inform()
 	return func() tea.Msg {
 		return resourceMsg{
-			objs: m.curInformer.GetObjects(),
+			objs: m.curController.GetObjects(),
 		}
 	}
 }
@@ -126,13 +125,14 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
-		m.inform(msg.gvk)
-		m.schema.Reset(msg.gvk, m.getInformer(msg.gvk).GetObjects())
+		m.setController(msg.gvk)
+		m.inform()
+		m.schema.Reset(msg.gvk, m.getController().GetObjects())
 		m.kbar.visible = false
 		m.selectedNodes = []*Node{}
 		return m, func() tea.Msg {
 			return resourceMsg{
-				objs: m.getInformer(msg.gvk).GetObjects(),
+				objs: m.getController().GetObjects(),
 			}
 		}
 	case pickFieldMsg:
@@ -140,7 +140,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
-				objs:       m.getInformer(m.curGVK).GetObjects(),
+				objs:       m.getController().GetObjects(),
 				picked:     true,
 				pickedNode: msg.node,
 			}
@@ -155,7 +155,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
-				objs:       m.getInformer(m.curGVK).GetObjects(),
+				objs:       m.getController().GetObjects(),
 				picked:     false,
 				pickedNode: nil,
 			}
@@ -205,23 +205,27 @@ func (m *mainModel) View() string {
 	)
 }
 
-func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
-	if m.curInformer == nil {
-		gvr, err := kube.GetGVR(gvk)
-		if err != nil {
-			return nil
-		}
-		m.curInformer = kube.NewInformer(gvr)
-	}
-	return m.curInformer
-}
-
-func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
+func (m *mainModel) setController(gvk schema.GroupVersionKind) {
 	if m.stop != nil {
 		close(m.stop)
 	}
+	gvr, err := kube.GetGVR(gvk)
+	if err != nil {
+		return
+	}
+	m.curController = kube.NewResourceController(gvr)
+	m.inform()
+}
 
-	stop, err := m.getInformer(gvk).Inform()
+func (m *mainModel) getController() *kube.ResourceController {
+	// if m.curController == nil {
+	// 	m.updateController(m.curGVK)
+	// }
+	return m.curController
+}
+
+func (m *mainModel) inform() tea.Cmd {
+	stop, err := m.getController().Inform()
 	if err != nil {
 		return nil
 	}

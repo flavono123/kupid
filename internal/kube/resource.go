@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -14,28 +15,37 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type Informer struct {
+type ResourceController struct {
 	client dynamic.Interface
 	gvr    schema.GroupVersionResource
-	objs   []*unstructured.Unstructured
+	store  cache.Store
 }
 
-func NewInformer(gvr schema.GroupVersionResource) *Informer {
+func NewResourceController(gvr schema.GroupVersionResource) *ResourceController {
 	client, err := DynamicClient()
 	if err != nil {
 		panic(err)
 	}
-	return &Informer{
+
+	return &ResourceController{
 		client: client,
 		gvr:    gvr,
 	}
 }
 
-func (i *Informer) GetObjects() []*unstructured.Unstructured {
-	return i.objs
+func (i *ResourceController) GetObjects() []*unstructured.Unstructured {
+	objs := make([]*unstructured.Unstructured, 0)
+	for _, obj := range i.store.List() {
+		objs = append(objs, obj.(*unstructured.Unstructured))
+	}
+	sort.Slice(objs, func(i, j int) bool {
+		// TODO: sort by namespace if gvr is namespaced
+		return objs[i].GetName() < objs[j].GetName()
+	})
+	return objs
 }
 
-func (i *Informer) Inform() (chan struct{}, error) {
+func (i *ResourceController) Inform() (chan struct{}, error) {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return i.client.Resource(i.gvr).Namespace("").List(context.Background(), options)
@@ -50,33 +60,20 @@ func (i *Informer) Inform() (chan struct{}, error) {
 		ObjectType:    &unstructured.Unstructured{},
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				i.objs = append(i.objs, obj.(*unstructured.Unstructured))
+				// nothing yet
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				o := oldObj.(*unstructured.Unstructured)
-				n := newObj.(*unstructured.Unstructured)
-
-				for idx, obj := range i.objs {
-					if obj.GetName() == o.GetName() {
-						i.objs[idx] = n
-						break
-					}
-				}
+				// nothing yet
 			},
 			DeleteFunc: func(obj interface{}) {
-				u := obj.(*unstructured.Unstructured)
-				for idx, obj := range i.objs {
-					if obj.GetName() == u.GetName() {
-						i.objs = append(i.objs[:idx], i.objs[idx+1:]...)
-						break
-					}
-				}
+				// nothing yet
 			},
 		},
 	}
-	_, controller := cache.NewInformerWithOptions(
+	store, controller := cache.NewInformerWithOptions(
 		options,
 	)
+	i.store = store
 
 	stop := make(chan struct{})
 	go controller.Run(stop)

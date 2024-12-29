@@ -222,7 +222,7 @@ func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool,
 	}
 }
 
-// TODO: remove arg width
+// TODO: remove arg width after horizontal scrollable
 func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) ([]*Line, int) {
 	lines := []*Line{}
 	keys := []string{}
@@ -261,8 +261,9 @@ func (m *schemaModel) renderRecursive(lines []*Line) string {
 	return result.String()
 }
 
+// TODO: split to each setter
 func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
-	m.curGVK = gvk // TODO: check if this is necessary
+	m.curGVK = gvk
 	fields, err := kube.CreateFieldTree(m.curGVK)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)

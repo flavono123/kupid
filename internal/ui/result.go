@@ -186,7 +186,6 @@ func (m *resultModel) setCandidate(candidate *Node) {
 	m.table.setCandidate(candidate)
 }
 
-// TODO: move to table
 func (m *resultModel) renderTopBar() string {
 	// HACK: safe right padding required how much? idk
 	// but 9 is safe where the point render 120 window width(result 80 width)
