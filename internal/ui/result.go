@@ -52,7 +52,6 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 
 func (m *resultModel) Init() tea.Cmd {
 	return textinput.Blink
-
 }
 
 func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -135,6 +134,8 @@ func (m *resultModel) focus() tea.Cmd {
 	)
 }
 
+// BUG: should blur when kbar rendered
+// maybe mainmodel should have a tristate
 func (m *resultModel) blur() {
 	m.focused = false
 	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0)

@@ -167,14 +167,14 @@ func (m *tableModel) renderRow() string {
 			if j == len(row.cells)-1 && m.candidate != nil {
 				// candidate 열은 특별한 스타일 적용
 				if match, ok := row.matches[j]; ok {
-					renderedCell = m.styles.candidate.Render(highlight(cell, match))
+					renderedCell = m.styles.candidate.Render(highlight(cell, match, m.styles.candidate.Margin(0, 0, 0, 0))) // TODO: define candidate cell and text style for each
 				} else {
 					renderedCell = m.styles.candidate.Render(cell)
 				}
 			} else {
 				// 일반 데이터 열
 				if match, ok := row.matches[j]; ok {
-					renderedCell = m.cellStyle(j).Render(highlight(cell, match))
+					renderedCell = m.cellStyle(j).Render(highlight(cell, match, lipgloss.NewStyle().Foreground(theme.Text))) // TODO: define text style as a field
 				} else {
 					renderedCell = m.cellStyle(j).Render(cell)
 				}
@@ -320,17 +320,17 @@ func (m *tableModel) setKeyword(keyword string) {
 }
 
 // helpers
-func highlight(s string, match fuzzy.Match) string {
-	style := lipgloss.NewStyle().Foreground(theme.Blue)
+func highlight(s string, match fuzzy.Match, unmatchedStyle lipgloss.Style) string {
+	highlightStyle := lipgloss.NewStyle().Foreground(theme.Blue)
 
 	runes := []rune(s)
 	result := make([]rune, 0, len(runes))
 
 	for i, r := range runes {
 		if contains(match.MatchedIndexes, i) {
-			result = append(result, []rune(style.Render(string(r)))...)
+			result = append(result, []rune(highlightStyle.Render(string(r)))...)
 		} else {
-			result = append(result, r)
+			result = append(result, []rune(unmatchedStyle.Render(string(r)))...)
 		}
 	}
 
