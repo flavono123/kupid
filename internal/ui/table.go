@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -14,8 +15,9 @@ import (
 )
 
 type fuzzyMatchedRow struct {
-	cells   []string
-	matches map[int]fuzzy.Match
+	cells    []string
+	matches  map[int]fuzzy.Match
+	scoreSum int
 }
 
 type tableStyles struct {
@@ -139,13 +141,15 @@ func (m *tableModel) renderRow() string {
 		}
 
 		matches := map[int]fuzzy.Match{}
+		scoreSum := 0
 		if m.keyword != "" {
 			// 키워드가 있을 때만 퍼지 매치 수행
 			for _, match := range fuzzy.Find(m.keyword, cells) {
 				matches[match.Index] = match
+				scoreSum += match.Score
 			}
 		}
-		rows = append(rows, fuzzyMatchedRow{cells: cells, matches: matches})
+		rows = append(rows, fuzzyMatchedRow{cells: cells, matches: matches, scoreSum: scoreSum})
 	}
 
 	lines := []string{}
@@ -159,7 +163,11 @@ func (m *tableModel) renderRow() string {
 			var renderedCell string
 			if j == len(row.cells)-1 && m.candidate != nil {
 				// candidate 열은 특별한 스타일 적용
-				renderedCell = m.styles.candidate.Render(cell)
+				if match, ok := row.matches[j]; ok {
+					renderedCell = m.styles.candidate.Render(highlight(cell, match))
+				} else {
+					renderedCell = m.styles.candidate.Render(cell)
+				}
 			} else {
 				// 일반 데이터 열
 				if match, ok := row.matches[j]; ok {
@@ -175,6 +183,9 @@ func (m *tableModel) renderRow() string {
 			line = m.styles.selected.Render(line)
 		}
 		lines = append(lines, line)
+		sort.Slice(lines, func(i, j int) bool {
+			return rows[i].scoreSum > rows[j].scoreSum
+		})
 	}
 
 	return strings.Join(lines, "\n")
