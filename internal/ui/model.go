@@ -26,7 +26,7 @@ type mainModel struct {
 	schema        *schemaModel
 	result        *resultModel
 	curGVK        schema.GroupVersionKind
-	informers     map[schema.GroupVersionKind]*kube.Informer
+	curInformer   *kube.Informer
 	stop          chan struct{}
 	selectedNodes []*Node
 	kbar          *kbarModel
@@ -42,21 +42,19 @@ func InitModel() *mainModel {
 	if err != nil {
 		log.Fatalf("failed to get gvr: %v", err)
 	}
-	informers := map[schema.GroupVersionKind]*kube.Informer{
-		initGvk: kube.NewInformer(gvr),
-	}
+	informer := kube.NewInformer(gvr)
 
-	informers[initGvk].Inform()
+	informer.Inform()
 
 	return &mainModel{
 		state:         schemaView,
 		keys:          newKeyMap(),
-		schema:        newSchemaModel(initGvk, informers[initGvk].GetObjects()),
-		result:        newResultModel(informers[initGvk].GetObjects()),
+		schema:        newSchemaModel(initGvk, informer.GetObjects()),
+		result:        newResultModel(informer.GetObjects()),
 		vp:            viewport.New(0, 0),
 		curGVK:        initGvk,
 		kbar:          newKbarModel(),
-		informers:     informers,
+		curInformer:   informer,
 		stop:          nil,
 		selectedNodes: []*Node{},
 	}
@@ -66,7 +64,7 @@ func (m *mainModel) Init() tea.Cmd {
 	m.inform(m.curGVK)
 	return func() tea.Msg {
 		return resourceMsg{
-			objs: m.informers[m.curGVK].GetObjects(),
+			objs: m.curInformer.GetObjects(),
 		}
 	}
 }
@@ -129,7 +127,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case selectGVKMsg:
 		m.curGVK = msg.gvk
 		m.inform(msg.gvk)
-		m.schema.Reset(msg.gvk, m.informers[msg.gvk].GetObjects())
+		m.schema.Reset(msg.gvk, m.getInformer(msg.gvk).GetObjects())
 		m.kbar.visible = false
 		m.selectedNodes = []*Node{}
 		return m, func() tea.Msg {
@@ -142,7 +140,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
-				objs:       m.informers[m.curGVK].GetObjects(),
+				objs:       m.getInformer(m.curGVK).GetObjects(),
 				picked:     true,
 				pickedNode: msg.node,
 			}
@@ -157,7 +155,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
-				objs:       m.informers[m.curGVK].GetObjects(),
+				objs:       m.getInformer(m.curGVK).GetObjects(),
 				picked:     false,
 				pickedNode: nil,
 			}
@@ -208,14 +206,14 @@ func (m *mainModel) View() string {
 }
 
 func (m *mainModel) getInformer(gvk schema.GroupVersionKind) *kube.Informer {
-	if m.informers[gvk] == nil {
+	if m.curInformer == nil {
 		gvr, err := kube.GetGVR(gvk)
 		if err != nil {
 			return nil
 		}
-		m.informers[gvk] = kube.NewInformer(gvr)
+		m.curInformer = kube.NewInformer(gvr)
 	}
-	return m.informers[gvk]
+	return m.curInformer
 }
 
 func (m *mainModel) inform(gvk schema.GroupVersionKind) tea.Cmd {
