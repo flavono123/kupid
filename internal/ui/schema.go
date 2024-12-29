@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"log"
 	"reflect"
 	"sort"
@@ -28,13 +27,11 @@ type schemaModel struct {
 
 	style     lipgloss.Style
 	cursor    int
+	curLines  []*Line
 	curLineNo int
 	prevNode  *Node
-	// curNode   *Node
-	curLines []*Line
-	curGVK   schema.GroupVersionKind
 
-	tmpTotalWidth int
+	gvk schema.GroupVersionKind
 
 	keys schemaKeyMap
 	help help.Model
@@ -57,7 +54,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 		vp:       vp,
 		style:    style,
 		cursor:   0,
-		curGVK:   gvk,
+		gvk:      gvk,
 		curLines: []*Line{},
 		prevNode: nil,
 		// curNode:  nil,
@@ -82,7 +79,6 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.tmpTotalWidth = msg.Width
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
 	case tea.KeyMsg:
@@ -176,7 +172,7 @@ func (m *schemaModel) View() string {
 		m.renderTopBar(),
 		m.style.Render(m.vp.View()),
 		// m.help.View(m.keys),
-		fmt.Sprintf("vpWidth: %d, tmpTotalWidth: %d", m.vp.Width, m.tmpTotalWidth),
+		// fmt.Sprintf("vpWidth: %d", m.vp.Width),
 	)
 }
 
@@ -263,8 +259,8 @@ func (m *schemaModel) renderRecursive(lines []*Line) string {
 
 // TODO: split to each setter
 func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
-	m.curGVK = gvk
-	fields, err := kube.CreateFieldTree(m.curGVK)
+	m.gvk = gvk
+	fields, err := kube.CreateFieldTree(m.gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
@@ -305,7 +301,7 @@ func (m *schemaModel) renderTopBar() string {
 		log.Fatalf("failed to get current context: %v", err)
 	}
 	ctx = lipgloss.NewStyle().Margin(0, 1).Render(ctx)
-	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.curGVK.Kind)
+	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.gvk.Kind)
 	return lipgloss.JoinHorizontal(lipgloss.Left,
 		ctx,
 		kind,

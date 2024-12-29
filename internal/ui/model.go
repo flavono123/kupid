@@ -20,13 +20,13 @@ const (
 )
 
 type mainModel struct {
-	state         sessionState
+	session       sessionState
 	keys          keyMap
 	vp            viewport.Model
 	schema        *schemaModel
 	result        *resultModel
-	curGVK        schema.GroupVersionKind
-	curController *kube.ResourceController
+	gvk           schema.GroupVersionKind
+	controller    *kube.ResourceController
 	stop          chan struct{}
 	selectedNodes []*Node
 	kbar          *kbarModel
@@ -46,14 +46,14 @@ func InitModel() *mainModel {
 	controller.Inform()
 
 	return &mainModel{
-		state:         schemaView,
+		session:       schemaView,
 		keys:          newKeyMap(),
 		schema:        newSchemaModel(initGvk, controller.GetObjects()),
 		result:        newResultModel(controller.GetObjects()),
 		vp:            viewport.New(0, 0),
-		curGVK:        initGvk,
+		gvk:           initGvk,
 		kbar:          newKbarModel(),
-		curController: controller,
+		controller:    controller,
 		stop:          nil,
 		selectedNodes: []*Node{},
 	}
@@ -62,8 +62,8 @@ func InitModel() *mainModel {
 func (m *mainModel) Init() tea.Cmd {
 	m.inform()
 	return func() tea.Msg {
-		return resourceMsg{
-			objs: m.curController.GetObjects(),
+		return updateObjsMsg{
+			objs: m.controller.GetObjects(),
 		}
 	}
 }
@@ -72,11 +72,11 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		if m.state == schemaView {
+		if m.session == schemaView {
 			sm, sCmd := m.schema.Update(msg)
 			m.schema = sm.(*schemaModel)
 			cmds = append(cmds, sCmd)
-		} else if m.state == resultView && m.result.focused {
+		} else if m.session == resultView && m.result.focused {
 			rm, rCmd := m.result.Update(msg)
 			m.result = rm.(*resultModel)
 			cmds = append(cmds, rCmd)
@@ -84,12 +84,12 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch {
 		case key.Matches(keyMsg, m.keys.tabView):
-			if m.state == schemaView {
-				m.state = resultView
+			if m.session == schemaView {
+				m.session = resultView
 				m.schema.blur()
 				cmds = append(cmds, m.result.focus())
 			} else {
-				m.state = schemaView
+				m.session = schemaView
 				m.result.blur()
 				cmds = append(cmds, m.schema.focus())
 			}
@@ -114,7 +114,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.vp.Width = msg.Width
 		m.vp.Height = msg.Height
-	case resourceMsg:
+	case updateObjsMsg:
 		return m, func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
@@ -124,14 +124,14 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case selectGVKMsg:
-		m.curGVK = msg.gvk
+		m.gvk = msg.gvk
 		m.setController(msg.gvk)
 		m.inform()
 		m.schema.Reset(msg.gvk, m.getController().GetObjects())
 		m.kbar.visible = false
 		m.selectedNodes = []*Node{}
 		return m, func() tea.Msg {
-			return resourceMsg{
+			return updateObjsMsg{
 				objs: m.getController().GetObjects(),
 			}
 		}
@@ -213,17 +213,11 @@ func (m *mainModel) setController(gvk schema.GroupVersionKind) {
 	if err != nil {
 		return
 	}
-	m.curController = kube.NewResourceController(gvr)
+	m.controller = kube.NewResourceController(gvr)
 	m.inform()
 }
 
-func (m *mainModel) getController() *kube.ResourceController {
-	// if m.curController == nil {
-	// 	m.updateController(m.curGVK)
-	// }
-	return m.curController
-}
-
+// TODO: ? why return?
 func (m *mainModel) inform() tea.Cmd {
 	stop, err := m.getController().Inform()
 	if err != nil {
@@ -234,8 +228,12 @@ func (m *mainModel) inform() tea.Cmd {
 	return nil
 }
 
+func (m *mainModel) getController() *kube.ResourceController {
+	return m.controller
+}
+
 func (m *mainModel) currentFocusedView() string {
-	if m.state == resultView {
+	if m.session == resultView {
 		return "result"
 	}
 	return "schema"

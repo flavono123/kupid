@@ -41,6 +41,7 @@ type tableModel struct {
 }
 
 func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel {
+	// TODO: should 0 when no objs, impl with no resources view
 	nameMaxWidth := 4 // Name
 	for _, obj := range objs {
 		if len(displayName(obj)) > nameMaxWidth {
@@ -110,9 +111,11 @@ func (m *tableModel) View() string {
 func (m *tableModel) renderHeader() string {
 	var render strings.Builder
 	// headers
-	render.WriteString(m.cellStyle(0).Render("Name"))
-	for i, node := range m.nodes {
-		render.WriteString(m.cellStyle(i + 1).Render(node.Name()))
+	if len(m.objs) > 0 {
+		render.WriteString(m.cellStyle(0).Render("Name"))
+		for i, node := range m.nodes {
+			render.WriteString(m.cellStyle(i + 1).Render(node.Name()))
+		}
 	}
 
 	if m.candidate != nil {
@@ -316,6 +319,7 @@ func (m *tableModel) setKeyword(keyword string) {
 	m.keyword = keyword
 }
 
+// helpers
 func highlight(s string, match fuzzy.Match) string {
 	style := lipgloss.NewStyle().Foreground(theme.Blue)
 

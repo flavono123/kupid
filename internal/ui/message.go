@@ -24,7 +24,7 @@ type hoverFieldMsg struct {
 }
 
 // main
-type resourceMsg struct {
+type updateObjsMsg struct {
 	objs []*unstructured.Unstructured
 }
 
