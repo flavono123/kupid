@@ -13,6 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+type fuzzyMatchedRow struct {
+	cells   []string
+	matches map[int]fuzzy.Match
+}
+
 type tableStyles struct {
 	header    lipgloss.Style
 	selected  lipgloss.Style
@@ -120,37 +125,59 @@ func (m *tableModel) renderHeader() string {
 }
 
 func (m *tableModel) renderRow() string {
-	rows := []string{}
-	for i, obj := range m.objs {
-		row := m.cellStyle(0).Render(displayName(obj))
-		for j, node := range m.nodes {
-			row += m.cellStyle(j + 1).Render(m.val(node, obj))
+	rows := []fuzzyMatchedRow{}
+	// 모든 행에 대해 cells 준비
+	for _, obj := range m.objs {
+		cells := []string{}
+		cells = append(cells, displayName(obj))
+		for _, node := range m.nodes {
+			cells = append(cells, m.val(node, obj))
 		}
-		if m.isCursor(i) {
-			row = m.styles.selected.Render(row)
-		}
+		// 후보 노드가 있으면 cells에 추가
 		if m.candidate != nil {
-			row = lipgloss.JoinHorizontal(
-				lipgloss.Left,
-				row,
-				m.styles.candidate.Render(m.val(m.candidate, obj)),
-			)
-		}
-		rows = append(rows, row)
-	}
-
-	if m.keyword != "" {
-		filteredRows := []string{}
-		matches := fuzzy.Find(m.keyword, rows)
-
-		for _, match := range matches {
-			filteredRows = append(filteredRows, rows[match.Index])
+			cells = append(cells, m.val(m.candidate, obj))
 		}
 
-		return strings.Join(filteredRows, "\n")
+		matches := map[int]fuzzy.Match{}
+		if m.keyword != "" {
+			// 키워드가 있을 때만 퍼지 매치 수행
+			for _, match := range fuzzy.Find(m.keyword, cells) {
+				matches[match.Index] = match
+			}
+		}
+		rows = append(rows, fuzzyMatchedRow{cells: cells, matches: matches})
 	}
 
-	return strings.Join(rows, "\n")
+	lines := []string{}
+	for i, row := range rows {
+		if m.keyword != "" && len(row.matches) == 0 {
+			continue // 키워드가 있고 매치가 없으면 건너뛰기
+		}
+
+		line := ""
+		for j, cell := range row.cells {
+			var renderedCell string
+			if j == len(row.cells)-1 && m.candidate != nil {
+				// candidate 열은 특별한 스타일 적용
+				renderedCell = m.styles.candidate.Render(cell)
+			} else {
+				// 일반 데이터 열
+				if match, ok := row.matches[j]; ok {
+					renderedCell = m.cellStyle(j).Render(highlight(cell, match))
+				} else {
+					renderedCell = m.cellStyle(j).Render(cell)
+				}
+			}
+			line += renderedCell
+		}
+
+		if m.isCursor(i) {
+			line = m.styles.selected.Render(line)
+		}
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func (m *tableModel) isCursor(index int) bool {
@@ -276,4 +303,30 @@ func (m *tableModel) cols() int {
 
 func (m *tableModel) setKeyword(keyword string) {
 	m.keyword = keyword
+}
+
+func highlight(s string, match fuzzy.Match) string {
+	style := lipgloss.NewStyle().Foreground(theme.Blue)
+
+	runes := []rune(s)
+	result := make([]rune, 0, len(runes))
+
+	for i, r := range runes {
+		if contains(match.MatchedIndexes, i) {
+			result = append(result, []rune(style.Render(string(r)))...)
+		} else {
+			result = append(result, r)
+		}
+	}
+
+	return string(result)
+}
+
+func contains(slice []int, item int) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
