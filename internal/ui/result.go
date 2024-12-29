@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -12,12 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// type filteredRow struct {
-// 	row     string
-// 	indices []int
-// }
-
-// type filteredRows []filteredRow
 type resultModel struct {
 	focused bool
 	table   *tableModel
@@ -34,6 +29,7 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 	filter.SetCursor(0)
 	filter.Width = 20
 	filter.Cursor.Blink = true
+	filter.Cursor.Style = lipgloss.NewStyle().Foreground(theme.Blue)
 	filter.Prompt = "|"
 	filter.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.Overlay0).Background(theme.Mantle)
 	filter.TextStyle = lipgloss.NewStyle().Foreground(theme.Blue).Background(theme.Mantle)
@@ -48,9 +44,7 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 			// HACK: with gradient does not support lipgloss.Color weird
 			progress.WithGradient("#df8e1d", "#1e66f5"),
 			progress.WithoutPercentage(),
-			// more speed; default freq, damp is 6, 1(no damping)
-			// TODO: crescendo freq dynamically for more picked like BALATRO
-			progress.WithSpringOptions(120, 1.0),
+			progress.WithSpringOptions(RESULT_PROGRESS_BAR_INIT_FREQ, RESULT_PROGRESS_BAR_CRITICAL_DAMP),
 		),
 		filter: filter,
 	}
@@ -210,8 +204,10 @@ func (m *resultModel) renderTopBar() string {
 
 func (m *resultModel) setWidthLimitRatio() tea.Cmd {
 	var cmd tea.Cmd
-	// TODO: when it exceeds hard (or soft) limit, damping in current percent
-	cmd = m.widthLimPB.SetPercent(float64(m.table.tableWidth()) / float64(m.width))
+	ratio := float64(m.table.tableWidth()) / float64(m.width)
+	freq := RESULT_PROGRESS_BAR_INIT_FREQ * math.Log1p(1.0-ratio)
+	m.widthLimPB.SetSpringOptions(freq, RESULT_PROGRESS_BAR_CRITICAL_DAMP)
+	cmd = m.widthLimPB.SetPercent(ratio)
 
 	return cmd
 }
