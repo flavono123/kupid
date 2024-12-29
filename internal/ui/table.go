@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/ui/theme"
+	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -29,6 +30,7 @@ type tableModel struct {
 	nodeMaxWidths []int
 	candidate     *Node
 	styles        tableStyles
+	keyword       string
 }
 
 func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel {
@@ -49,10 +51,11 @@ func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel
 		nodeMaxWidths: []int{},
 		styles: tableStyles{
 			header:    lipgloss.NewStyle().Bold(true),
-			selected:  lipgloss.NewStyle().Bold(true).Foreground(theme.Blue),
+			selected:  lipgloss.NewStyle().Background(theme.Surface0),
 			candidate: lipgloss.NewStyle().Margin(0, 0, 0, 1).Foreground(theme.Surface2),
 			debug:     lipgloss.NewStyle().Italic(true).Foreground(theme.Surface1),
 		},
+		keyword: "",
 	}
 	return m
 }
@@ -117,29 +120,37 @@ func (m *tableModel) renderHeader() string {
 }
 
 func (m *tableModel) renderRow() string {
-	var render strings.Builder
-
-	// rows
+	rows := []string{}
 	for i, obj := range m.objs {
-		line := m.cellStyle(0).Render(displayName(obj))
+		row := m.cellStyle(0).Render(displayName(obj))
 		for j, node := range m.nodes {
-			line += m.cellStyle(j + 1).Render(m.val(node, obj))
+			row += m.cellStyle(j + 1).Render(m.val(node, obj))
 		}
 		if m.isCursor(i) {
-			line = m.styles.selected.Render(line)
+			row = m.styles.selected.Render(row)
 		}
 		if m.candidate != nil {
-			line = lipgloss.JoinHorizontal(
+			row = lipgloss.JoinHorizontal(
 				lipgloss.Left,
-				line,
+				row,
 				m.styles.candidate.Render(m.val(m.candidate, obj)),
 			)
 		}
-		render.WriteString(line)
-		render.WriteString("\n")
+		rows = append(rows, row)
 	}
 
-	return render.String()
+	if m.keyword != "" {
+		filteredRows := []string{}
+		matches := fuzzy.Find(m.keyword, rows)
+
+		for _, match := range matches {
+			filteredRows = append(filteredRows, rows[match.Index])
+		}
+
+		return strings.Join(filteredRows, "\n")
+	}
+
+	return strings.Join(rows, "\n")
 }
 
 func (m *tableModel) isCursor(index int) bool {
@@ -261,4 +272,8 @@ func (m *tableModel) tableWidth() int {
 
 func (m *tableModel) cols() int {
 	return len(m.nodes) + 1 // name + nodes
+}
+
+func (m *tableModel) setKeyword(keyword string) {
+	m.keyword = keyword
 }

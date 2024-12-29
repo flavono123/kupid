@@ -97,6 +97,7 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.focused {
 			fm, fCmd := m.filter.Update(msg)
 			m.filter = fm
+			m.table.setKeyword(m.filter.Value())
 			cmds = append(cmds, fCmd)
 
 			tm, tCmd := m.table.Update(msg)
