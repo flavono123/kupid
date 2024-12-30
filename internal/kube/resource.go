@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,11 +16,15 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+type emitMsg struct {
+	Obj *unstructured.Unstructured
+}
+
 type ResourceController struct {
 	client dynamic.Interface
 	gvr    schema.GroupVersionResource
 	store  cache.Store
-	emitCh chan struct{}
+	emitCh chan emitMsg
 }
 
 func NewResourceController(gvr schema.GroupVersionResource) *ResourceController {
@@ -31,6 +36,7 @@ func NewResourceController(gvr schema.GroupVersionResource) *ResourceController 
 	return &ResourceController{
 		client: client,
 		gvr:    gvr,
+		emitCh: make(chan emitMsg, 1),
 	}
 }
 
@@ -61,13 +67,19 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 		ObjectType:    &unstructured.Unstructured{},
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				go func() { i.emitCh <- struct{}{} }()
+				u := obj.(*unstructured.Unstructured)
+				log.Printf("add %s/%s [%s %s]", u.GetNamespace(), u.GetName(), u.GetAPIVersion(), u.GetKind())
+				go func() { i.emitCh <- emitMsg{Obj: u} }()
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				go func() { i.emitCh <- struct{}{} }()
+				n := newObj.(*unstructured.Unstructured)
+				log.Printf("update %s/%s [%s %s]", n.GetNamespace(), n.GetName(), n.GetAPIVersion(), n.GetKind())
+				go func() { i.emitCh <- emitMsg{Obj: n} }()
 			},
 			DeleteFunc: func(obj interface{}) {
-				go func() { i.emitCh <- struct{}{} }()
+				d := obj.(*unstructured.Unstructured)
+				log.Printf("delete %s/%s [%s %s]", d.GetNamespace(), d.GetName(), d.GetAPIVersion(), d.GetKind())
+				go func() { i.emitCh <- emitMsg{Obj: d} }()
 			},
 		},
 	}
@@ -87,6 +99,6 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 	return stop, nil
 }
 
-func (i *ResourceController) EventEmitted() <-chan struct{} {
+func (i *ResourceController) EventEmitted() <-chan emitMsg {
 	return i.emitCh
 }

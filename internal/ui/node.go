@@ -224,3 +224,94 @@ func getDistinctKeys(mapPath []string, objs []*unstructured.Unstructured) []stri
 
 	return keys
 }
+
+// TODO: refactor, pull up traverse with create to function
+func updateNodeTree(existing map[string]*Node, fieldTree map[string]*kube.Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
+	result := make(map[string]*Node)
+
+	for key, field := range fieldTree {
+		prefix := field.Prefix
+		if !comparePrefix(nodePrefix, field.Prefix) {
+			prefix = nodePrefix
+		}
+
+		childPrefix := append(prefix, key)
+		var children map[string]*Node
+
+		existingNode, exists := existing[key]
+		expanded := exists && existingNode.Expanded
+		selected := exists && existingNode.Selected
+
+		if strings.HasPrefix(field.Type, "[]") {
+			maxLength := getMaxLength(childPrefix, objs)
+			children = make(map[string]*Node)
+
+			for i := 0; i < maxLength; i++ {
+				idx := strconv.Itoa(i)
+				var grandChildren map[string]*Node
+
+				if field.Children != nil {
+					existingChildren := map[string]*Node{}
+					if exists && existingNode.children != nil {
+						existingChildren = existingNode.children[idx].children
+					}
+					grandChildren = updateNodeTree(existingChildren, field.Children, objs, append(childPrefix, idx))
+				}
+
+				children[idx] = &Node{
+					field:     nil,
+					name:      idx,
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  grandChildren,
+					Expanded:  exists && existingNode.children != nil && existingNode.children[idx] != nil && existingNode.children[idx].Expanded,
+					Selected:  exists && existingNode.children != nil && existingNode.children[idx] != nil && existingNode.children[idx].Selected,
+				}
+			}
+		} else if strings.HasPrefix(field.Type, "map[string]") {
+			keys := getDistinctKeys(childPrefix, objs)
+			children = make(map[string]*Node)
+
+			for _, mapKey := range keys {
+				var grandChildren map[string]*Node
+
+				if field.Children != nil {
+					existingChildren := map[string]*Node{}
+					if exists && existingNode.children != nil {
+						if existingChild, ok := existingNode.children[mapKey]; ok {
+							existingChildren = existingChild.children
+						}
+					}
+					grandChildren = updateNodeTree(existingChildren, field.Children, objs, append(childPrefix, mapKey))
+				}
+
+				children[mapKey] = &Node{
+					field:     nil,
+					name:      mapKey,
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  grandChildren,
+					Expanded:  exists && existingNode.children != nil && existingNode.children[mapKey] != nil && existingNode.children[mapKey].Expanded,
+					Selected:  exists && existingNode.children != nil && existingNode.children[mapKey] != nil && existingNode.children[mapKey].Selected,
+				}
+			}
+		} else if field.Children != nil {
+			existingChildren := map[string]*Node{}
+			if exists {
+				existingChildren = existingNode.children
+			}
+			children = updateNodeTree(existingChildren, field.Children, objs, childPrefix)
+		}
+
+		result[key] = &Node{
+			field:     field,
+			ancestors: prefix,
+			name:      key,
+			children:  children,
+			Expanded:  expanded,
+			Selected:  selected,
+		}
+	}
+
+	return result
+}

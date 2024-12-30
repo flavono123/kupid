@@ -11,6 +11,14 @@ type selectGVKMsg struct {
 }
 
 // schema
+type setSchemaMsg struct {
+	// TODO: refactor, pull down to sub package
+	// if gvk is not changed, actual schema fields, nodes, are not changed
+	// so following may not required and the message name would be more specific
+	// for only updating by objects informing
+	// nodes []*Node
+	objs []*unstructured.Unstructured
+}
 type pickFieldMsg struct {
 	node *Node
 }
@@ -25,6 +33,7 @@ type hoverFieldMsg struct {
 
 // main
 type updateObjsMsg struct {
+	obj  *unstructured.Unstructured
 	objs []*unstructured.Unstructured
 }
 

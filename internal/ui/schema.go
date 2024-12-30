@@ -22,6 +22,7 @@ import (
 type schemaModel struct {
 	focused bool
 	nodes   map[string]*Node
+	fields  map[string]*kube.Field // cache when objs are updated
 
 	vp viewport.Model
 
@@ -51,6 +52,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 	vp := viewport.New(0, 0)
 	m := &schemaModel{
 		nodes:    nodes,
+		fields:   fields,
 		vp:       vp,
 		style:    style,
 		cursor:   0,
@@ -78,6 +80,10 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	retCmd = nil
 
 	switch msg := msg.(type) {
+	case setSchemaMsg:
+		// TODO: should 'update' nodes, keep them whether expanded or not
+		m.nodes = updateNodeTree(m.nodes, m.fields, msg.objs, []string{})
+		m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	case tea.WindowSizeMsg:
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN

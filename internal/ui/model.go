@@ -36,7 +36,7 @@ func InitModel() *mainModel {
 	initGvk := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
-		Kind:    "Pod",
+		Kind:    "Service",
 	}
 	gvr, err := kube.GetGVR(initGvk)
 	if err != nil {
@@ -111,6 +111,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.vp.Width = msg.Width
 		m.vp.Height = msg.Height
 	case updateObjsMsg:
+		log.Printf("updateObjsMsg since %s/%s is updated", msg.obj.GetNamespace(), msg.obj.GetName())
 		setResultCmd := func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
@@ -119,8 +120,14 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				pickedNode: nil,
 			}
 		}
+		setSchemaMsg := func() tea.Msg {
+			return setSchemaMsg{
+				objs: msg.objs,
+			}
+		}
 		return m, tea.Batch(
 			setResultCmd,
+			setSchemaMsg,
 			m.listenController(),
 		)
 	case selectGVKMsg:
@@ -241,13 +248,15 @@ func (m *mainModel) currentFocusedView() string {
 
 // BUG: listen event only when selectgvk(or just once?)
 func (m *mainModel) listenController() tea.Cmd {
+	log.Printf("listen %s", m.gvk)
 	return func() tea.Msg {
 		match, ok := <-m.getController().EventEmitted()
-		if !ok || match != struct{}{} {
+		if !ok || match.Obj == nil {
 			return nil
 		}
 
 		return updateObjsMsg{
+			obj:  match.Obj,
 			objs: m.getController().GetObjects(),
 		}
 	}

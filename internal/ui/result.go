@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 
@@ -64,6 +65,7 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.widthLimPB = pM.(progress.Model)
 		cmds = append(cmds, pCmd)
 	case resultMsg:
+		log.Printf("resultMsg rendered")
 		if msg.picked {
 			m.setCandidate(nil)
 		}
