@@ -270,7 +270,7 @@ func (m *tableModel) isCursorTop() bool {
 func (m *tableModel) isCursorBottom() bool {
 	// objs size as an index(-1) and the debug/help bar(-1)
 	// rowsview height as an index(-1); already adjusted for the debug/help bar
-	return m.cursor < min(len(m.objs)-2, m.rowsView.Height-1)
+	return m.cursor < min(len(m.objs)-1, m.rowsView.Height-1)
 }
 
 func (m *tableModel) setRowsViewSize(msg tea.WindowSizeMsg) {

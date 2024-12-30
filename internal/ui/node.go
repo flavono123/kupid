@@ -16,6 +16,8 @@ import (
 type Node struct {
 	Expanded bool
 	Selected bool
+	// TODO: new field to represent the values of node are all nil
+	// reversed this would be a Line's Essential field(tbd), to reduce of schema context
 
 	field     *kube.Field
 	name      string
@@ -226,6 +228,7 @@ func getDistinctKeys(mapPath []string, objs []*unstructured.Unstructured) []stri
 }
 
 // TODO: refactor, pull up traverse with create to function
+// TODO: besides, expandedNodes should be a state of the schemaModel(ideally expand would not be a state of node)
 func updateNodeTree(existing map[string]*Node, fieldTree map[string]*kube.Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
 	result := make(map[string]*Node)
 

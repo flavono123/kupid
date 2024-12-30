@@ -111,7 +111,9 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.vp.Width = msg.Width
 		m.vp.Height = msg.Height
 	case updateObjsMsg:
-		log.Printf("updateObjsMsg since %s/%s is updated", msg.obj.GetNamespace(), msg.obj.GetName())
+		if msg.obj != nil {
+			log.Printf("updateObjsMsg since %s/%s is updated", msg.obj.GetNamespace(), msg.obj.GetName())
+		}
 		setResultCmd := func() tea.Msg {
 			return resultMsg{
 				nodes:      m.selectedNodes,
