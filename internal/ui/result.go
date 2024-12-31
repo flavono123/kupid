@@ -102,6 +102,8 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tm, tCmd := m.table.Update(msg)
 			m.table = tm.(*tableModel)
 			cmds = append(cmds, tCmd)
+		} else {
+			log.Printf("resultModel blurred")
 		}
 	}
 
@@ -139,6 +141,7 @@ func (m *resultModel) focus() tea.Cmd {
 // BUG: should blur when kbar rendered
 // maybe mainmodel should have a tristate
 func (m *resultModel) blur() {
+	log.Println("Blurring resultModel")
 	m.focused = false
 	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0)
 	m.filter.Blur()

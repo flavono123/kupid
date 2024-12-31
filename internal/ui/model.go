@@ -17,6 +17,7 @@ type sessionState uint
 const (
 	schemaView sessionState = iota
 	resultView
+	// kbarView
 )
 
 type mainModel struct {
@@ -102,6 +103,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, sCmd)
 	}
 
+	// TODO: only update when kbar is focused(after refactoring message design for session)
 	km, kCmd := m.kbar.Update(msg)
 	m.kbar = km.(*kbarModel)
 	cmds = append(cmds, kCmd)
@@ -137,8 +139,15 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setController(msg.gvk)
 
 		m.schema.Reset(msg.gvk, m.getController().GetObjects())
+		// TODO: should pass by msg
 		m.kbar.visible = false
 		m.selectedNodes = []*Node{}
+
+		if m.session == schemaView {
+			m.schema.focus()
+		} else {
+			m.result.focus()
+		}
 		return m, func() tea.Msg {
 			return updateObjsMsg{
 				objs: m.getController().GetObjects(),
@@ -197,7 +206,12 @@ func (m *mainModel) View() string {
 
 	m.vp.SetContent(mainContent)
 
+	// TODO: should render by msg
 	if m.kbar.visible {
+		// TODO: should pass by msg
+		m.result.blur()
+		m.schema.blur()
+
 		return lipgloss.Place(
 			m.vp.Width,
 			m.vp.Height,

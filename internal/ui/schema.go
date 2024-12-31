@@ -83,7 +83,8 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case setSchemaMsg:
 		// TODO: should 'update' nodes, keep them whether expanded or not
-		m.nodes = updateNodeTree(m.nodes, m.fields, msg.objs, []string{})
+		// reverted since when gvk is changed, the current message system cannot handle
+		m.nodes = createNodeTree(m.fields, msg.objs, []string{})
 		m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	case tea.WindowSizeMsg:
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)

@@ -37,6 +37,13 @@ type updateObjsMsg struct {
 	objs []*unstructured.Unstructured
 }
 
+// TODO: impl msg on session
+// BUG: when  popup kbar result focused, "k" is inputted
+// type focusSchemaMsg struct{}
+// type focusResultMsg struct{}
+// type showKbarMsg struct{}
+// type blurHiddensMsg struct{}
+
 // result
 type resultMsg struct {
 	nodes      []*Node
