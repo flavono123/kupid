@@ -48,7 +48,7 @@ func InitModel() *mainModel {
 	return &mainModel{
 		session:       schemaView,
 		keys:          newKeyMap(),
-		schema:        newSchemaModel(initGvk, controller.GetObjects()),
+		schema:        newSchemaModel(initGvk, controller.GetObjects(), true),
 		result:        newResultModel(controller.GetObjects()),
 		vp:            viewport.New(0, 0),
 		gvk:           initGvk,

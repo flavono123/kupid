@@ -38,7 +38,7 @@ type schemaModel struct {
 	help help.Model
 }
 
-func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *schemaModel {
+func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, focused bool) *schemaModel {
 	fields, err := kube.CreateFieldTree(gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
@@ -51,6 +51,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 
 	vp := viewport.New(0, 0)
 	m := &schemaModel{
+		focused:  focused,
 		nodes:    nodes,
 		fields:   fields,
 		vp:       vp,
