@@ -18,3 +18,13 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: simple
+          skip-github-release: true
+          changelog-notes: |
+            # Changelog
+
+            ## 0.0.1 (2025-01-01)
+
+            ### Features & Bug Fixes
+
+            on the alpha stage would not be specified in detail
+            maybe commits are also squashed in later.
