@@ -9,6 +9,7 @@ permissions:
   contents: write
   pull-requests: write
 
+# TODO: set pr branch name pattern as release/${version}
 jobs:
   release-please:
     runs-on: ubuntu-latest
