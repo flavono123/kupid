@@ -9,6 +9,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/keymap"
+	"github.com/flavono123/kupid/internal/ui/message"
+	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,8 +24,8 @@ import (
 
 type schemaModel struct {
 	focused bool
-	nodes   map[string]*kube.Node  // TODO: move to lines' state
-	fields  map[string]*kube.Field // TODO: move to node(tree)'s state
+	nodes   map[string]*kube.Node
+	fields  map[string]*kube.Field // cache for objs changed
 
 	vp viewport.Model
 
@@ -34,7 +37,7 @@ type schemaModel struct {
 
 	gvk schema.GroupVersionKind
 
-	keys schemaKeyMap
+	keys keymap.SchemaKeyMap
 	help help.Model
 }
 
@@ -61,7 +64,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 		curLines: []*Line{},
 		prevNode: nil,
 		// curNode:  nil,
-		keys: newSchemaKeyMap(),
+		keys: keymap.NewSchemaKeyMap(),
 		help: help.New(),
 	}
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
@@ -81,17 +84,17 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	retCmd = nil
 
 	switch msg := msg.(type) {
-	case setSchemaMsg:
+	case message.SetSchemaMsg:
 		// TODO: should 'update' nodes, keep them whether expanded or not
 		// reverted since when gvk is changed, the current message system cannot handle
-		m.nodes = kube.CreateNodeTree(m.fields, msg.objs, []string{})
+		m.nodes = kube.CreateNodeTree(m.fields, msg.Objs, []string{})
 		m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	case tea.WindowSizeMsg:
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.up):
+		case key.Matches(msg, m.keys.Up):
 			if m.cursor > SCHEMA_CURSOR_TOP {
 				m.cursor--
 			} else {
@@ -100,14 +103,14 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return hoverFieldMsg{candidate: m.curNode()}
+					return message.HoverFieldMsg{Candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
-					return candidateMsg{candidate: nil}
+					return result.SetCandidateMsg{Candidate: nil}
 				}
 			}
-		case key.Matches(msg, m.keys.down):
+		case key.Matches(msg, m.keys.Down):
 			if m.cursor < min(m.vp.Height-1, m.curLineNo-1) {
 				m.cursor++
 			} else {
@@ -116,14 +119,14 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return hoverFieldMsg{candidate: m.curNode()}
+					return message.HoverFieldMsg{Candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
-					return candidateMsg{candidate: nil}
+					return result.SetCandidateMsg{Candidate: nil}
 				}
 			}
-		case key.Matches(msg, m.keys.action):
+		case key.Matches(msg, m.keys.Action):
 			if m.curNode() == nil {
 				break
 			}
@@ -135,19 +138,19 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.curNode().Selected {
 					m.curNode().Selected = false
 					retCmd = func() tea.Msg {
-						return unpickFieldMsg{node: m.curNode()}
+						return message.UnpickFieldMsg{Node: m.curNode()}
 					}
 				} else {
 					m.curNode().Selected = true
 					retCmd = func() tea.Msg {
-						return pickFieldMsg{node: m.curNode()}
+						return message.PickFieldMsg{Node: m.curNode()}
 					}
 				}
 			}
 
 		// BUG: when viewport is adjusted by expland all/level then fold back, the cursor is not rendered
 		// reproduce - expand level of status in kind Pod(long enough) and fold
-		case key.Matches(msg, m.keys.levelExpand):
+		case key.Matches(msg, m.keys.LevelExpand):
 			node := m.curNode()
 			if node != nil && node.Foldable() {
 				toggledExpanded := !node.Expanded
@@ -156,7 +159,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 				m.setCursor(prevNode.FullPath())
 			}
-		case key.Matches(msg, m.keys.allExpand):
+		case key.Matches(msg, m.keys.AllExpand):
 			node := m.curNode()
 			if node != nil && node.Foldable() {
 				toggledExpanded := !node.Expanded
@@ -227,7 +230,6 @@ func (m *schemaModel) toggleExpandRecursive(nodes map[string]*kube.Node, expand 
 }
 
 // TODO: remove arg width after horizontal scrollable
-// TODO: get gvr, create nodetree itself
 func (m *schemaModel) buildLines(nodes map[string]*kube.Node, width int, lineNo int) ([]*Line, int) {
 	lines := []*Line{}
 	keys := []string{}

@@ -8,6 +8,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/keymap"
+	"github.com/flavono123/kupid/internal/ui/message"
+	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -22,10 +25,10 @@ const (
 
 type mainModel struct {
 	session       sessionState
-	keys          keyMap
+	keys          keymap.KeyMap
 	vp            viewport.Model
 	schema        *schemaModel
-	result        *resultModel
+	result        *result.Model
 	gvk           schema.GroupVersionKind
 	controller    *kube.ResourceController
 	stop          chan struct{}
@@ -48,9 +51,9 @@ func InitModel() *mainModel {
 
 	return &mainModel{
 		session:       schemaView,
-		keys:          newKeyMap(),
+		keys:          keymap.NewKeyMap(),
 		schema:        newSchemaModel(initGvk, controller.GetObjects(), true),
-		result:        newResultModel(controller.GetObjects()),
+		result:        result.NewModel(controller.GetObjects()),
 		vp:            viewport.New(0, 0),
 		gvk:           initGvk,
 		kbar:          newKbarModel(),
@@ -73,29 +76,29 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sm, sCmd := m.schema.Update(msg)
 			m.schema = sm.(*schemaModel)
 			cmds = append(cmds, sCmd)
-		} else if m.session == resultView && m.result.focused {
+		} else if m.session == resultView && m.result.Focused() {
 			rm, rCmd := m.result.Update(msg)
-			m.result = rm.(*resultModel)
+			m.result = rm.(*result.Model)
 			cmds = append(cmds, rCmd)
 		}
 
 		switch {
-		case key.Matches(keyMsg, m.keys.tabView):
+		case key.Matches(keyMsg, m.keys.TabView):
 			if m.session == schemaView {
 				m.session = resultView
 				m.schema.blur()
-				cmds = append(cmds, m.result.focus())
+				cmds = append(cmds, m.result.Focus())
 			} else {
 				m.session = schemaView
-				m.result.blur()
+				m.result.Blur()
 				cmds = append(cmds, m.schema.focus())
 			}
-		case key.Matches(keyMsg, m.keys.quit):
+		case key.Matches(keyMsg, m.keys.Quit):
 			return m, tea.Quit
 		}
 	} else {
 		rm, rCmd := m.result.Update(msg)
-		m.result = rm.(*resultModel)
+		m.result = rm.(*result.Model)
 		cmds = append(cmds, rCmd)
 
 		sm, sCmd := m.schema.Update(msg)
@@ -112,21 +115,21 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.vp.Width = msg.Width
 		m.vp.Height = msg.Height
-	case updateObjsMsg:
-		if msg.obj != nil {
-			log.Printf("updateObjsMsg since %s/%s is updated", msg.obj.GetNamespace(), msg.obj.GetName())
+	case message.UpdateObjsMsg:
+		if msg.Obj != nil {
+			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
 		}
 		setResultCmd := func() tea.Msg {
-			return resultMsg{
-				nodes:      m.selectedNodes,
-				objs:       msg.objs,
-				picked:     false,
-				pickedNode: nil,
+			return result.SetTableMsg{
+				Nodes:      m.selectedNodes,
+				Objs:       msg.Objs,
+				Picked:     false,
+				PickedNode: nil,
 			}
 		}
 		setSchemaMsg := func() tea.Msg {
-			return setSchemaMsg{
-				objs: msg.objs,
+			return message.SetSchemaMsg{
+				Objs: msg.Objs,
 			}
 		}
 		return m, tea.Batch(
@@ -134,11 +137,11 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			setSchemaMsg,
 			m.listenController(),
 		)
-	case selectGVKMsg:
-		m.gvk = msg.gvk
-		m.setController(msg.gvk)
+	case message.SelectGVKMsg:
+		m.gvk = msg.GVK
+		m.setController(msg.GVK)
 
-		m.schema.Reset(msg.gvk, m.getController().GetObjects())
+		m.schema.Reset(msg.GVK, m.getController().GetObjects())
 		// TODO: should pass by msg
 		m.kbar.visible = false
 		m.selectedNodes = []*kube.Node{}
@@ -146,47 +149,47 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.session == schemaView {
 			m.schema.focus()
 		} else {
-			m.result.focus()
+			m.result.Focus()
 		}
 		return m, func() tea.Msg {
-			return updateObjsMsg{
-				objs: m.getController().GetObjects(),
+			return message.UpdateObjsMsg{
+				Objs: m.getController().GetObjects(),
 			}
 		}
-	case pickFieldMsg:
-		m.selectedNodes = append(m.selectedNodes, msg.node)
+	case message.PickFieldMsg:
+		m.selectedNodes = append(m.selectedNodes, msg.Node)
 		return m, func() tea.Msg {
-			return resultMsg{
-				nodes:      m.selectedNodes,
-				objs:       m.getController().GetObjects(),
-				picked:     true,
-				pickedNode: msg.node,
+			return result.SetTableMsg{
+				Nodes:      m.selectedNodes,
+				Objs:       m.getController().GetObjects(),
+				Picked:     true,
+				PickedNode: msg.Node,
 			}
 		}
-	case unpickFieldMsg:
+	case message.UnpickFieldMsg:
 		for idx, node := range m.selectedNodes {
-			if node.Name() == msg.node.Name() {
+			if node.Name() == msg.Node.Name() {
 				m.selectedNodes = append(m.selectedNodes[:idx], m.selectedNodes[idx+1:]...)
 				break
 			}
 		}
 		return m, func() tea.Msg {
-			return resultMsg{
-				nodes:      m.selectedNodes,
-				objs:       m.getController().GetObjects(),
-				picked:     false,
-				pickedNode: nil,
+			return result.SetTableMsg{
+				Nodes:      m.selectedNodes,
+				Objs:       m.getController().GetObjects(),
+				Picked:     false,
+				PickedNode: nil,
 			}
 		}
-	case cancelPickMsg:
-		if msg.canceled {
-			msg.node.Selected = false
+	case message.CancelPickMsg:
+		if msg.Canceled {
+			msg.Node.Selected = false
 			m.selectedNodes = append(m.selectedNodes[:len(m.selectedNodes)-1], m.selectedNodes[len(m.selectedNodes):]...)
 		}
-	case hoverFieldMsg:
+	case message.HoverFieldMsg:
 		return m, func() tea.Msg {
-			return candidateMsg{
-				candidate: msg.candidate,
+			return result.SetCandidateMsg{
+				Candidate: msg.Candidate,
 			}
 		}
 	}
@@ -209,7 +212,7 @@ func (m *mainModel) View() string {
 	// TODO: should render by msg
 	if m.kbar.visible {
 		// TODO: should pass by msg
-		m.result.blur()
+		m.result.Blur()
 		m.schema.blur()
 
 		return lipgloss.Place(
@@ -271,9 +274,9 @@ func (m *mainModel) listenController() tea.Cmd {
 			return nil
 		}
 
-		return updateObjsMsg{
-			obj:  match.Obj,
-			objs: m.getController().GetObjects(),
+		return message.UpdateObjsMsg{
+			Obj:  match.Obj,
+			Objs: m.getController().GetObjects(),
 		}
 	}
 }

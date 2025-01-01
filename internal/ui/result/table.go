@@ -1,4 +1,4 @@
-package ui
+package result
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/keymap"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -29,7 +30,7 @@ type tableStyles struct {
 }
 
 type tableModel struct {
-	keys          tableKeyMap
+	keys          keymap.TableKeyMap
 	cursor        int
 	nodes         []*kube.Node
 	objs          []*unstructured.Unstructured
@@ -51,7 +52,7 @@ func newTableModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *table
 	}
 
 	m := &tableModel{
-		keys:          newTableKeyMap(),
+		keys:          keymap.NewTableKeyMap(),
 		cursor:        0,
 		nodes:         nodes,
 		objs:          objs,
@@ -81,13 +82,13 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setRowsViewSize(msg)
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.up):
+		case key.Matches(msg, m.keys.Up):
 			if m.isCursorTop() {
 				m.cursor--
 			} else {
 				m.rowsView.LineUp(TABLE_SCROLL_STEP)
 			}
-		case key.Matches(msg, m.keys.down):
+		case key.Matches(msg, m.keys.Down):
 			if m.isCursorBottom() {
 				m.cursor++
 			} else {

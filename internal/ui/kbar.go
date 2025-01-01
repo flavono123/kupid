@@ -10,6 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/keymap"
+	"github.com/flavono123/kupid/internal/ui/message"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,7 +30,7 @@ var kinds = []string{
 }
 
 type kbarModel struct {
-	keys          kbarKeyMap
+	keys          keymap.KbarKeyMap
 	visible       bool
 	style         lipgloss.Style
 	items         kbarItems
@@ -57,7 +59,7 @@ func newKbarModel() *kbarModel {
 	ti.Width = 30
 	ti.Cursor.Blink = true
 	m := &kbarModel{
-		keys:    newKbarKeyMap(),
+		keys:    keymap.NewKbarKeyMap(),
 		visible: false,
 		style: lipgloss.NewStyle().
 			Border(lipgloss.ThickBorder()),
@@ -112,7 +114,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				return m, func() tea.Msg {
 					actualIndex := m.cursor + m.srViewport.YOffset
-					return selectGVKMsg{gvk: filtered[actualIndex].GroupVersionKind}
+					return message.SelectGVKMsg{GVK: filtered[actualIndex].GroupVersionKind}
 				}
 			case "esc", "alt+k": // HACK: use keymap
 				m.visible = false
@@ -120,7 +122,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			switch {
-			case key.Matches(msg, m.keys.show):
+			case key.Matches(msg, m.keys.Show):
 				m.visible = true
 				m.reset()
 

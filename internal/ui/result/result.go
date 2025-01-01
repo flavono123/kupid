@@ -1,4 +1,4 @@
-package ui
+package result
 
 import (
 	"fmt"
@@ -11,11 +11,32 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/message"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type resultModel struct {
+const (
+	RESULT_PROGRESS_BAR_INIT_FREQ     = 120.0
+	RESULT_PROGRESS_BAR_CRITICAL_DAMP = 1.0
+
+	TABLE_WIDTH_RATIO = 0.7
+	TABLE_SCROLL_STEP = 1
+)
+
+// messages
+type SetTableMsg struct {
+	Nodes      []*kube.Node
+	Objs       []*unstructured.Unstructured
+	Picked     bool
+	PickedNode *kube.Node
+}
+
+type SetCandidateMsg struct {
+	Candidate *kube.Node
+}
+
+type Model struct {
 	focused bool
 	table   *tableModel
 	filter  textinput.Model
@@ -24,7 +45,7 @@ type resultModel struct {
 	widthLimPB progress.Model
 }
 
-func newResultModel(objs []*unstructured.Unstructured) *resultModel {
+func NewModel(objs []*unstructured.Unstructured) *Model {
 	nodes := []*kube.Node{}
 	filter := textinput.New()
 	filter.Placeholder = "Filter"
@@ -37,7 +58,7 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 	filter.TextStyle = lipgloss.NewStyle().Foreground(theme.Blue).Background(theme.Mantle)
 
 	t := newTableModel(nodes, objs)
-	return &resultModel{
+	return &Model{
 		focused: false,
 		table:   t,
 		width:   0,
@@ -52,11 +73,11 @@ func newResultModel(objs []*unstructured.Unstructured) *resultModel {
 	}
 }
 
-func (m *resultModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -65,29 +86,29 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		pM, pCmd := m.widthLimPB.Update(msg)
 		m.widthLimPB = pM.(progress.Model)
 		cmds = append(cmds, pCmd)
-	case resultMsg:
+	case SetTableMsg:
 		log.Printf("resultMsg rendered")
-		if msg.picked {
+		if msg.Picked {
 			m.setCandidate(nil)
 		}
 
-		if msg.picked && m.table.willOverWidth(msg.pickedNode) {
+		if msg.Picked && m.table.willOverWidth(msg.PickedNode) {
 			return m, func() tea.Msg {
-				return cancelPickMsg{
-					canceled: true,
-					node:     msg.pickedNode,
+				return message.CancelPickMsg{
+					Canceled: true,
+					Node:     msg.PickedNode,
 				}
 			}
 		}
 
-		m.setTable(msg.nodes, msg.objs)
+		m.setTable(msg.Nodes, msg.Objs)
 		cmds = append(cmds, m.setWidthLimitRatio())
-	case candidateMsg:
-		if m.table.willOverWidth(msg.candidate) {
+	case SetCandidateMsg:
+		if m.table.willOverWidth(msg.Candidate) {
 			// do not render candidate
 			return m, nil
 		}
-		m.setCandidate(msg.candidate)
+		m.setCandidate(msg.Candidate)
 	case tea.WindowSizeMsg:
 		m.width = int(float64(msg.Width) * TABLE_WIDTH_RATIO) // TODO: rename TABLE_WIDTH_RATIO to result's
 		tm, tCmd := m.table.Update(msg)
@@ -111,7 +132,7 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *resultModel) View() string {
+func (m *Model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.renderTopBar(),
 		m.table.View(),
@@ -129,7 +150,7 @@ func displayName(obj *unstructured.Unstructured) string {
 	return obj.GetName()
 }
 
-func (m *resultModel) focus() tea.Cmd {
+func (m *Model) Focus() tea.Cmd {
 	m.focused = true
 
 	m.filter.PromptStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.Blue)
@@ -139,9 +160,13 @@ func (m *resultModel) focus() tea.Cmd {
 	)
 }
 
+func (m *Model) Focused() bool {
+	return m.focused
+}
+
 // BUG: should blur when kbar rendered
 // maybe mainmodel should have a tristate
-func (m *resultModel) blur() {
+func (m *Model) Blur() {
 	log.Println("Blurring resultModel")
 	m.focused = false
 	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0)
@@ -185,16 +210,16 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 	return current, true, nil
 }
 
-func (m *resultModel) setTable(nodes []*kube.Node, objs []*unstructured.Unstructured) {
+func (m *Model) setTable(nodes []*kube.Node, objs []*unstructured.Unstructured) {
 	m.table.setObjs(objs)
 	m.table.setNodes(nodes) // HACK: update ojbs first, setNodeMaxWidths is dependent on objs
 }
 
-func (m *resultModel) setCandidate(candidate *kube.Node) {
+func (m *Model) setCandidate(candidate *kube.Node) {
 	m.table.setCandidate(candidate)
 }
 
-func (m *resultModel) renderTopBar() string {
+func (m *Model) renderTopBar() string {
 	// HACK: safe right padding required how much? idk
 	// but 9 is safe where the point render 120 window width(result 80 width)
 	// TODO: make 120 width as a hard lower limit of the program
@@ -209,7 +234,7 @@ func (m *resultModel) renderTopBar() string {
 	)
 }
 
-func (m *resultModel) setWidthLimitRatio() tea.Cmd {
+func (m *Model) setWidthLimitRatio() tea.Cmd {
 	var cmd tea.Cmd
 	ratio := float64(m.table.tableWidth()) / float64(m.width)
 	freq := RESULT_PROGRESS_BAR_INIT_FREQ * math.Log1p(1.0-ratio)
