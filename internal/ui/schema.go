@@ -21,8 +21,8 @@ import (
 
 type schemaModel struct {
 	focused bool
-	nodes   map[string]*Node
-	fields  map[string]*kube.Field // cache when objs are updated
+	nodes   map[string]*kube.Node  // TODO: move to lines' state
+	fields  map[string]*kube.Field // TODO: move to node(tree)'s state
 
 	vp viewport.Model
 
@@ -30,7 +30,7 @@ type schemaModel struct {
 	cursor    int
 	curLines  []*Line
 	curLineNo int
-	prevNode  *Node
+	prevNode  *kube.Node
 
 	gvk schema.GroupVersionKind
 
@@ -43,7 +43,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	nodes := createNodeTree(fields, objs, []string{})
+	nodes := kube.CreateNodeTree(fields, objs, []string{})
 
 	style := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
@@ -84,7 +84,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case setSchemaMsg:
 		// TODO: should 'update' nodes, keep them whether expanded or not
 		// reverted since when gvk is changed, the current message system cannot handle
-		m.nodes = createNodeTree(m.fields, msg.objs, []string{})
+		m.nodes = kube.CreateNodeTree(m.fields, msg.objs, []string{})
 		m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	case tea.WindowSizeMsg:
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
@@ -207,11 +207,11 @@ func (m *schemaModel) setCursor(path []string) {
 
 func (m *schemaModel) toggleCurrentNodeFolder() {
 	if node := m.curNode(); node != nil {
-		node.toggleFolder()
+		node.ToggleFolder()
 	}
 }
 
-func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool, all bool) {
+func (m *schemaModel) toggleExpandRecursive(nodes map[string]*kube.Node, expand bool, all bool) {
 	node := m.curNode()
 	if node == nil {
 		return
@@ -219,15 +219,16 @@ func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool,
 
 	for _, n := range nodes {
 		if all || (n.Level() == node.Level()) {
-			n.setExpanded(expand)
+			n.SetExpanded(expand)
 		}
 
-		m.toggleExpandRecursive(n.children, expand, all)
+		m.toggleExpandRecursive(n.Children(), expand, all)
 	}
 }
 
 // TODO: remove arg width after horizontal scrollable
-func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) ([]*Line, int) {
+// TODO: get gvr, create nodetree itself
+func (m *schemaModel) buildLines(nodes map[string]*kube.Node, width int, lineNo int) ([]*Line, int) {
 	lines := []*Line{}
 	keys := []string{}
 	for key := range nodes {
@@ -245,7 +246,7 @@ func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) 
 		lineNo++
 		lines = append(lines, line)
 		if node.Expanded {
-			childrenLines, childrenLineNo := m.buildLines(node.children, width, lineNo)
+			childrenLines, childrenLineNo := m.buildLines(node.Children(), width, lineNo)
 			lines = append(lines, childrenLines...)
 			lineNo = childrenLineNo
 		}
@@ -272,7 +273,7 @@ func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Un
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	nodes := createNodeTree(fields, objs, []string{})
+	nodes := kube.CreateNodeTree(fields, objs, []string{})
 	m.nodes = nodes
 	m.cursor = 0
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
@@ -295,7 +296,7 @@ func sortKeys(keys []string) {
 	}
 }
 
-func (m *schemaModel) curNode() *Node {
+func (m *schemaModel) curNode() *kube.Node {
 	return m.curLines[m.cursor+m.vp.YOffset].node
 }
 

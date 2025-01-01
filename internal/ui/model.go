@@ -29,7 +29,7 @@ type mainModel struct {
 	gvk           schema.GroupVersionKind
 	controller    *kube.ResourceController
 	stop          chan struct{}
-	selectedNodes []*Node
+	selectedNodes []*kube.Node
 	kbar          *kbarModel
 }
 
@@ -56,7 +56,7 @@ func InitModel() *mainModel {
 		kbar:          newKbarModel(),
 		controller:    controller,
 		stop:          nil,
-		selectedNodes: []*Node{},
+		selectedNodes: []*kube.Node{},
 	}
 }
 
@@ -141,7 +141,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.schema.Reset(msg.gvk, m.getController().GetObjects())
 		// TODO: should pass by msg
 		m.kbar.visible = false
-		m.selectedNodes = []*Node{}
+		m.selectedNodes = []*kube.Node{}
 
 		if m.session == schemaView {
 			m.schema.focus()

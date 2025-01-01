@@ -5,17 +5,19 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
 )
 
+// TODO: function args node(s) under ui should be line and get the node from getter
 type Line struct {
-	node *Node
+	node *kube.Node
 
 	style lipgloss.Style
 	index int
 }
 
-func newLine(node *Node, width int, index int) *Line {
+func newLine(node *kube.Node, width int, index int) *Line {
 	style := lipgloss.NewStyle().MaxWidth(width)
 	return &Line{node: node, style: style, index: index}
 }
@@ -27,10 +29,25 @@ func (l *Line) render(leftPadding int, cursored bool, maxWidth int, schemaBlurre
 		l.indent(),
 		l.cursor(cursored, schemaBlurred),
 		l.action(),
-		l.node.render(),
+		l.renderNode(),
 	)
 
 	return lipgloss.NewStyle().MaxWidth(maxWidth).Render(line)
+}
+
+func (l *Line) renderNode() string {
+	name := lipgloss.NewStyle().Foreground(theme.Green)
+	displayType := lipgloss.NewStyle().Foreground(theme.Peach)
+
+	if l.node.Type() == "" {
+		return name.Render(l.node.Name())
+	}
+
+	return lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		name.Render(l.node.Name()),
+		displayType.Render(fmt.Sprintf("<%s>", l.node.Type())),
+	)
 }
 
 func (l *Line) number(leftPadding int) string {

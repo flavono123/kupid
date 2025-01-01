@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/flavono123/kupid/internal/kube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -20,15 +21,15 @@ type setSchemaMsg struct {
 	objs []*unstructured.Unstructured
 }
 type pickFieldMsg struct {
-	node *Node
+	node *kube.Node
 }
 
 type unpickFieldMsg struct {
-	node *Node
+	node *kube.Node
 }
 
 type hoverFieldMsg struct {
-	candidate *Node
+	candidate *kube.Node
 }
 
 // main
@@ -46,17 +47,17 @@ type updateObjsMsg struct {
 
 // result
 type resultMsg struct {
-	nodes      []*Node
+	nodes      []*kube.Node
 	objs       []*unstructured.Unstructured
 	picked     bool
-	pickedNode *Node
+	pickedNode *kube.Node
 }
 
 type candidateMsg struct {
-	candidate *Node
+	candidate *kube.Node
 }
 
 type cancelPickMsg struct {
 	canceled bool
-	node     *Node
+	node     *kube.Node
 }

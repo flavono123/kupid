@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -24,7 +25,7 @@ type resultModel struct {
 }
 
 func newResultModel(objs []*unstructured.Unstructured) *resultModel {
-	nodes := []*Node{}
+	nodes := []*kube.Node{}
 	filter := textinput.New()
 	filter.Placeholder = "Filter"
 	filter.SetCursor(0)
@@ -184,12 +185,12 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 	return current, true, nil
 }
 
-func (m *resultModel) setTable(nodes []*Node, objs []*unstructured.Unstructured) {
+func (m *resultModel) setTable(nodes []*kube.Node, objs []*unstructured.Unstructured) {
 	m.table.setObjs(objs)
 	m.table.setNodes(nodes) // HACK: update ojbs first, setNodeMaxWidths is dependent on objs
 }
 
-func (m *resultModel) setCandidate(candidate *Node) {
+func (m *resultModel) setCandidate(candidate *kube.Node) {
 	m.table.setCandidate(candidate)
 }
 

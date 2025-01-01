@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,17 +31,17 @@ type tableStyles struct {
 type tableModel struct {
 	keys          tableKeyMap
 	cursor        int
-	nodes         []*Node
+	nodes         []*kube.Node
 	objs          []*unstructured.Unstructured
 	rowsView      viewport.Model
 	nameMaxWidth  int
 	nodeMaxWidths []int
-	candidate     *Node
+	candidate     *kube.Node
 	styles        tableStyles
 	keyword       string
 }
 
-func newTableModel(nodes []*Node, objs []*unstructured.Unstructured) *tableModel {
+func newTableModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *tableModel {
 	// TODO: should 0 when no objs, impl with no resources view
 	nameMaxWidth := 4 // Name
 	for _, obj := range objs {
@@ -198,7 +199,7 @@ func (m *tableModel) isCursor(index int) bool {
 	return index == m.cursor+m.rowsView.YOffset
 }
 
-func (m *tableModel) setNodeMaxWidths(nodes []*Node) {
+func (m *tableModel) setNodeMaxWidths(nodes []*kube.Node) {
 	// name
 	nameMaxWidth := 4
 	for _, obj := range m.objs {
@@ -223,7 +224,7 @@ func (m *tableModel) setNodeMaxWidths(nodes []*Node) {
 	m.nodeMaxWidths = nodeMaxWidths
 }
 
-func (m *tableModel) val(node *Node, obj *unstructured.Unstructured) string {
+func (m *tableModel) val(node *kube.Node, obj *unstructured.Unstructured) string {
 	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
 	if err != nil || !found {
 		return "-"
@@ -240,7 +241,7 @@ func (m *tableModel) cellStyle(col int) lipgloss.Style {
 	return lipgloss.NewStyle().Margin(0, 0, 0, 1).Width(m.colMaxWidth(col))
 }
 
-func (m *tableModel) setNodes(nodes []*Node) {
+func (m *tableModel) setNodes(nodes []*kube.Node) {
 	m.setNodeMaxWidths(nodes)
 	m.nodes = nodes
 }
@@ -259,7 +260,7 @@ func (m *tableModel) colMaxWidth(idxPlusOne int) int {
 	return m.nodeMaxWidths[idxPlusOne-1]
 }
 
-func (m *tableModel) setCandidate(candidate *Node) {
+func (m *tableModel) setCandidate(candidate *kube.Node) {
 	m.candidate = candidate
 }
 
@@ -285,7 +286,7 @@ func (m *tableModel) renderDebugBar() string {
 	)
 }
 
-func (m *tableModel) willOverWidth(node *Node) bool {
+func (m *tableModel) willOverWidth(node *kube.Node) bool {
 	if node == nil {
 		return false
 	}
@@ -293,7 +294,7 @@ func (m *tableModel) willOverWidth(node *Node) bool {
 	return m.tableWidth()+m.maxWidth(node) > m.rowsView.Width-9 // magic num again, safty margin
 }
 
-func (m *tableModel) maxWidth(node *Node) int {
+func (m *tableModel) maxWidth(node *kube.Node) int {
 	max := len(node.Name())
 	for _, obj := range m.objs {
 		if len(m.val(node, obj)) > max {
