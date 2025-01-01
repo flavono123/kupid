@@ -21,7 +21,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: simple
-          skip-github-release: true
   goreleaser:
     needs: [release-please]
     runs-on: ubuntu-latest
