@@ -20,9 +20,8 @@ jobs:
         uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          release-type: simple
-          # HACK: manually
-          # prerelease: true
+          release-type: go
+          prerelease: true
   goreleaser:
     needs: [release-please]
     runs-on: ubuntu-latest
