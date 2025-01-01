@@ -21,6 +21,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: simple
+          # HACK: manually
+          # prerelease: true
   goreleaser:
     needs: [release-please]
     runs-on: ubuntu-latest
