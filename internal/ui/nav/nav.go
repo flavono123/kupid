@@ -1,4 +1,4 @@
-package ui
+package nav
 
 import (
 	"log"
@@ -22,7 +22,21 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type schemaModel struct {
+const (
+	SCHEMA_CURSOR_TOP  = 0
+	SCHEMA_SCROLL_STEP = 1
+
+	SCHEMA_WIDTH_RATIO          = 0.3
+	SCHEMA_HEIGHT_BOTTOM_MARGIN = 4 // topbar 1 + border top, down 2 + help, status 1
+	SCHEMA_EXPAND_MULTI_MARGIN  = 3 // render above 3 lines when cursor moved by fold/expand a lot
+)
+
+// messages
+type SetNavMsg struct {
+	Objs []*unstructured.Unstructured
+}
+
+type Model struct {
 	focused bool
 	nodes   map[string]*kube.Node
 	fields  map[string]*kube.Field // cache for objs changed
@@ -41,7 +55,7 @@ type schemaModel struct {
 	help help.Model
 }
 
-func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, focused bool) *schemaModel {
+func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, focused bool) *Model {
 	fields, err := kube.CreateFieldTree(gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
@@ -53,7 +67,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 		BorderForeground(theme.Blue)
 
 	vp := viewport.New(0, 0)
-	m := &schemaModel{
+	m := &Model{
 		focused:  focused,
 		nodes:    nodes,
 		fields:   fields,
@@ -75,16 +89,16 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 	return m
 }
 
-func (m *schemaModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var retCmd tea.Cmd
 	retCmd = nil
 
 	switch msg := msg.(type) {
-	case message.SetSchemaMsg:
+	case SetNavMsg:
 		// TODO: should 'update' nodes, keep them whether expanded or not
 		// reverted since when gvk is changed, the current message system cannot handle
 		m.nodes = kube.CreateNodeTree(m.fields, msg.Objs, []string{})
@@ -174,7 +188,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, retCmd
 }
 
-func (m *schemaModel) View() string {
+func (m *Model) View() string {
 	content := m.renderRecursive(m.curLines)
 	content = strings.TrimSuffix(content, "\n")
 	m.vp.SetContent(content)
@@ -188,11 +202,11 @@ func (m *schemaModel) View() string {
 }
 
 // utils
-func (m *schemaModel) isCursor(curLineNo int) bool {
+func (m *Model) isCursor(curLineNo int) bool {
 	return m.cursor == curLineNo-m.vp.YOffset
 }
 
-func (m *schemaModel) setCursor(path []string) {
+func (m *Model) setCursor(path []string) {
 	for _, line := range m.curLines {
 		if reflect.DeepEqual(line.node.FullPath(), path) {
 			actualIndex := line.index
@@ -208,13 +222,13 @@ func (m *schemaModel) setCursor(path []string) {
 	}
 }
 
-func (m *schemaModel) toggleCurrentNodeFolder() {
+func (m *Model) toggleCurrentNodeFolder() {
 	if node := m.curNode(); node != nil {
 		node.ToggleFolder()
 	}
 }
 
-func (m *schemaModel) toggleExpandRecursive(nodes map[string]*kube.Node, expand bool, all bool) {
+func (m *Model) toggleExpandRecursive(nodes map[string]*kube.Node, expand bool, all bool) {
 	node := m.curNode()
 	if node == nil {
 		return
@@ -230,7 +244,7 @@ func (m *schemaModel) toggleExpandRecursive(nodes map[string]*kube.Node, expand 
 }
 
 // TODO: remove arg width after horizontal scrollable
-func (m *schemaModel) buildLines(nodes map[string]*kube.Node, width int, lineNo int) ([]*Line, int) {
+func (m *Model) buildLines(nodes map[string]*kube.Node, width int, lineNo int) ([]*Line, int) {
 	lines := []*Line{}
 	keys := []string{}
 	for key := range nodes {
@@ -257,7 +271,7 @@ func (m *schemaModel) buildLines(nodes map[string]*kube.Node, width int, lineNo 
 	return lines, lineNo
 }
 
-func (m *schemaModel) renderRecursive(lines []*Line) string {
+func (m *Model) renderRecursive(lines []*Line) string {
 	var result strings.Builder
 	leftPadding := len(strconv.Itoa(len(lines) - 1))
 
@@ -269,7 +283,7 @@ func (m *schemaModel) renderRecursive(lines []*Line) string {
 }
 
 // TODO: split to each setter
-func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
+func (m *Model) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
 	m.gvk = gvk
 	fields, err := kube.CreateFieldTree(m.gvk)
 	if err != nil {
@@ -298,15 +312,15 @@ func sortKeys(keys []string) {
 	}
 }
 
-func (m *schemaModel) curNode() *kube.Node {
+func (m *Model) curNode() *kube.Node {
 	return m.curLines[m.cursor+m.vp.YOffset].node
 }
 
-func (m *schemaModel) curIsPickable() bool {
+func (m *Model) curIsPickable() bool {
 	return m.curNode() != nil && !m.curNode().Foldable() && !m.curNode().Selected
 }
 
-func (m *schemaModel) renderTopBar() string {
+func (m *Model) renderTopBar() string {
 	ctx, err := kube.CurrentContext()
 	if err != nil {
 		log.Fatalf("failed to get current context: %v", err)
@@ -319,14 +333,14 @@ func (m *schemaModel) renderTopBar() string {
 	)
 }
 
-func (m *schemaModel) focus() tea.Cmd {
+func (m *Model) Focus() tea.Cmd {
 	m.focused = true
 	m.style = m.style.Border(lipgloss.ThickBorder()).BorderForeground(theme.Blue)
 	// nothing to send
 	return nil
 }
 
-func (m *schemaModel) blur() {
+func (m *Model) Blur() {
 	m.focused = false
 	m.style = m.style.Border(lipgloss.NormalBorder()).BorderForeground(theme.Overlay0)
 }

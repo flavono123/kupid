@@ -10,6 +10,7 @@ import (
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/keymap"
 	"github.com/flavono123/kupid/internal/ui/message"
+	"github.com/flavono123/kupid/internal/ui/nav"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -27,7 +28,7 @@ type mainModel struct {
 	session       sessionState
 	keys          keymap.KeyMap
 	vp            viewport.Model
-	schema        *schemaModel
+	nav           *nav.Model
 	result        *result.Model
 	gvk           schema.GroupVersionKind
 	controller    *kube.ResourceController
@@ -52,7 +53,7 @@ func InitModel() *mainModel {
 	return &mainModel{
 		session:       schemaView,
 		keys:          keymap.NewKeyMap(),
-		schema:        newSchemaModel(initGvk, controller.GetObjects(), true),
+		nav:           nav.NewModel(initGvk, controller.GetObjects(), true),
 		result:        result.NewModel(controller.GetObjects()),
 		vp:            viewport.New(0, 0),
 		gvk:           initGvk,
@@ -73,9 +74,9 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if m.session == schemaView {
-			sm, sCmd := m.schema.Update(msg)
-			m.schema = sm.(*schemaModel)
-			cmds = append(cmds, sCmd)
+			nm, nCmd := m.nav.Update(msg)
+			m.nav = nm.(*nav.Model)
+			cmds = append(cmds, nCmd)
 		} else if m.session == resultView && m.result.Focused() {
 			rm, rCmd := m.result.Update(msg)
 			m.result = rm.(*result.Model)
@@ -86,12 +87,12 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(keyMsg, m.keys.TabView):
 			if m.session == schemaView {
 				m.session = resultView
-				m.schema.blur()
+				m.nav.Blur()
 				cmds = append(cmds, m.result.Focus())
 			} else {
 				m.session = schemaView
 				m.result.Blur()
-				cmds = append(cmds, m.schema.focus())
+				cmds = append(cmds, m.nav.Focus())
 			}
 		case key.Matches(keyMsg, m.keys.Quit):
 			return m, tea.Quit
@@ -101,9 +102,9 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.result = rm.(*result.Model)
 		cmds = append(cmds, rCmd)
 
-		sm, sCmd := m.schema.Update(msg)
-		m.schema = sm.(*schemaModel)
-		cmds = append(cmds, sCmd)
+		nm, nCmd := m.nav.Update(msg)
+		m.nav = nm.(*nav.Model)
+		cmds = append(cmds, nCmd)
 	}
 
 	// TODO: only update when kbar is focused(after refactoring message design for session)
@@ -129,13 +130,13 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// HACK: cannot update schema change now, e.g. new annotation, deleted label key, ...
 		// setSchemaMsg := func() tea.Msg {
-		// 	return message.SetSchemaMsg{
+		// 	return nav.SetNavMsg{
 		// 		Objs: msg.Objs,
 		// 	}
 		// }
 		return m, tea.Batch(
 			setResultCmd,
-			// setSchemaMsg,
+			// setNavMsg,
 			m.listenController(),
 		)
 	case message.SelectGVKMsg:
@@ -144,13 +145,13 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.gvk = msg.GVK
 		m.setController(msg.GVK)
 
-		m.schema.Reset(msg.GVK, m.getController().GetObjects())
+		m.nav.Reset(msg.GVK, m.getController().GetObjects())
 		// TODO: should pass by msg; this makes above a bug
 		m.kbar.visible = false
 		m.selectedNodes = []*kube.Node{}
 
 		if m.session == schemaView {
-			m.schema.focus()
+			m.nav.Focus()
 		} else {
 			m.result.Focus()
 		}
@@ -205,7 +206,7 @@ func (m *mainModel) View() string {
 		lipgloss.Left,
 		lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			m.schema.View(),
+			m.nav.View(),
 			m.result.View(),
 		),
 	)
@@ -216,7 +217,7 @@ func (m *mainModel) View() string {
 	if m.kbar.visible {
 		// TODO: should pass by msg
 		m.result.Blur()
-		m.schema.blur()
+		m.nav.Blur()
 
 		return lipgloss.Place(
 			m.vp.Width,

@@ -16,10 +16,6 @@ type SelectGVKMsg struct {
 	GVK schema.GroupVersionKind
 }
 
-type SetSchemaMsg struct {
-	Objs []*unstructured.Unstructured
-}
-
 type PickFieldMsg struct {
 	Node *kube.Node
 }
