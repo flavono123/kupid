@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/kbar"
 	"github.com/flavono123/kupid/internal/ui/keymap"
 	"github.com/flavono123/kupid/internal/ui/message"
 	"github.com/flavono123/kupid/internal/ui/nav"
@@ -34,7 +35,7 @@ type mainModel struct {
 	controller    *kube.ResourceController
 	stop          chan struct{}
 	selectedNodes []*kube.Node
-	kbar          *kbarModel
+	kbar          *kbar.Model
 }
 
 func InitModel() *mainModel {
@@ -57,7 +58,7 @@ func InitModel() *mainModel {
 		result:        result.NewModel(controller.GetObjects()),
 		vp:            viewport.New(0, 0),
 		gvk:           initGvk,
-		kbar:          newKbarModel(),
+		kbar:          kbar.NewModel(),
 		controller:    controller,
 		stop:          nil,
 		selectedNodes: []*kube.Node{},
@@ -109,7 +110,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// TODO: only update when kbar is focused(after refactoring message design for session)
 	km, kCmd := m.kbar.Update(msg)
-	m.kbar = km.(*kbarModel)
+	m.kbar = km.(*kbar.Model)
 	cmds = append(cmds, kCmd)
 
 	switch msg := msg.(type) {
@@ -147,7 +148,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.nav.Reset(msg.GVK, m.getController().GetObjects())
 		// TODO: should pass by msg; this makes above a bug
-		m.kbar.visible = false
+		m.kbar.SetVisible(false)
 		m.selectedNodes = []*kube.Node{}
 
 		if m.session == schemaView {
@@ -214,7 +215,7 @@ func (m *mainModel) View() string {
 	m.vp.SetContent(mainContent)
 
 	// TODO: should render by msg
-	if m.kbar.visible {
+	if m.kbar.Visible() {
 		// TODO: should pass by msg
 		m.result.Blur()
 		m.nav.Blur()

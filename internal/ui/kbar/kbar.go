@@ -1,4 +1,4 @@
-package ui
+package kbar
 
 import (
 	"log"
@@ -17,19 +17,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var kinds = []string{
-	"pod",
-	"deployment",
-	"secret",
-	"configmap",
-	"hpa",
-	"ingress",
-	"service",
-	"nodepool",
-	"ec2nodeclass",
-}
+const (
+	KBAR_WIDTH_DIV                 = 3
+	KBAR_SEARCH_RESULTS_MAX_HEIGHT = 10
 
-type kbarModel struct {
+	KBAR_SCROLL_STEP = 1
+)
+
+type Model struct {
 	keys          keymap.KbarKeyMap
 	visible       bool
 	style         lipgloss.Style
@@ -40,7 +35,7 @@ type kbarModel struct {
 	cursor        int
 }
 
-func newKbarModel() *kbarModel {
+func NewModel() *Model {
 	var items kbarItems
 
 	gvks, err := kube.GetGVKs()
@@ -58,7 +53,7 @@ func newKbarModel() *kbarModel {
 	ti.Prompt = "🔍 "
 	ti.Width = 30
 	ti.Cursor.Blink = true
-	m := &kbarModel{
+	m := &Model{
 		keys:    keymap.NewKbarKeyMap(),
 		visible: false,
 		style: lipgloss.NewStyle().
@@ -73,14 +68,14 @@ func newKbarModel() *kbarModel {
 	return m
 }
 
-func (m *kbarModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.input.Focus(),
 		textinput.Blink,
 	)
 }
 
-func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	prevInputValue := m.input.Value()
@@ -137,7 +132,7 @@ func (m *kbarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *kbarModel) View() string {
+func (m *Model) View() string {
 	inputStyle := lipgloss.NewStyle().Margin(0, 0, 1, 0)
 	searchResult := strings.TrimSuffix(m.searchResults.string(m.srViewport.Width), "\n")
 	m.srViewport.SetContent(searchResult)
@@ -149,16 +144,24 @@ func (m *kbarModel) View() string {
 	)
 }
 
+func (m *Model) SetVisible(visible bool) {
+	m.visible = visible
+}
+
+func (m *Model) Visible() bool {
+	return m.visible
+}
+
 // utils
 
-func (m *kbarModel) reset() {
+func (m *Model) reset() {
 	m.input.Reset()
 	m.cursor = 0
 	m.setSearchResults(m.items)
 	m.srViewport.SetYOffset(0)
 }
 
-func (m *kbarModel) setSearchResults(items kbarItems) {
+func (m *Model) setSearchResults(items kbarItems) {
 	var newSearchResults searchResults
 	for index, item := range items {
 		newSearchResults = append(newSearchResults, searchResult{
@@ -169,12 +172,12 @@ func (m *kbarModel) setSearchResults(items kbarItems) {
 	m.searchResults = newSearchResults
 }
 
-func (m *kbarModel) moveCursorTop(items kbarItems) {
+func (m *Model) moveCursorTop(items kbarItems) {
 	m.cursor = 0
 	m.setSearchResults(items)
 }
 
-func (m *kbarModel) actualItemIndex() int {
+func (m *Model) actualItemIndex() int {
 	return m.cursor + m.srViewport.YOffset
 }
 
