@@ -127,22 +127,25 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				PickedNode: nil,
 			}
 		}
-		setSchemaMsg := func() tea.Msg {
-			return message.SetSchemaMsg{
-				Objs: msg.Objs,
-			}
-		}
+		// HACK: cannot update schema change now, e.g. new annotation, deleted label key, ...
+		// setSchemaMsg := func() tea.Msg {
+		// 	return message.SetSchemaMsg{
+		// 		Objs: msg.Objs,
+		// 	}
+		// }
 		return m, tea.Batch(
 			setResultCmd,
-			setSchemaMsg,
+			// setSchemaMsg,
 			m.listenController(),
 		)
 	case message.SelectGVKMsg:
+
+		log.Printf("selectGVKMsg: %s", msg.GVK)
 		m.gvk = msg.GVK
 		m.setController(msg.GVK)
 
 		m.schema.Reset(msg.GVK, m.getController().GetObjects())
-		// TODO: should pass by msg
+		// TODO: should pass by msg; this makes above a bug
 		m.kbar.visible = false
 		m.selectedNodes = []*kube.Node{}
 

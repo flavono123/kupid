@@ -32,6 +32,7 @@ This project is alpha stage for now.
 - schema
   - expand/collapse; move back when collapsed from level, all expand
   - pick/unpick
+  - update schema; new annotation, deleted label key, ... X
 - result
   - filter; should not be focused when kbar up
   - candidate on hover
