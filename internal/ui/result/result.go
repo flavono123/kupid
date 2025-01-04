@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/ui/message"
+	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -24,7 +24,7 @@ const (
 	TABLE_SCROLL_STEP = 1
 )
 
-// messages
+// msgs
 type SetTableMsg struct {
 	Nodes      []*kube.Node
 	Objs       []*unstructured.Unstructured
@@ -94,7 +94,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.Picked && m.table.willOverWidth(msg.PickedNode) {
 			return m, func() tea.Msg {
-				return message.CancelPickMsg{
+				return event.CancelPickMsg{
 					Canceled: true,
 					Node:     msg.PickedNode,
 				}

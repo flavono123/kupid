@@ -1,5 +1,5 @@
-// TODO: remove all message would go for each "handling"(case of switch msg.(type)) model's
-package message
+// TODO: remove all msg would go for each "handling"(case of switch msg.(type)) model's
+package event
 
 import (
 	"github.com/flavono123/kupid/internal/kube"

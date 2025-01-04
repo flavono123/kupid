@@ -22,6 +22,11 @@ This project is alpha stage for now.
   - do not expose setters of component(model) is default, send message to it to update itself
   - setters are should be called in model's Update()
 
+#### Message System
+
+- only root model can handle 'behavioral' messages(in package `event`) to set submodels
+  - returns Set*Msg of submodel
+
 ## Manual Test List
 
 - tab

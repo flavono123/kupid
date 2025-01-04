@@ -8,9 +8,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/kbar"
 	"github.com/flavono123/kupid/internal/ui/keymap"
-	"github.com/flavono123/kupid/internal/ui/message"
 	"github.com/flavono123/kupid/internal/ui/nav"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
@@ -108,7 +108,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, nCmd)
 	}
 
-	// TODO: only update when kbar is focused(after refactoring message design for session)
+	// TODO: only update when kbar is focused(after refactoring msg design for session)
 	km, kCmd := m.kbar.Update(msg)
 	m.kbar = km.(*kbar.Model)
 	cmds = append(cmds, kCmd)
@@ -117,7 +117,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.vp.Width = msg.Width
 		m.vp.Height = msg.Height
-	case message.UpdateObjsMsg:
+	case event.UpdateObjsMsg:
 		if msg.Obj != nil {
 			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
 		}
@@ -140,7 +140,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// setNavMsg,
 			m.listenController(),
 		)
-	case message.SelectGVKMsg:
+	case event.SelectGVKMsg:
 
 		log.Printf("selectGVKMsg: %s", msg.GVK)
 		m.gvk = msg.GVK
@@ -157,11 +157,11 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.result.Focus()
 		}
 		return m, func() tea.Msg {
-			return message.UpdateObjsMsg{
+			return event.UpdateObjsMsg{
 				Objs: m.getController().GetObjects(),
 			}
 		}
-	case message.PickFieldMsg:
+	case event.PickFieldMsg:
 		m.selectedNodes = append(m.selectedNodes, msg.Node)
 		return m, func() tea.Msg {
 			return result.SetTableMsg{
@@ -171,7 +171,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				PickedNode: msg.Node,
 			}
 		}
-	case message.UnpickFieldMsg:
+	case event.UnpickFieldMsg:
 		for idx, node := range m.selectedNodes {
 			if node.Name() == msg.Node.Name() {
 				m.selectedNodes = append(m.selectedNodes[:idx], m.selectedNodes[idx+1:]...)
@@ -186,12 +186,12 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				PickedNode: nil,
 			}
 		}
-	case message.CancelPickMsg:
+	case event.CancelPickMsg:
 		if msg.Canceled {
 			msg.Node.Selected = false
 			m.selectedNodes = append(m.selectedNodes[:len(m.selectedNodes)-1], m.selectedNodes[len(m.selectedNodes):]...)
 		}
-	case message.HoverFieldMsg:
+	case event.HoverFieldMsg:
 		return m, func() tea.Msg {
 			return result.SetCandidateMsg{
 				Candidate: msg.Candidate,
@@ -279,7 +279,7 @@ func (m *mainModel) listenController() tea.Cmd {
 			return nil
 		}
 
-		return message.UpdateObjsMsg{
+		return event.UpdateObjsMsg{
 			Obj:  match.Obj,
 			Objs: m.getController().GetObjects(),
 		}

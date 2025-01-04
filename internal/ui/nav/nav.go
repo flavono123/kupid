@@ -9,8 +9,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/keymap"
-	"github.com/flavono123/kupid/internal/ui/message"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,7 +31,7 @@ const (
 	SCHEMA_EXPAND_MULTI_MARGIN  = 3 // render above 3 lines when cursor moved by fold/expand a lot
 )
 
-// messages
+// msgs
 type SetNavMsg struct {
 	Objs []*unstructured.Unstructured
 }
@@ -100,7 +100,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case SetNavMsg:
 		// TODO: should 'update' nodes, keep them whether expanded or not
-		// reverted since when gvk is changed, the current message system cannot handle
+		// reverted since when gvk is changed, the current msg system cannot handle
 		m.nodes = kube.CreateNodeTree(m.fields, msg.Objs, []string{})
 		m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	case tea.WindowSizeMsg:
@@ -117,7 +117,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return message.HoverFieldMsg{Candidate: m.curNode()}
+					return event.HoverFieldMsg{Candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
@@ -133,7 +133,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return message.HoverFieldMsg{Candidate: m.curNode()}
+					return event.HoverFieldMsg{Candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
@@ -152,12 +152,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.curNode().Selected {
 					m.curNode().Selected = false
 					retCmd = func() tea.Msg {
-						return message.UnpickFieldMsg{Node: m.curNode()}
+						return event.UnpickFieldMsg{Node: m.curNode()}
 					}
 				} else {
 					m.curNode().Selected = true
 					retCmd = func() tea.Msg {
-						return message.PickFieldMsg{Node: m.curNode()}
+						return event.PickFieldMsg{Node: m.curNode()}
 					}
 				}
 			}

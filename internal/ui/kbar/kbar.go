@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/keymap"
-	"github.com/flavono123/kupid/internal/ui/message"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -109,7 +109,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				return m, func() tea.Msg {
 					actualIndex := m.cursor + m.srViewport.YOffset
-					return message.SelectGVKMsg{GVK: filtered[actualIndex].GroupVersionKind}
+					return event.SelectGVKMsg{GVK: filtered[actualIndex].GroupVersionKind}
 				}
 			case "esc", "alt+k": // HACK: use keymap
 				m.visible = false
