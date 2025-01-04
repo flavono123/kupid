@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
-	"github.com/flavono123/kupid/internal/ui/keymap"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +24,7 @@ const (
 )
 
 type Model struct {
-	keys          keymap.KbarKeyMap
+	keys          keyMap
 	visible       bool
 	style         lipgloss.Style
 	items         kbarItems
@@ -54,7 +53,7 @@ func NewModel() *Model {
 	ti.Width = 30
 	ti.Cursor.Blink = true
 	m := &Model{
-		keys:    keymap.NewKbarKeyMap(),
+		keys:    newKeyMap(),
 		visible: false,
 		style: lipgloss.NewStyle().
 			Border(lipgloss.ThickBorder()),
@@ -117,7 +116,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			switch {
-			case key.Matches(msg, m.keys.Show):
+			case key.Matches(msg, m.keys.show):
 				m.visible = true
 				m.reset()
 

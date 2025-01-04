@@ -1,8 +1,9 @@
-package result
+package table
 
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -10,10 +11,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/ui/keymap"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+const (
+	TABLE_WIDTH_RATIO = 0.7
+	TABLE_SCROLL_STEP = 1
 )
 
 type fuzzyMatchedRow struct {
@@ -29,8 +34,8 @@ type tableStyles struct {
 	debug     lipgloss.Style
 }
 
-type tableModel struct {
-	keys          keymap.TableKeyMap
+type Model struct {
+	keys          keyMap
 	cursor        int
 	nodes         []*kube.Node
 	objs          []*unstructured.Unstructured
@@ -42,7 +47,7 @@ type tableModel struct {
 	keyword       string
 }
 
-func newTableModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *tableModel {
+func NewModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *Model {
 	// TODO: should 0 when no objs, impl with no resources view
 	nameMaxWidth := 4 // Name
 	for _, obj := range objs {
@@ -51,8 +56,8 @@ func newTableModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *table
 		}
 	}
 
-	m := &tableModel{
-		keys:          keymap.NewTableKeyMap(),
+	m := &Model{
+		keys:          newKeyMap(),
 		cursor:        0,
 		nodes:         nodes,
 		objs:          objs,
@@ -70,11 +75,11 @@ func newTableModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *table
 	return m
 }
 
-func (m *tableModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -82,13 +87,13 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setRowsViewSize(msg)
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.Up):
+		case key.Matches(msg, m.keys.up):
 			if m.isCursorTop() {
 				m.cursor--
 			} else {
 				m.rowsView.LineUp(TABLE_SCROLL_STEP)
 			}
-		case key.Matches(msg, m.keys.Down):
+		case key.Matches(msg, m.keys.down):
 			if m.isCursorBottom() {
 				m.cursor++
 			} else {
@@ -99,7 +104,7 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *tableModel) View() string {
+func (m *Model) View() string {
 	content := m.renderRow()
 	m.rowsView.SetContent(content)
 	return lipgloss.JoinVertical(
@@ -110,7 +115,7 @@ func (m *tableModel) View() string {
 	)
 }
 
-func (m *tableModel) renderHeader() string {
+func (m *Model) renderHeader() string {
 	var render strings.Builder
 	// headers
 	if len(m.objs) > 0 {
@@ -131,7 +136,7 @@ func (m *tableModel) renderHeader() string {
 	return m.styles.header.Render(render.String())
 }
 
-func (m *tableModel) renderRow() string {
+func (m *Model) renderRow() string {
 	rows := []fuzzyMatchedRow{}
 	// 모든 행에 대해 cells 준비
 	for _, obj := range m.objs {
@@ -196,11 +201,11 @@ func (m *tableModel) renderRow() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *tableModel) isCursor(index int) bool {
+func (m *Model) isCursor(index int) bool {
 	return index == m.cursor+m.rowsView.YOffset
 }
 
-func (m *tableModel) setNodeMaxWidths(nodes []*kube.Node) {
+func (m *Model) setNodeMaxWidths(nodes []*kube.Node) {
 	// name
 	nameMaxWidth := 4
 	for _, obj := range m.objs {
@@ -225,8 +230,8 @@ func (m *tableModel) setNodeMaxWidths(nodes []*kube.Node) {
 	m.nodeMaxWidths = nodeMaxWidths
 }
 
-func (m *tableModel) val(node *kube.Node, obj *unstructured.Unstructured) string {
-	val, found, err := GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
+func (m *Model) val(node *kube.Node, obj *unstructured.Unstructured) string {
+	val, found, err := getNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
 	if err != nil || !found {
 		return "-"
 	}
@@ -238,20 +243,20 @@ func (m *tableModel) val(node *kube.Node, obj *unstructured.Unstructured) string
 	return fmt.Sprintf("%v", val)
 }
 
-func (m *tableModel) cellStyle(col int) lipgloss.Style {
+func (m *Model) cellStyle(col int) lipgloss.Style {
 	return lipgloss.NewStyle().Margin(0, 0, 0, 1).Width(m.colMaxWidth(col))
 }
 
-func (m *tableModel) setNodes(nodes []*kube.Node) {
+func (m *Model) SetNodes(nodes []*kube.Node) {
 	m.setNodeMaxWidths(nodes)
 	m.nodes = nodes
 }
 
-func (m *tableModel) setObjs(objs []*unstructured.Unstructured) {
+func (m *Model) SetObjs(objs []*unstructured.Unstructured) {
 	m.objs = objs
 }
 
-func (m *tableModel) colMaxWidth(idxPlusOne int) int {
+func (m *Model) colMaxWidth(idxPlusOne int) int {
 	// first col is always name
 	if idxPlusOne < 1 {
 		return m.nameMaxWidth
@@ -261,41 +266,41 @@ func (m *tableModel) colMaxWidth(idxPlusOne int) int {
 	return m.nodeMaxWidths[idxPlusOne-1]
 }
 
-func (m *tableModel) setCandidate(candidate *kube.Node) {
+func (m *Model) SetCandidate(candidate *kube.Node) {
 	m.candidate = candidate
 }
 
-func (m *tableModel) isCursorTop() bool {
+func (m *Model) isCursorTop() bool {
 	return m.cursor > 0
 }
 
-func (m *tableModel) isCursorBottom() bool {
+func (m *Model) isCursorBottom() bool {
 	// objs size as an index(-1) and the debug/help bar(-1)
 	// rowsview height as an index(-1); already adjusted for the debug/help bar
 	return m.cursor < min(len(m.objs)-1, m.rowsView.Height-1)
 }
 
-func (m *tableModel) setRowsViewSize(msg tea.WindowSizeMsg) {
+func (m *Model) setRowsViewSize(msg tea.WindowSizeMsg) {
 	m.rowsView.Width = int(float64(msg.Width) * TABLE_WIDTH_RATIO)
 	m.rowsView.Height = msg.Height - 3 // HACK: topbar 1 + debug line 1 + header 1
 }
 
-func (m *tableModel) renderDebugBar() string {
+func (m *Model) renderDebugBar() string {
 	return m.styles.debug.Render(
-		fmt.Sprintf("vpwidth: %d, tablewidth: %d, cols: %d",
-			m.rowsView.Width, m.tableWidth(), m.cols()),
+		fmt.Sprintf("vpwidth: %d, TableWidth: %d, cols: %d",
+			m.rowsView.Width, m.TableWidth(), m.cols()),
 	)
 }
 
-func (m *tableModel) willOverWidth(node *kube.Node) bool {
+func (m *Model) WillOverWidth(node *kube.Node) bool {
 	if node == nil {
 		return false
 	}
 
-	return m.tableWidth()+m.maxWidth(node) > m.rowsView.Width-9 // magic num again, safty margin
+	return m.TableWidth()+m.maxWidth(node) > m.rowsView.Width-9 // magic num again, safty margin
 }
 
-func (m *tableModel) maxWidth(node *kube.Node) int {
+func (m *Model) maxWidth(node *kube.Node) int {
 	max := len(node.Name())
 	for _, obj := range m.objs {
 		if len(m.val(node, obj)) > max {
@@ -305,7 +310,7 @@ func (m *tableModel) maxWidth(node *kube.Node) int {
 	return max
 }
 
-func (m *tableModel) tableWidth() int {
+func (m *Model) TableWidth() int {
 	width := 0
 	for col := 0; col < m.cols(); col++ {
 		width += m.colMaxWidth(col) + 1 // margin?
@@ -313,11 +318,11 @@ func (m *tableModel) tableWidth() int {
 	return width
 }
 
-func (m *tableModel) cols() int {
+func (m *Model) cols() int {
 	return len(m.nodes) + 1 // name + nodes
 }
 
-func (m *tableModel) setKeyword(keyword string) {
+func (m *Model) SetKeyword(keyword string) {
 	m.keyword = keyword
 }
 
@@ -346,4 +351,51 @@ func contains(slice []int, item int) bool {
 		}
 	}
 	return false
+}
+
+func displayName(obj *unstructured.Unstructured) string {
+	// TODO: gonna be namespace toggling feature
+	// HACK: to reduce the width of table before viewport supporting horizontal scroll
+	// if obj.GetNamespace() != "" {
+	// 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
+	// }
+	return obj.GetName()
+}
+
+// TODO: pull up to util, dedup with nav
+func getNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
+	var current interface{} = obj
+
+	for i, field := range fields {
+		// 숫자인지 확인 (배열 인덱스)
+		if index, err := strconv.Atoi(field); err == nil {
+			// 현재 값이 슬라이스인지 확인
+			if slice, ok := current.([]interface{}); ok {
+				if index >= len(slice) {
+					return nil, false, fmt.Errorf("index %d out of bounds", index)
+				}
+				current = slice[index]
+			} else {
+				return nil, false, fmt.Errorf("expected array, got %T", current)
+			}
+		} else {
+			// 맵인지 확인
+			if m, ok := current.(map[string]interface{}); ok {
+				var exists bool
+				current, exists = m[field]
+				if !exists {
+					return nil, false, nil
+				}
+			} else {
+				return nil, false, fmt.Errorf("expected map, got %T", current)
+			}
+		}
+
+		// 마지막 필드면 현재 값 반환
+		if i == len(fields)-1 {
+			return current, true, nil
+		}
+	}
+
+	return current, true, nil
 }

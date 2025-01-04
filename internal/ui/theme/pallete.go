@@ -2,7 +2,7 @@ package theme
 
 import "github.com/charmbracelet/lipgloss"
 
-// TODO: migrate to https://github.com/catppuccin/go
+// TODO: REMOVE and migrate to https://github.com/catppuccin/go
 // https://catppuccin.com/palette
 const (
 	// Default

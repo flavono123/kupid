@@ -1,10 +1,8 @@
 package result
 
 import (
-	"fmt"
 	"log"
 	"math"
-	"strconv"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -12,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
+	"github.com/flavono123/kupid/internal/ui/result/table"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -19,26 +18,12 @@ import (
 const (
 	RESULT_PROGRESS_BAR_INIT_FREQ     = 120.0
 	RESULT_PROGRESS_BAR_CRITICAL_DAMP = 1.0
-
-	TABLE_WIDTH_RATIO = 0.7
-	TABLE_SCROLL_STEP = 1
+	RESULT_WIDTH_RATIO                = table.TABLE_WIDTH_RATIO
 )
-
-// msgs
-type SetTableMsg struct {
-	Nodes      []*kube.Node
-	Objs       []*unstructured.Unstructured
-	Picked     bool
-	PickedNode *kube.Node
-}
-
-type SetCandidateMsg struct {
-	Candidate *kube.Node
-}
 
 type Model struct {
 	focused bool
-	table   *tableModel
+	table   *table.Model
 	filter  textinput.Model
 
 	width      int
@@ -57,7 +42,7 @@ func NewModel(objs []*unstructured.Unstructured) *Model {
 	filter.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.Overlay0).Background(theme.Mantle)
 	filter.TextStyle = lipgloss.NewStyle().Foreground(theme.Blue).Background(theme.Mantle)
 
-	t := newTableModel(nodes, objs)
+	t := table.NewModel(nodes, objs)
 	return &Model{
 		focused: false,
 		table:   t,
@@ -65,6 +50,7 @@ func NewModel(objs []*unstructured.Unstructured) *Model {
 		widthLimPB: progress.New(
 			// ?: catppuccin "latte" yellow to blue,
 			// HACK: with gradient does not support lipgloss.Color weird
+			// this would resolve if using https://github.com/catppuccin/go, it offers hex codes
 			progress.WithGradient("#df8e1d", "#1e66f5"),
 			progress.WithoutPercentage(),
 			progress.WithSpringOptions(RESULT_PROGRESS_BAR_INIT_FREQ, RESULT_PROGRESS_BAR_CRITICAL_DAMP),
@@ -92,7 +78,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setCandidate(nil)
 		}
 
-		if msg.Picked && m.table.willOverWidth(msg.PickedNode) {
+		if msg.Picked && m.table.WillOverWidth(msg.PickedNode) {
 			return m, func() tea.Msg {
 				return event.CancelPickMsg{
 					Canceled: true,
@@ -104,25 +90,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setTable(msg.Nodes, msg.Objs)
 		cmds = append(cmds, m.setWidthLimitRatio())
 	case SetCandidateMsg:
-		if m.table.willOverWidth(msg.Candidate) {
+		if m.table.WillOverWidth(msg.Candidate) {
 			// do not render candidate
 			return m, nil
 		}
 		m.setCandidate(msg.Candidate)
 	case tea.WindowSizeMsg:
-		m.width = int(float64(msg.Width) * TABLE_WIDTH_RATIO) // TODO: rename TABLE_WIDTH_RATIO to result's
+		m.width = int(float64(msg.Width) * RESULT_WIDTH_RATIO) // TODO: rename TABLE_WIDTH_RATIO to result's
 		tm, tCmd := m.table.Update(msg)
-		m.table = tm.(*tableModel)
+		m.table = tm.(*table.Model)
 		cmds = append(cmds, tCmd)
 	case tea.KeyMsg:
 		if m.focused {
 			fm, fCmd := m.filter.Update(msg)
 			m.filter = fm
-			m.table.setKeyword(m.filter.Value())
+			m.table.SetKeyword(m.filter.Value())
 			cmds = append(cmds, fCmd)
 
 			tm, tCmd := m.table.Update(msg)
-			m.table = tm.(*tableModel)
+			m.table = tm.(*table.Model)
 			cmds = append(cmds, tCmd)
 		} else {
 			log.Printf("resultModel blurred")
@@ -140,15 +126,6 @@ func (m *Model) View() string {
 }
 
 // utils
-
-func displayName(obj *unstructured.Unstructured) string {
-	// TODO: gonna be namespace toggling feature
-	// HACK: to reduce the width of table before viewport supporting horizontal scroll
-	// if obj.GetNamespace() != "" {
-	// 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
-	// }
-	return obj.GetName()
-}
 
 func (m *Model) Focus() tea.Cmd {
 	m.focused = true
@@ -173,50 +150,13 @@ func (m *Model) Blur() {
 	m.filter.Blur()
 }
 
-func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
-	var current interface{} = obj
-
-	for i, field := range fields {
-		// 숫자인지 확인 (배열 인덱스)
-		if index, err := strconv.Atoi(field); err == nil {
-			// 현재 값이 슬라이스인지 확인
-			if slice, ok := current.([]interface{}); ok {
-				if index >= len(slice) {
-					return nil, false, fmt.Errorf("index %d out of bounds", index)
-				}
-				current = slice[index]
-			} else {
-				return nil, false, fmt.Errorf("expected array, got %T", current)
-			}
-		} else {
-			// 맵인지 확인
-			if m, ok := current.(map[string]interface{}); ok {
-				var exists bool
-				current, exists = m[field]
-				if !exists {
-					return nil, false, nil
-				}
-			} else {
-				return nil, false, fmt.Errorf("expected map, got %T", current)
-			}
-		}
-
-		// 마지막 필드면 현재 값 반환
-		if i == len(fields)-1 {
-			return current, true, nil
-		}
-	}
-
-	return current, true, nil
-}
-
 func (m *Model) setTable(nodes []*kube.Node, objs []*unstructured.Unstructured) {
-	m.table.setObjs(objs)
-	m.table.setNodes(nodes) // HACK: update ojbs first, setNodeMaxWidths is dependent on objs
+	m.table.SetObjs(objs)
+	m.table.SetNodes(nodes) // HACK: update ojbs first, setNodeMaxWidths is dependent on objs
 }
 
 func (m *Model) setCandidate(candidate *kube.Node) {
-	m.table.setCandidate(candidate)
+	m.table.SetCandidate(candidate)
 }
 
 func (m *Model) renderTopBar() string {
@@ -236,7 +176,7 @@ func (m *Model) renderTopBar() string {
 
 func (m *Model) setWidthLimitRatio() tea.Cmd {
 	var cmd tea.Cmd
-	ratio := float64(m.table.tableWidth()) / float64(m.width)
+	ratio := float64(m.table.TableWidth()) / float64(m.width)
 	freq := RESULT_PROGRESS_BAR_INIT_FREQ * math.Log1p(1.0-ratio)
 	m.widthLimPB.SetSpringOptions(freq, RESULT_PROGRESS_BAR_CRITICAL_DAMP)
 	cmd = m.widthLimPB.SetPercent(ratio)

@@ -10,7 +10,6 @@ import (
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/kbar"
-	"github.com/flavono123/kupid/internal/ui/keymap"
 	"github.com/flavono123/kupid/internal/ui/nav"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
@@ -25,9 +24,9 @@ const (
 	// kbarView
 )
 
-type mainModel struct {
+type Model struct {
 	session       sessionState
-	keys          keymap.KeyMap
+	keys          keyMap
 	vp            viewport.Model
 	nav           *nav.Model
 	result        *result.Model
@@ -38,7 +37,7 @@ type mainModel struct {
 	kbar          *kbar.Model
 }
 
-func InitModel() *mainModel {
+func NewModel() *Model {
 	initGvk := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
@@ -51,9 +50,9 @@ func InitModel() *mainModel {
 	controller := kube.NewResourceController(gvr)
 	controller.Inform()
 
-	return &mainModel{
+	return &Model{
 		session:       schemaView,
-		keys:          keymap.NewKeyMap(),
+		keys:          newKeyMap(),
 		nav:           nav.NewModel(initGvk, controller.GetObjects(), true),
 		result:        result.NewModel(controller.GetObjects()),
 		vp:            viewport.New(0, 0),
@@ -65,12 +64,12 @@ func InitModel() *mainModel {
 	}
 }
 
-func (m *mainModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	m.inform()
 	return m.listenController()
 }
 
-func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -85,7 +84,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch {
-		case key.Matches(keyMsg, m.keys.TabView):
+		case key.Matches(keyMsg, m.keys.tabView):
 			if m.session == schemaView {
 				m.session = resultView
 				m.nav.Blur()
@@ -95,7 +94,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.result.Blur()
 				cmds = append(cmds, m.nav.Focus())
 			}
-		case key.Matches(keyMsg, m.keys.Quit):
+		case key.Matches(keyMsg, m.keys.quit):
 			return m, tea.Quit
 		}
 	} else {
@@ -202,7 +201,7 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *mainModel) View() string {
+func (m *Model) View() string {
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		lipgloss.JoinHorizontal(
@@ -236,7 +235,7 @@ func (m *mainModel) View() string {
 	)
 }
 
-func (m *mainModel) setController(gvk schema.GroupVersionKind) {
+func (m *Model) setController(gvk schema.GroupVersionKind) {
 	if m.stop != nil {
 		close(m.stop)
 	}
@@ -249,7 +248,7 @@ func (m *mainModel) setController(gvk schema.GroupVersionKind) {
 }
 
 // TODO: ? why return?
-func (m *mainModel) inform() tea.Cmd {
+func (m *Model) inform() tea.Cmd {
 	stop, err := m.getController().Inform()
 	if err != nil {
 		return nil
@@ -259,11 +258,11 @@ func (m *mainModel) inform() tea.Cmd {
 	return nil
 }
 
-func (m *mainModel) getController() *kube.ResourceController {
+func (m *Model) getController() *kube.ResourceController {
 	return m.controller
 }
 
-func (m *mainModel) currentFocusedView() string {
+func (m *Model) currentFocusedView() string {
 	if m.session == resultView {
 		return "result"
 	}
@@ -271,7 +270,7 @@ func (m *mainModel) currentFocusedView() string {
 }
 
 // BUG: listen event only when selectgvk(or just once?)
-func (m *mainModel) listenController() tea.Cmd {
+func (m *Model) listenController() tea.Cmd {
 	log.Printf("listen %s", m.gvk)
 	return func() tea.Msg {
 		match, ok := <-m.getController().EventEmitted()

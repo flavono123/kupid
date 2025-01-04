@@ -21,11 +21,27 @@ This project is alpha stage for now.
   - handling messages are should be in model's package(case of `msg.(type)`)
   - do not expose setters of component(model) is default, send message to it to update itself
   - setters are should be called in model's Update()
+- models
+  - implementaion of bubbletea model interface(Init, Update, View)
+  - defined in a model.go file
+    - have own messages(see details in [Message System](#message-system))
+      - only root has seperated package name `event` (to avoid circular dependencies)
+      - the other submodels' are in for each msg.go file
+    - have own keymaps in the keymap.go file
+  - root is in ui/
+  - submodels are in ui/*
+- components
+  - rendered by model's View()
+    - no need to define bubbletea model's interface
+    - no messages
+    - use 'render*' over view to naming functions
+  - defined with its named file(e.g. table.go)
 
 #### Message System
 
-- only root model can handle 'behavioral' messages(in package `event`) to set submodels
+- only root model(ui/) can handle 'behavioral' messages(in package `event`) to set submodels(ui/*)
   - returns Set*Msg of submodel
+
 
 ## Manual Test List
 

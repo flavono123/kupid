@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
-	"github.com/flavono123/kupid/internal/ui/keymap"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,11 +30,6 @@ const (
 	SCHEMA_EXPAND_MULTI_MARGIN  = 3 // render above 3 lines when cursor moved by fold/expand a lot
 )
 
-// msgs
-type SetNavMsg struct {
-	Objs []*unstructured.Unstructured
-}
-
 type Model struct {
 	focused bool
 	nodes   map[string]*kube.Node
@@ -51,7 +45,7 @@ type Model struct {
 
 	gvk schema.GroupVersionKind
 
-	keys keymap.SchemaKeyMap
+	keys keyMap
 	help help.Model
 }
 
@@ -78,7 +72,7 @@ func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, fo
 		curLines: []*Line{},
 		prevNode: nil,
 		// curNode:  nil,
-		keys: keymap.NewSchemaKeyMap(),
+		keys: newKeyMap(),
 		help: help.New(),
 	}
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
@@ -108,7 +102,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.Up):
+		case key.Matches(msg, m.keys.up):
 			if m.cursor > SCHEMA_CURSOR_TOP {
 				m.cursor--
 			} else {
@@ -124,7 +118,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return result.SetCandidateMsg{Candidate: nil}
 				}
 			}
-		case key.Matches(msg, m.keys.Down):
+		case key.Matches(msg, m.keys.down):
 			if m.cursor < min(m.vp.Height-1, m.curLineNo-1) {
 				m.cursor++
 			} else {
@@ -140,7 +134,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return result.SetCandidateMsg{Candidate: nil}
 				}
 			}
-		case key.Matches(msg, m.keys.Action):
+		case key.Matches(msg, m.keys.action):
 			if m.curNode() == nil {
 				break
 			}
@@ -164,7 +158,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// BUG: when viewport is adjusted by expland all/level then fold back, the cursor is not rendered
 		// reproduce - expand level of status in kind Pod(long enough) and fold
-		case key.Matches(msg, m.keys.LevelExpand):
+		case key.Matches(msg, m.keys.levelExpand):
 			node := m.curNode()
 			if node != nil && node.Foldable() {
 				toggledExpanded := !node.Expanded
@@ -173,7 +167,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 				m.setCursor(prevNode.FullPath())
 			}
-		case key.Matches(msg, m.keys.AllExpand):
+		case key.Matches(msg, m.keys.allExpand):
 			node := m.curNode()
 			if node != nil && node.Foldable() {
 				toggledExpanded := !node.Expanded
