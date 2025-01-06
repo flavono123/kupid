@@ -3,13 +3,17 @@ package kbar
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	show key.Binding
+	up   key.Binding
+	down key.Binding
+	pick key.Binding
 	hide key.Binding
 }
 
 func newKeyMap() keyMap {
 	return keyMap{
-		show: key.NewBinding(key.WithKeys("alt+k")),
-		hide: key.NewBinding(key.WithKeys("esc", "alt+k")),
+		up:   key.NewBinding(key.WithKeys("up")),
+		down: key.NewBinding(key.WithKeys("down")),
+		pick: key.NewBinding(key.WithKeys("enter")),
+		hide: key.NewBinding(key.WithKeys("esc")),
 	}
 }

@@ -1,4 +1,3 @@
-// TODO: remove all msg would go for each "handling"(case of switch msg.(type)) model's
 package event
 
 import (
@@ -12,7 +11,7 @@ type CancelPickMsg struct {
 	Node     *kube.Node
 }
 
-type SelectGVKMsg struct {
+type PickGVKMsg struct {
 	GVK schema.GroupVersionKind
 }
 

@@ -83,7 +83,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.setRowsViewSize(msg)
+		m.setViewSize(msg)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.up):
@@ -279,7 +279,7 @@ func (m *Model) isCursorBottom() bool {
 	return m.cursor < min(len(m.objs)-1, m.rowsView.Height-1)
 }
 
-func (m *Model) setRowsViewSize(msg tea.WindowSizeMsg) {
+func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
 	m.rowsView.Width = int(float64(msg.Width) * TABLE_WIDTH_RATIO)
 	m.rowsView.Height = msg.Height - 3 // HACK: topbar 1 + debug line 1 + header 1
 }

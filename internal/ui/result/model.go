@@ -129,8 +129,8 @@ func (m *Model) View() string {
 
 func (m *Model) Focus() tea.Cmd {
 	m.focused = true
-
 	m.filter.PromptStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.Blue)
+
 	return tea.Batch(
 		textinput.Blink, // ???? not working
 		m.filter.Focus(),

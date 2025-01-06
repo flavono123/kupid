@@ -83,6 +83,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, rCmd)
 		}
 
+		if m.kbar.Visible() {
+			km, kCmd := m.kbar.Update(msg)
+			m.kbar = km.(*kbar.Model)
+			cmds = append(cmds, kCmd)
+		}
+
 		switch {
 		case key.Matches(keyMsg, m.keys.tabView):
 			if m.session == schemaView {
@@ -94,8 +100,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.result.Blur()
 				cmds = append(cmds, m.nav.Focus())
 			}
+		case key.Matches(keyMsg, m.keys.toggleKbar):
+			// var cmd tea.Cmd
+			if m.kbar.Visible() {
+				cmds = append(cmds, kbar.Hide)
+			} else {
+				cmds = append(cmds, kbar.Show)
+			}
 		case key.Matches(keyMsg, m.keys.quit):
-			return m, tea.Quit
+			cmds = append(cmds, tea.Quit)
 		}
 	} else {
 		rm, rCmd := m.result.Update(msg)
@@ -105,17 +118,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nm, nCmd := m.nav.Update(msg)
 		m.nav = nm.(*nav.Model)
 		cmds = append(cmds, nCmd)
-	}
 
-	// TODO: only update when kbar is focused(after refactoring msg design for session)
-	km, kCmd := m.kbar.Update(msg)
-	m.kbar = km.(*kbar.Model)
-	cmds = append(cmds, kCmd)
+		km, kCmd := m.kbar.Update(msg)
+		m.kbar = km.(*kbar.Model)
+		cmds = append(cmds, kCmd)
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.vp.Width = msg.Width
-		m.vp.Height = msg.Height
+		m.setViewSize(msg)
 	case event.UpdateObjsMsg:
 		if msg.Obj != nil {
 			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
@@ -139,27 +150,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// setNavMsg,
 			m.listenController(),
 		)
-	case event.SelectGVKMsg:
-
-		log.Printf("selectGVKMsg: %s", msg.GVK)
+	case event.PickGVKMsg:
 		m.gvk = msg.GVK
 		m.setController(msg.GVK)
-
-		m.nav.Reset(msg.GVK, m.getController().GetObjects())
-		// TODO: should pass by msg; this makes above a bug
-		m.kbar.SetVisible(false)
 		m.selectedNodes = []*kube.Node{}
 
+		// TODO: should be updated by msg
+		m.nav.Reset(msg.GVK, m.getController().GetObjects())
+
+		// TODO: fix this(actually, nav.Focus() nothing return) each model should handle message
 		if m.session == schemaView {
-			m.nav.Focus()
+			cmds = append(cmds, m.nav.Focus())
 		} else {
-			m.result.Focus()
+			cmds = append(cmds, m.result.Focus())
 		}
-		return m, func() tea.Msg {
+
+		cmds = append(cmds, func() tea.Msg {
 			return event.UpdateObjsMsg{
 				Objs: m.getController().GetObjects(),
 			}
-		}
+		})
+		cmds = append(cmds, kbar.Hide)
 	case event.PickFieldMsg:
 		m.selectedNodes = append(m.selectedNodes, msg.Node)
 		return m, func() tea.Msg {
@@ -233,6 +244,11 @@ func (m *Model) View() string {
 		lipgloss.Left,
 		m.vp.View(),
 	)
+}
+
+func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
+	m.vp.Width = msg.Width
+	m.vp.Height = msg.Height
 }
 
 func (m *Model) setController(gvk schema.GroupVersionKind) {

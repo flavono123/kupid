@@ -77,55 +77,58 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	prevInputValue := m.input.Value()
-	m.input, cmd = m.input.Update(msg)
-	filtered := m.items.filter(m.input.Value())
-	if prevInputValue != m.input.Value() {
-		m.moveCursorTop(filtered)
-	}
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.srViewport.Width = msg.Width / KBAR_WIDTH_DIV
-		m.srViewport.Height = KBAR_SEARCH_RESULTS_MAX_HEIGHT
+		m.setViewSize(msg)
 	case tea.KeyMsg:
-		if m.visible {
-			switch msg.String() {
-			case "up":
+		// ? review is this always to be updated
+		prevInputValue := m.input.Value()
+		m.input, cmd = m.input.Update(msg)
+		filtered := m.items.filter(m.input.Value())
+		if prevInputValue != m.input.Value() {
+			m.moveCursorTop(filtered)
+		}
+
+		if m.Visible() {
+			switch {
+			case key.Matches(msg, m.keys.up):
 				if m.cursor > 0 {
 					m.cursor--
 				} else {
 					m.srViewport.LineUp(KBAR_SCROLL_STEP)
 				}
 				m.setSearchResults(filtered)
-			case "down":
+			case key.Matches(msg, m.keys.down):
 				if m.cursor < min(len(filtered)-1, KBAR_SEARCH_RESULTS_MAX_HEIGHT-1) {
 					m.cursor++
 				} else {
 					m.srViewport.LineDown(KBAR_SCROLL_STEP)
 				}
 				m.setSearchResults(filtered)
-			case "enter":
+			case key.Matches(msg, m.keys.pick):
 				return m, func() tea.Msg {
 					actualIndex := m.cursor + m.srViewport.YOffset
-					return event.SelectGVKMsg{GVK: filtered[actualIndex].GroupVersionKind}
+					return event.PickGVKMsg{GVK: filtered[actualIndex].GroupVersionKind}
 				}
-			case "esc", "alt+k": // HACK: use keymap
-				m.visible = false
-				cmd = nil
-			}
-		} else {
-			switch {
-			case key.Matches(msg, m.keys.show):
-				m.visible = true
-				m.reset()
-
-				cmd = tea.Batch(
-					m.input.Focus(),
-					textinput.Blink,
-				)
+			case key.Matches(msg, m.keys.hide):
+				return m, func() tea.Msg {
+					return HideMsg{}
+				}
 			}
 		}
+	case ShowMsg:
+		log.Printf("model showKbar")
+		m.setVisible(true)
+		m.reset()
+
+		cmd = tea.Batch(
+			m.input.Focus(),
+			textinput.Blink,
+		)
+	case HideMsg:
+		m.setVisible(false)
+		m.reset()
+		m.input.Blur()
 	}
 
 	return m, cmd
@@ -143,7 +146,7 @@ func (m *Model) View() string {
 	)
 }
 
-func (m *Model) SetVisible(visible bool) {
+func (m *Model) setVisible(visible bool) {
 	m.visible = visible
 }
 
@@ -151,7 +154,10 @@ func (m *Model) Visible() bool {
 	return m.visible
 }
 
-// utils
+func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
+	m.srViewport.Width = msg.Width / KBAR_WIDTH_DIV
+	m.srViewport.Height = KBAR_SEARCH_RESULTS_MAX_HEIGHT
+}
 
 func (m *Model) reset() {
 	m.input.Reset()
