@@ -51,7 +51,7 @@ func NewModel() *Model {
 	ti.SetCursor(0)
 	ti.Prompt = "🔍 "
 	ti.Width = 30
-	ti.Cursor.Blink = true
+	// ti.Cursor.Blink = true
 	m := &Model{
 		keys:    newKeyMap(),
 		visible: false,
@@ -68,27 +68,36 @@ func NewModel() *Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.input.Focus(),
-		textinput.Blink,
-	)
+	return textinput.Blink
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
+	prevInputValue := m.input.Value()
+
+	im, iCmd := m.input.Update(msg)
+	m.input = im
+	cmds = append(cmds, iCmd)
+	filtered := m.items.filter(m.input.Value())
+	if prevInputValue != m.input.Value() {
+		m.moveCursorTop(filtered)
+	}
 
 	switch msg := msg.(type) {
+	case ShowMsg:
+		m.setVisible(true)
+		m.reset()
+
+		cmds = append(cmds, m.input.Focus())
+	case HideMsg:
+		m.setVisible(false)
+		m.reset()
+		m.input.Blur()
+
 	case tea.WindowSizeMsg:
 		m.setViewSize(msg)
 	case tea.KeyMsg:
-		// ? review is this always to be updated
-		prevInputValue := m.input.Value()
-		m.input, cmd = m.input.Update(msg)
-		filtered := m.items.filter(m.input.Value())
-		if prevInputValue != m.input.Value() {
-			m.moveCursorTop(filtered)
-		}
-
 		if m.Visible() {
 			switch {
 			case key.Matches(msg, m.keys.up):
@@ -106,32 +115,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.setSearchResults(filtered)
 			case key.Matches(msg, m.keys.pick):
-				return m, func() tea.Msg {
-					actualIndex := m.cursor + m.srViewport.YOffset
+				actualIndex := m.cursor + m.srViewport.YOffset
+				cmds = append(cmds, func() tea.Msg {
 					return event.PickGVKMsg{GVK: filtered[actualIndex].GroupVersionKind}
-				}
+				})
 			case key.Matches(msg, m.keys.hide):
-				return m, func() tea.Msg {
-					return HideMsg{}
-				}
+				cmds = append(cmds, Hide)
 			}
 		}
-	case ShowMsg:
-		log.Printf("model showKbar")
-		m.setVisible(true)
-		m.reset()
-
-		cmd = tea.Batch(
-			m.input.Focus(),
-			textinput.Blink,
-		)
-	case HideMsg:
-		m.setVisible(false)
-		m.reset()
-		m.input.Blur()
 	}
 
-	return m, cmd
+	return m, tea.Batch(cmds...)
 }
 
 func (m *Model) View() string {

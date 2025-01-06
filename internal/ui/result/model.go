@@ -22,7 +22,7 @@ const (
 )
 
 type Model struct {
-	focused bool
+	focused bool // TODO: rename to focus
 	table   *table.Model
 	filter  textinput.Model
 
@@ -36,7 +36,6 @@ func NewModel(objs []*unstructured.Unstructured) *Model {
 	filter.Placeholder = "Filter"
 	filter.SetCursor(0)
 	filter.Width = 20
-	filter.Cursor.Blink = true
 	filter.Cursor.Style = lipgloss.NewStyle().Foreground(theme.Blue)
 	filter.Prompt = "|"
 	filter.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.Overlay0).Background(theme.Mantle)
@@ -89,30 +88,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.setTable(msg.Nodes, msg.Objs)
 		cmds = append(cmds, m.setWidthLimitRatio())
-	case SetCandidateMsg:
+	case SetCandidateMsg: // TODO: move to table
 		if m.table.WillOverWidth(msg.Candidate) {
 			// do not render candidate
 			return m, nil
 		}
+
 		m.setCandidate(msg.Candidate)
 	case tea.WindowSizeMsg:
-		m.width = int(float64(msg.Width) * RESULT_WIDTH_RATIO) // TODO: rename TABLE_WIDTH_RATIO to result's
+		m.setViewSize(msg)
+
 		tm, tCmd := m.table.Update(msg)
 		m.table = tm.(*table.Model)
 		cmds = append(cmds, tCmd)
-	case tea.KeyMsg:
-		if m.focused {
-			fm, fCmd := m.filter.Update(msg)
-			m.filter = fm
-			m.table.SetKeyword(m.filter.Value())
-			cmds = append(cmds, fCmd)
+	}
 
-			tm, tCmd := m.table.Update(msg)
-			m.table = tm.(*table.Model)
-			cmds = append(cmds, tCmd)
-		} else {
-			log.Printf("resultModel blurred")
-		}
+	if m.focused {
+		fm, fCmd := m.filter.Update(msg)
+		m.filter = fm
+		m.table.SetKeyword(m.filter.Value())
+		cmds = append(cmds, fCmd)
+
+		tm, tCmd := m.table.Update(msg)
+		m.table = tm.(*table.Model)
+		cmds = append(cmds, tCmd)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -125,16 +124,11 @@ func (m *Model) View() string {
 	)
 }
 
-// utils
-
 func (m *Model) Focus() tea.Cmd {
 	m.focused = true
 	m.filter.PromptStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.Blue)
 
-	return tea.Batch(
-		textinput.Blink, // ???? not working
-		m.filter.Focus(),
-	)
+	return m.filter.Focus()
 }
 
 func (m *Model) Focused() bool {
@@ -148,6 +142,10 @@ func (m *Model) Blur() {
 	m.focused = false
 	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0)
 	m.filter.Blur()
+}
+
+func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
+	m.width = int(float64(msg.Width) * RESULT_WIDTH_RATIO)
 }
 
 func (m *Model) setTable(nodes []*kube.Node, objs []*unstructured.Unstructured) {
