@@ -3,7 +3,6 @@ package table
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -231,7 +230,7 @@ func (m *Model) setNodeMaxWidths(nodes []*kube.Node) {
 }
 
 func (m *Model) val(node *kube.Node, obj *unstructured.Unstructured) string {
-	val, found, err := getNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
+	val, found, err := kube.GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
 	if err != nil || !found {
 		return "-"
 	}
@@ -360,42 +359,4 @@ func displayName(obj *unstructured.Unstructured) string {
 	// 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
 	// }
 	return obj.GetName()
-}
-
-// TODO: pull up to util, dedup with nav
-func getNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
-	var current interface{} = obj
-
-	for i, field := range fields {
-		// 숫자인지 확인 (배열 인덱스)
-		if index, err := strconv.Atoi(field); err == nil {
-			// 현재 값이 슬라이스인지 확인
-			if slice, ok := current.([]interface{}); ok {
-				if index >= len(slice) {
-					return nil, false, fmt.Errorf("index %d out of bounds", index)
-				}
-				current = slice[index]
-			} else {
-				return nil, false, fmt.Errorf("expected array, got %T", current)
-			}
-		} else {
-			// 맵인지 확인
-			if m, ok := current.(map[string]interface{}); ok {
-				var exists bool
-				current, exists = m[field]
-				if !exists {
-					return nil, false, nil
-				}
-			} else {
-				return nil, false, fmt.Errorf("expected map, got %T", current)
-			}
-		}
-
-		// 마지막 필드면 현재 값 반환
-		if i == len(fields)-1 {
-			return current, true, nil
-		}
-	}
-
-	return current, true, nil
 }
