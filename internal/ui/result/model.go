@@ -66,15 +66,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	// treat width limit bar's animation
 	case progress.FrameMsg:
 		pM, pCmd := m.widthLimPB.Update(msg)
 		m.widthLimPB = pM.(progress.Model)
+
 		cmds = append(cmds, pCmd)
-	case SetTableMsg:
-		log.Printf("resultMsg rendered")
+	case SetResultMsg:
 		if msg.Picked {
-			m.setCandidate(nil)
+			cmds = append(cmds, m.setCandidate(nil))
 		}
 
 		if msg.Picked && m.table.WillOverWidth(msg.PickedNode) {
@@ -86,33 +85,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		m.setTable(msg.Nodes, msg.Objs)
+		cmds = append(cmds, m.setTable(msg.Nodes, msg.Objs))
 		cmds = append(cmds, m.setWidthLimitRatio())
-	case SetCandidateMsg: // TODO: move to table
-		if m.table.WillOverWidth(msg.Candidate) {
-			// do not render candidate
-			return m, nil
-		}
-
-		m.setCandidate(msg.Candidate)
+	case SetTableCandidateMsg:
+		cmds = append(cmds, m.setCandidate(msg.Candidate))
 	case tea.WindowSizeMsg:
 		m.setViewSize(msg)
-
-		tm, tCmd := m.table.Update(msg)
-		m.table = tm.(*table.Model)
-		cmds = append(cmds, tCmd)
 	}
 
 	if m.focused {
 		fm, fCmd := m.filter.Update(msg)
 		m.filter = fm
-		m.table.SetKeyword(m.filter.Value())
+		if m.filter.Value() != m.table.Keyword() {
+			cmds = append(cmds, m.setKeyword(m.filter.Value()))
+		}
 		cmds = append(cmds, fCmd)
-
-		tm, tCmd := m.table.Update(msg)
-		m.table = tm.(*table.Model)
-		cmds = append(cmds, tCmd)
 	}
+
+	tm, tCmd := m.table.Update(msg)
+	m.table = tm.(*table.Model)
+	cmds = append(cmds, tCmd)
 
 	return m, tea.Batch(cmds...)
 }
@@ -135,7 +127,7 @@ func (m *Model) Focused() bool {
 	return m.focused
 }
 
-// BUG: should blur when kbar rendered
+// BUG: k put when show kbar in result tab should blur when kbar rendered
 // maybe mainmodel should have a tristate
 func (m *Model) Blur() {
 	log.Println("Blurring resultModel")
@@ -148,13 +140,29 @@ func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
 	m.width = int(float64(msg.Width) * RESULT_WIDTH_RATIO)
 }
 
-func (m *Model) setTable(nodes []*kube.Node, objs []*unstructured.Unstructured) {
-	m.table.SetObjs(objs)
-	m.table.SetNodes(nodes) // HACK: update ojbs first, setNodeMaxWidths is dependent on objs
+func (m *Model) setCandidate(candidate *kube.Node) tea.Cmd {
+	return func() tea.Msg {
+		return table.SetCandidateMsg{
+			Candidate: candidate,
+		}
+	}
 }
 
-func (m *Model) setCandidate(candidate *kube.Node) {
-	m.table.SetCandidate(candidate)
+func (m *Model) setKeyword(keyword string) tea.Cmd {
+	return func() tea.Msg {
+		return table.SetKeywordMsg{
+			Keyword: keyword,
+		}
+	}
+}
+
+func (m *Model) setTable(nodes []*kube.Node, objs []*unstructured.Unstructured) tea.Cmd {
+	return func() tea.Msg {
+		return table.SetTableMsg{
+			Nodes: nodes,
+			Objs:  objs,
+		}
+	}
 }
 
 func (m *Model) renderTopBar() string {

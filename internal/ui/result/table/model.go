@@ -82,6 +82,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case SetCandidateMsg:
+		if m.WillOverWidth(msg.Candidate) {
+			// do not render candidate
+			return m, nil
+		}
+
+		m.setCandidate(msg.Candidate)
+	case SetKeywordMsg:
+		m.setKeyword(msg.Keyword)
+	case SetTableMsg:
+		m.setNodes(msg.Nodes)
+		m.setObjs(msg.Objs)
 	case tea.WindowSizeMsg:
 		m.setViewSize(msg)
 	case tea.KeyMsg:
@@ -112,6 +124,10 @@ func (m *Model) View() string {
 		m.rowsView.View(),
 		m.renderDebugBar(),
 	)
+}
+
+func (m *Model) Keyword() string {
+	return m.keyword
 }
 
 func (m *Model) renderHeader() string {
@@ -161,40 +177,44 @@ func (m *Model) renderRow() string {
 		rows = append(rows, fuzzyMatchedRow{cells: cells, matches: matches, scoreSum: scoreSum})
 	}
 
-	lines := []string{}
+	lines := make([]string, 0, len(rows))
+	var builder strings.Builder
+
+	if m.keyword != "" {
+		sort.Slice(rows, func(i, j int) bool {
+			return rows[i].scoreSum > rows[j].scoreSum
+		})
+	}
+
 	for i, row := range rows {
 		if m.keyword != "" && len(row.matches) == 0 {
-			continue // 키워드가 있고 매치가 없으면 건너뛰기
+			continue
 		}
 
-		line := ""
+		builder.Reset()
 		for j, cell := range row.cells {
 			var renderedCell string
 			if j == len(row.cells)-1 && m.candidate != nil {
-				// candidate 열은 특별한 스타일 적용
 				if match, ok := row.matches[j]; ok {
-					renderedCell = m.styles.candidate.Render(highlight(cell, match, m.styles.candidate.Margin(0, 0, 0, 0))) // TODO: define candidate cell and text style for each
+					renderedCell = m.styles.candidate.Render(highlight(cell, match, m.styles.candidate.Margin(0, 0, 0, 0)))
 				} else {
 					renderedCell = m.styles.candidate.Render(cell)
 				}
 			} else {
-				// 일반 데이터 열
 				if match, ok := row.matches[j]; ok {
-					renderedCell = m.cellStyle(j).Render(highlight(cell, match, lipgloss.NewStyle().Foreground(theme.Text))) // TODO: define text style as a field
+					renderedCell = m.cellStyle(j).Render(highlight(cell, match, lipgloss.NewStyle().Foreground(theme.Text)))
 				} else {
 					renderedCell = m.cellStyle(j).Render(cell)
 				}
 			}
-			line += renderedCell
+			builder.WriteString(renderedCell)
 		}
 
+		line := builder.String()
 		if m.isCursor(i) {
 			line = m.styles.selected.Render(line)
 		}
 		lines = append(lines, line)
-		sort.Slice(lines, func(i, j int) bool {
-			return rows[i].scoreSum > rows[j].scoreSum
-		})
 	}
 
 	return strings.Join(lines, "\n")
@@ -246,12 +266,12 @@ func (m *Model) cellStyle(col int) lipgloss.Style {
 	return lipgloss.NewStyle().Margin(0, 0, 0, 1).Width(m.colMaxWidth(col))
 }
 
-func (m *Model) SetNodes(nodes []*kube.Node) {
+func (m *Model) setNodes(nodes []*kube.Node) {
 	m.setNodeMaxWidths(nodes)
 	m.nodes = nodes
 }
 
-func (m *Model) SetObjs(objs []*unstructured.Unstructured) {
+func (m *Model) setObjs(objs []*unstructured.Unstructured) {
 	m.objs = objs
 }
 
@@ -265,7 +285,7 @@ func (m *Model) colMaxWidth(idxPlusOne int) int {
 	return m.nodeMaxWidths[idxPlusOne-1]
 }
 
-func (m *Model) SetCandidate(candidate *kube.Node) {
+func (m *Model) setCandidate(candidate *kube.Node) {
 	m.candidate = candidate
 }
 
@@ -321,7 +341,7 @@ func (m *Model) cols() int {
 	return len(m.nodes) + 1 // name + nodes
 }
 
-func (m *Model) SetKeyword(keyword string) {
+func (m *Model) setKeyword(keyword string) {
 	m.keyword = keyword
 }
 

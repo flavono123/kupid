@@ -132,7 +132,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
 		}
 		setResultCmd := func() tea.Msg {
-			return result.SetTableMsg{
+			return result.SetResultMsg{
 				Nodes:      m.selectedNodes,
 				Objs:       msg.Objs,
 				Picked:     false,
@@ -174,7 +174,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case event.PickFieldMsg:
 		m.selectedNodes = append(m.selectedNodes, msg.Node)
 		return m, func() tea.Msg {
-			return result.SetTableMsg{
+			return result.SetResultMsg{
 				Nodes:      m.selectedNodes,
 				Objs:       m.getController().GetObjects(),
 				Picked:     true,
@@ -189,7 +189,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, func() tea.Msg {
-			return result.SetTableMsg{
+			return result.SetResultMsg{
 				Nodes:      m.selectedNodes,
 				Objs:       m.getController().GetObjects(),
 				Picked:     false,
@@ -203,7 +203,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case event.HoverFieldMsg:
 		return m, func() tea.Msg {
-			return result.SetCandidateMsg{
+			return result.SetTableCandidateMsg{
 				Candidate: msg.Candidate,
 			}
 		}

@@ -115,7 +115,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				retCmd = func() tea.Msg {
-					return result.SetCandidateMsg{Candidate: nil}
+					return result.SetTableCandidateMsg{Candidate: nil}
 				}
 			}
 		case key.Matches(msg, m.keys.down):
@@ -131,7 +131,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				retCmd = func() tea.Msg {
-					return result.SetCandidateMsg{Candidate: nil}
+					return result.SetTableCandidateMsg{Candidate: nil}
 				}
 			}
 		case key.Matches(msg, m.keys.action):
