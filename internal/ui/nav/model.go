@@ -92,11 +92,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	retCmd = nil
 
 	switch msg := msg.(type) {
-	case SetNavMsg:
-		// TODO: should 'update' nodes, keep them whether expanded or not
-		// reverted since when gvk is changed, the current msg system cannot handle
-		m.nodes = kube.CreateNodeTree(m.fields, msg.Objs, []string{})
-		m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
+	case SetGVKMsg:
+		m.setGVK(msg.GVK)
+		m.setNodes(msg.GVK, msg.Objs)
+		m.reset()
+	case UpdateObjsMsg:
+		m.updateNodes(msg.Objs)
 	case tea.WindowSizeMsg:
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
@@ -277,15 +278,30 @@ func (m *Model) renderRecursive(lines []*Line) string {
 }
 
 // TODO: split to each setter
-func (m *Model) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
+func (m *Model) reset() {
+	m.cursor = 0
+	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
+}
+
+func (m *Model) setGVK(gvk schema.GroupVersionKind) {
 	m.gvk = gvk
-	fields, err := kube.CreateFieldTree(m.gvk)
+}
+
+// set nodes when gvk is changed
+// fields are also changed by gvk
+func (m *Model) setNodes(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
+	fields, err := kube.CreateFieldTree(gvk)
+	m.fields = fields
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	nodes := kube.CreateNodeTree(fields, objs, []string{})
-	m.nodes = nodes
-	m.cursor = 0
+	m.nodes = kube.CreateNodeTree(fields, objs, []string{})
+}
+
+// update nodes when objs is changed
+// do not update fields
+func (m *Model) updateNodes(objs []*unstructured.Unstructured) {
+	m.nodes = kube.UpdateNodeTree(m.nodes, m.fields, objs, []string{})
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 }
 

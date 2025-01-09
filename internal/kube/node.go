@@ -249,7 +249,7 @@ func getDistinctKeys(mapPath []string, objs []*unstructured.Unstructured) []stri
 
 // TODO: refactor, pull up traverse with create to function
 // TODO: besides, expandedNodes should be a state of the schemaModel(ideally expand would not be a state of node)
-func updateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
+func UpdateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
 	result := make(map[string]*Node)
 
 	for key, field := range fieldTree {
@@ -278,7 +278,7 @@ func updateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 					if exists && existingNode.children != nil {
 						existingChildren = existingNode.children[idx].children
 					}
-					grandChildren = updateNodeTree(existingChildren, field.Children, objs, append(childPrefix, idx))
+					grandChildren = UpdateNodeTree(existingChildren, field.Children, objs, append(childPrefix, idx))
 				}
 
 				children[idx] = &Node{
@@ -305,7 +305,7 @@ func updateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 							existingChildren = existingChild.children
 						}
 					}
-					grandChildren = updateNodeTree(existingChildren, field.Children, objs, append(childPrefix, mapKey))
+					grandChildren = UpdateNodeTree(existingChildren, field.Children, objs, append(childPrefix, mapKey))
 				}
 
 				children[mapKey] = &Node{
@@ -323,7 +323,7 @@ func updateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 			if exists {
 				existingChildren = existingNode.children
 			}
-			children = updateNodeTree(existingChildren, field.Children, objs, childPrefix)
+			children = UpdateNodeTree(existingChildren, field.Children, objs, childPrefix)
 		}
 
 		result[key] = &Node{

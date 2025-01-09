@@ -13,6 +13,7 @@ import (
 	"github.com/flavono123/kupid/internal/ui/nav"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -101,7 +102,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, m.nav.Focus())
 			}
 		case key.Matches(keyMsg, m.keys.toggleKbar):
-			// var cmd tea.Cmd
 			if m.kbar.Visible() {
 				cmds = append(cmds, kbar.Hide)
 			} else {
@@ -131,6 +131,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Obj != nil {
 			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
 		}
+
 		setResultCmd := func() tea.Msg {
 			return result.SetResultMsg{
 				Nodes:      m.selectedNodes,
@@ -139,15 +140,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				PickedNode: nil,
 			}
 		}
-		// HACK: cannot update schema change now, e.g. new annotation, deleted label key, ...
-		// setSchemaMsg := func() tea.Msg {
-		// 	return nav.SetNavMsg{
-		// 		Objs: msg.Objs,
-		// 	}
-		// }
 		return m, tea.Batch(
 			setResultCmd,
-			// setNavMsg,
+			m.updateNavObjs(m.getController().GetObjects()),
 			m.listenController(),
 		)
 	case event.PickGVKMsg:
@@ -156,7 +151,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selectedNodes = []*kube.Node{}
 
 		// TODO: should be updated by msg
-		m.nav.Reset(msg.GVK, m.getController().GetObjects())
+		cmds = append(cmds, m.setNavGVK(msg.GVK, m.getController().GetObjects()))
 
 		// TODO: fix this(actually, nav.Focus() nothing return) each model should handle message
 		if m.session == schemaView {
@@ -261,6 +256,21 @@ func (m *Model) setController(gvk schema.GroupVersionKind) {
 	}
 	m.controller = kube.NewResourceController(gvr)
 	m.inform()
+}
+
+func (m *Model) setNavGVK(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) tea.Cmd {
+	return func() tea.Msg {
+		return nav.SetGVKMsg{
+			GVK:  gvk,
+			Objs: objs,
+		}
+	}
+}
+
+func (m *Model) updateNavObjs(objs []*unstructured.Unstructured) tea.Cmd {
+	return func() tea.Msg {
+		return nav.UpdateObjsMsg{Objs: objs}
+	}
 }
 
 // TODO: ? why return?
