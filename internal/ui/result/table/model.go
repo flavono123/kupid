@@ -177,11 +177,11 @@ func (m *Model) renderRow() string {
 		cells := []string{}
 		cells = append(cells, displayName(obj))
 		for _, node := range m.nodes {
-			cells = append(cells, m.val(node, obj))
+			cells = append(cells, kube.ValStr(node, obj))
 		}
 		// 후보 노드가 있으면 cells에 추가
 		if m.candidate != nil {
-			cells = append(cells, m.val(m.candidate, obj))
+			cells = append(cells, kube.ValStr(m.candidate, obj))
 		}
 
 		matches := map[int]fuzzy.Match{}
@@ -258,27 +258,14 @@ func (m *Model) setNodeMaxWidths(nodes []*kube.Node) {
 	for _, node := range nodes {
 		max := len(node.Name())
 		for _, obj := range m.objs {
-			if len(m.val(node, obj)) > max {
-				max = len(m.val(node, obj))
+			if len(kube.ValStr(node, obj)) > max {
+				max = len(kube.ValStr(node, obj))
 			}
 		}
 		nodeMaxWidths = append(nodeMaxWidths, max)
 	}
 
 	m.nodeMaxWidths = nodeMaxWidths
-}
-
-func (m *Model) val(node *kube.Node, obj *unstructured.Unstructured) string {
-	val, found, err := kube.GetNestedValueWithIndex(obj.Object, node.NodeFullPath()...)
-	if err != nil || !found {
-		return "-"
-	}
-
-	if str, ok := val.(string); ok && len(str) == 0 { // edge case `""`
-		return "\"\""
-	}
-
-	return fmt.Sprintf("%v", val)
 }
 
 func (m *Model) cellStyle(col int) lipgloss.Style {
@@ -341,8 +328,8 @@ func (m *Model) WillOverWidth(node *kube.Node) bool {
 func (m *Model) maxWidth(node *kube.Node) int {
 	max := len(node.Name())
 	for _, obj := range m.objs {
-		if len(m.val(node, obj)) > max {
-			max = len(m.val(node, obj))
+		if len(kube.ValStr(node, obj)) > max {
+			max = len(kube.ValStr(node, obj))
 		}
 	}
 	return max

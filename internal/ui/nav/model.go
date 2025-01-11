@@ -34,6 +34,7 @@ type Model struct {
 	focus  bool
 	nodes  map[string]*kube.Node
 	fields map[string]*kube.Field // cache for objs changed
+	objs   []*unstructured.Unstructured
 
 	vp viewport.Model
 
@@ -65,15 +66,15 @@ func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *M
 		focus:    true, // HACK: required to be injected by root
 		nodes:    nodes,
 		fields:   fields,
+		objs:     objs,
 		vp:       vp,
 		style:    style,
 		cursor:   0,
 		gvk:      gvk,
 		curLines: []*Line{},
 		prevNode: nil,
-		// curNode:  nil,
-		keys: newKeyMap(),
-		help: help.New(),
+		keys:     newKeyMap(),
+		help:     help.New(),
 	}
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	content := m.renderRecursive(m.curLines)
@@ -93,11 +94,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case SetGVKMsg:
+		m.setObjs(msg.Objs)
 		m.setGVK(msg.GVK)
-		m.setNodes(msg.GVK, msg.Objs)
+		m.setNodes(msg.GVK)
 		m.reset()
 	case UpdateObjsMsg:
-		m.updateNodes(msg.Objs)
+		m.updateNodes()
 	case tea.WindowSizeMsg:
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
@@ -191,8 +193,6 @@ func (m *Model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.renderTopBar(),
 		m.style.Render(m.vp.View()),
-		// m.help.View(m.keys),
-		// fmt.Sprintf("vpWidth: %d", m.vp.Width),
 	)
 }
 
@@ -253,7 +253,11 @@ func (m *Model) buildLines(nodes map[string]*kube.Node, width int, lineNo int) (
 		}
 
 		node := nodes[key]
-		line := newLine(node, width, lineNo)
+		if !node.Renderable(m.objs) {
+			continue
+		}
+
+		line := newLine(node, width, lineNo, m.objs)
 		lineNo++
 		lines = append(lines, line)
 		if node.Expanded {
@@ -283,25 +287,29 @@ func (m *Model) reset() {
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 }
 
+func (m *Model) setObjs(objs []*unstructured.Unstructured) {
+	m.objs = objs
+}
+
 func (m *Model) setGVK(gvk schema.GroupVersionKind) {
 	m.gvk = gvk
 }
 
 // set nodes when gvk is changed
 // fields are also changed by gvk
-func (m *Model) setNodes(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
+func (m *Model) setNodes(gvk schema.GroupVersionKind) {
 	fields, err := kube.CreateFieldTree(gvk)
 	m.fields = fields
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	m.nodes = kube.CreateNodeTree(fields, objs, []string{})
+	m.nodes = kube.CreateNodeTree(fields, m.objs, []string{})
 }
 
 // update nodes when objs is changed
 // do not update fields
-func (m *Model) updateNodes(objs []*unstructured.Unstructured) {
-	m.nodes = kube.UpdateNodeTree(m.nodes, m.fields, objs, []string{})
+func (m *Model) updateNodes() {
+	m.nodes = kube.UpdateNodeTree(m.nodes, m.fields, m.objs, []string{})
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 }
 

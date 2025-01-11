@@ -7,19 +7,21 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/theme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // TODO: function args node(s) under ui should be line and get the node from getter
 type Line struct {
 	node *kube.Node
+	objs []*unstructured.Unstructured
 
 	style lipgloss.Style
 	index int
 }
 
-func newLine(node *kube.Node, width int, index int) *Line {
+func newLine(node *kube.Node, width int, index int, objs []*unstructured.Unstructured) *Line {
 	style := lipgloss.NewStyle().MaxWidth(width)
-	return &Line{node: node, style: style, index: index}
+	return &Line{node: node, style: style, index: index, objs: objs}
 }
 
 func (l *Line) render(leftPadding int, cursored bool, maxWidth int, schemaBlurred bool) string {
@@ -83,10 +85,14 @@ func (l *Line) action() string {
 			return action.Render("-")
 		}
 		return action.Render("+")
-	} else {
+	} else if l.node.Pickable(l.objs) {
 		if l.node.Selected {
 			return action.Render("◉")
 		}
 		return action.Render("○")
 	}
+
+	// HACK: this would not be rendered
+	// see Model.buildLines
+	return action.Render(" ")
 }

@@ -3,7 +3,6 @@ package kube
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -32,8 +31,33 @@ func (n *Node) SetExpanded(expanded bool) {
 	n.Expanded = expanded
 }
 
+func (n *Node) Renderable(objs []*unstructured.Unstructured) bool {
+	return n.Foldable() || n.Pickable(objs)
+}
+
 func (n *Node) Foldable() bool {
-	return n.children != nil
+	return n.hasChildren()
+}
+
+func (n *Node) Pickable(objs []*unstructured.Unstructured) bool {
+	if n.field == nil {
+		return !n.allNil(objs)
+	}
+
+	return n.field.IsPrimitive() && !n.allNil(objs)
+}
+
+func (n *Node) allNil(objs []*unstructured.Unstructured) bool {
+	for _, obj := range objs {
+		if ValStr(n, obj) != "-" {
+			return false
+		}
+	}
+	return true
+}
+
+func (n *Node) hasChildren() bool {
+	return n.children != nil && len(n.children) > 0
 }
 
 // line things end
@@ -107,7 +131,7 @@ func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructur
 		childPrefix := append(prefix, key)
 		children := map[string]*Node(nil)
 
-		if strings.HasPrefix(field.Type, "[]") { // array; inject index keys
+		if field.IsArray() {
 			maxLength := getMaxLength(childPrefix, objs)
 			children = make(map[string]*Node)
 
@@ -126,7 +150,7 @@ func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructur
 					children:  grandChildren,
 				}
 			}
-		} else if strings.HasPrefix(field.Type, "map[string]") { // map; inject string keys
+		} else if field.IsMap() {
 			keys := getDistinctKeys(childPrefix, objs)
 			children = make(map[string]*Node)
 			for _, key := range keys {
@@ -144,7 +168,7 @@ func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructur
 				}
 			}
 
-		} else if field.Children != nil {
+		} else if field.IsObject() {
 			children = CreateNodeTree(field.Children, objs, childPrefix)
 		}
 
@@ -159,14 +183,12 @@ func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructur
 	return result
 }
 
-// TODO: rename to more generic, not only for array nodes
-func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
+func getNestedValue(obj map[string]interface{}, paths ...string) (interface{}, bool, error) {
 	var current interface{} = obj
 
-	for i, field := range fields {
-		// 숫자인지 확인 (배열 인덱스)
-		if index, err := strconv.Atoi(field); err == nil {
-			// 현재 값이 슬라이스인지 확인
+	for i, path := range paths {
+		// for array nodes
+		if index, err := strconv.Atoi(path); err == nil {
 			if slice, ok := current.([]interface{}); ok {
 				if index >= len(slice) {
 					return nil, false, fmt.Errorf("index %d out of bounds", index)
@@ -176,10 +198,10 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 				return nil, false, fmt.Errorf("expected array, got %T", current)
 			}
 		} else {
-			// 맵인지 확인
+			// for map nodes
 			if m, ok := current.(map[string]interface{}); ok {
 				var exists bool
-				current, exists = m[field]
+				current, exists = m[path]
 				if !exists {
 					return nil, false, nil
 				}
@@ -189,7 +211,7 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 		}
 
 		// 마지막 필드면 현재 값 반환
-		if i == len(fields)-1 {
+		if i == len(paths)-1 {
 			return current, true, nil
 		}
 	}
@@ -197,10 +219,23 @@ func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (inte
 	return current, true, nil
 }
 
+func ValStr(node *Node, obj *unstructured.Unstructured) string {
+	val, found, err := getNestedValue(obj.Object, node.NodeFullPath()...)
+	if err != nil || !found {
+		return "-"
+	}
+
+	if str, ok := val.(string); ok && len(str) == 0 { // edge case `""`
+		return "\"\""
+	}
+
+	return fmt.Sprintf("%v", val)
+}
+
 func getMaxLength(arrayPath []string, objs []*unstructured.Unstructured) int {
-	maxLength := 1 // if no array, return 1 to render only fields
+	maxLength := 0 // if no array, return 1 to render only fields
 	for _, obj := range objs {
-		val, found, err := GetNestedValueWithIndex(obj.Object, arrayPath...)
+		val, found, err := getNestedValue(obj.Object, arrayPath...)
 		if err != nil || !found {
 			continue
 		}
@@ -231,7 +266,7 @@ func getDistinctKeys(mapPath []string, objs []*unstructured.Unstructured) []stri
 	exists := map[string]struct{}{}
 
 	for _, obj := range objs {
-		val, found, err := GetNestedValueWithIndex(obj.Object, mapPath...)
+		val, found, err := getNestedValue(obj.Object, mapPath...)
 		if err != nil || !found {
 			continue
 		}
@@ -265,7 +300,7 @@ func UpdateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 		expanded := exists && existingNode.Expanded
 		selected := exists && existingNode.Selected
 
-		if strings.HasPrefix(field.Type, "[]") {
+		if field.IsArray() {
 			maxLength := getMaxLength(childPrefix, objs)
 			children = make(map[string]*Node)
 
@@ -291,7 +326,7 @@ func UpdateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 					Selected:  exists && existingNode.children != nil && existingNode.children[idx] != nil && existingNode.children[idx].Selected,
 				}
 			}
-		} else if strings.HasPrefix(field.Type, "map[string]") {
+		} else if field.IsMap() {
 			keys := getDistinctKeys(childPrefix, objs)
 			children = make(map[string]*Node)
 
@@ -318,7 +353,7 @@ func UpdateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 					Selected:  exists && existingNode.children != nil && existingNode.children[mapKey] != nil && existingNode.children[mapKey].Selected,
 				}
 			}
-		} else if field.Children != nil {
+		} else if field.IsObject() {
 			existingChildren := map[string]*Node{}
 			if exists {
 				existingChildren = existingNode.children
