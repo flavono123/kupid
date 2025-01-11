@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -28,6 +29,8 @@ const (
 	kbarView
 )
 
+const statusDuration = time.Millisecond * 1060
+
 type Model struct {
 	session        sessionState
 	lastTabSession sessionState
@@ -44,6 +47,7 @@ type Model struct {
 	status         event.Status
 	statusMsg      string
 	showStatus     bool
+	statusTimer    *time.Timer
 }
 
 func NewModel() *Model {
@@ -83,6 +87,7 @@ func NewModel() *Model {
 		controller:     controller,
 		stop:           nil,
 		selectedNodes:  []*kube.Node{},
+		statusTimer:    nil,
 	}
 }
 
@@ -215,10 +220,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Canceled {
 			msg.Node.Selected = false
 			m.selectedNodes = append(m.selectedNodes[:len(m.selectedNodes)-1], m.selectedNodes[len(m.selectedNodes):]...)
-			m.status = event.Error
-			m.statusMsg = fmt.Sprintf("cannot pick `%s'", strings.Join(msg.Node.NodeFullPath(), "."))
-			m.showStatus = true
-			cmds = append(cmds, event.ShowStatus())
+
+			cmds = append(cmds, errCannotPick(msg.Node))
 		}
 	case event.HoverFieldMsg:
 		return m, func() tea.Msg {
@@ -227,10 +230,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case event.SetStatusMsg:
+		if m.statusTimer != nil {
+			m.statusTimer.Stop()
+		}
 		m.status = msg.Status
 		m.statusMsg = msg.Message
 		m.showStatus = true
-		cmds = append(cmds, event.ShowStatus())
+
+		m.statusTimer = time.NewTimer(1060 * time.Millisecond)
+		return m, func() tea.Msg {
+			<-m.statusTimer.C
+			return event.HideStatusMsg{}
+		}
 	case event.HideStatusMsg:
 		m.showStatus = false
 		m.statusMsg = ""
@@ -298,6 +309,15 @@ func (m *Model) statusStyle() lipgloss.Style {
 		return style.Foreground(theme.Yellow())
 	default:
 		return style.Foreground(theme.Subtext0())
+	}
+}
+
+func errCannotPick(node *kube.Node) tea.Cmd {
+	return func() tea.Msg {
+		return event.SetStatusMsg{
+			Message: fmt.Sprintf("cannot pick `%s'", strings.Join(node.NodeFullPath(), ".")),
+			Status:  event.Error,
+		}
 	}
 }
 

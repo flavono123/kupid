@@ -1,9 +1,6 @@
 package event
 
 import (
-	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/flavono123/kupid/internal/kube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,14 +52,6 @@ const (
 type SetStatusMsg struct {
 	Message string
 	Status  Status
-}
-
-const statusDuration = time.Millisecond * 1060
-
-func ShowStatus() tea.Cmd {
-	return tea.Tick(statusDuration, func(t time.Time) tea.Msg {
-		return HideStatusMsg{}
-	})
 }
 
 type HideStatusMsg struct{}
