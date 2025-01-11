@@ -56,7 +56,7 @@ func NewModel() *Model {
 		session:        schemaView,
 		lastTabSession: schemaView,
 		keys:           newKeyMap(),
-		nav:            nav.NewModel(initGvk, controller.Objects(), true),
+		nav:            nav.NewModel(initGvk, controller.Objects()),
 		result:         result.NewModel(controller.Objects()),
 		vp:             viewport.New(0, 0),
 		gvk:            initGvk,
@@ -293,14 +293,6 @@ func (m *Model) inform() tea.Cmd {
 	return nil
 }
 
-func (m *Model) currentFocusedView() string {
-	if m.session == resultView {
-		return "result"
-	}
-	return "schema"
-}
-
-// BUG: listen event only when selectgvk(or just once?)
 func (m *Model) listenController() tea.Cmd {
 	log.Printf("listen %s", m.gvk)
 	return func() tea.Msg {

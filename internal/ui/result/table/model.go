@@ -28,13 +28,13 @@ type fuzzyMatchedRow struct {
 }
 
 type tableStyles struct {
-	header    lipgloss.Style
 	selected  lipgloss.Style
 	candidate lipgloss.Style
 	debug     lipgloss.Style
 }
 
 type Model struct {
+	focus         bool // same with result model, sync by msg
 	keys          keyMap
 	cursor        int
 	nodes         []*kube.Node
@@ -65,7 +65,6 @@ func NewModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *Model {
 		nameMaxWidth:  nameMaxWidth,
 		nodeMaxWidths: []int{},
 		styles: tableStyles{
-			header:    lipgloss.NewStyle().Bold(true),
 			selected:  lipgloss.NewStyle().Background(theme.Surface0()),
 			candidate: lipgloss.NewStyle().Margin(0, 0, 0, 1).Foreground(theme.Surface2()),
 			debug:     lipgloss.NewStyle().Italic(true).Foreground(theme.Surface1()),
@@ -133,6 +132,23 @@ func (m *Model) Keyword() string {
 	return m.keyword
 }
 
+func (m *Model) Focus() tea.Cmd {
+	m.focus = true
+	return nil
+}
+
+func (m *Model) Blur() {
+	m.focus = false
+}
+
+func (m *Model) headerStyle() lipgloss.Style {
+	style := lipgloss.NewStyle().Foreground(theme.Surface2())
+	if m.focus {
+		style = style.Foreground(theme.Blue())
+	}
+	return style
+}
+
 func (m *Model) renderHeader() string {
 	var render strings.Builder
 	// headers
@@ -146,12 +162,12 @@ func (m *Model) renderHeader() string {
 	if m.candidate != nil {
 		return lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			m.styles.header.Render(render.String()),
+			m.headerStyle().Render(render.String()),
 			m.styles.candidate.Render(m.candidate.Name()),
 		)
 	}
 
-	return m.styles.header.Render(render.String())
+	return m.headerStyle().Render(render.String())
 }
 
 func (m *Model) renderRow() string {
