@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"log"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -39,6 +41,9 @@ type Model struct {
 	stop           chan struct{}
 	selectedNodes  []*kube.Node
 	kbar           *kbar.Model
+	status         event.Status
+	statusMsg      string
+	showStatus     bool
 }
 
 func NewModel() *Model {
@@ -210,6 +215,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Canceled {
 			msg.Node.Selected = false
 			m.selectedNodes = append(m.selectedNodes[:len(m.selectedNodes)-1], m.selectedNodes[len(m.selectedNodes):]...)
+			m.status = event.Error
+			m.statusMsg = fmt.Sprintf("cannot pick `%s'", strings.Join(msg.Node.NodeFullPath(), "."))
+			m.showStatus = true
+			cmds = append(cmds, event.ShowStatus())
 		}
 	case event.HoverFieldMsg:
 		return m, func() tea.Msg {
@@ -217,6 +226,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Candidate: msg.Candidate,
 			}
 		}
+	case event.SetStatusMsg:
+		m.status = msg.Status
+		m.statusMsg = msg.Message
+		m.showStatus = true
+		cmds = append(cmds, event.ShowStatus())
+	case event.HideStatusMsg:
+		m.showStatus = false
+		m.statusMsg = ""
 	}
 
 	return m, tea.Batch(cmds...)
@@ -260,12 +277,28 @@ func (m *Model) renderStatusBar() string {
 	} else {
 		sessionHelp = ""
 	}
-	return lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		globalHelp,
-		" ",
-		sessionHelp,
-	)
+
+	statusBar := lipgloss.NewStyle().
+		Render(globalHelp + sessionHelp)
+
+	if m.showStatus {
+		statusBar += m.statusStyle().Render(m.statusMsg)
+	}
+
+	return statusBar
+}
+
+func (m *Model) statusStyle() lipgloss.Style {
+	style := lipgloss.NewStyle().MarginLeft(2).Align(lipgloss.Right)
+
+	switch m.status {
+	case event.Error:
+		return style.Foreground(theme.Maroon())
+	case event.Warn:
+		return style.Foreground(theme.Yellow())
+	default:
+		return style.Foreground(theme.Subtext0())
+	}
 }
 
 func (m *Model) setViewSize(msg tea.WindowSizeMsg) {

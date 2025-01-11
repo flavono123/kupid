@@ -1,6 +1,7 @@
 package table
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -85,7 +86,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.WillOverWidth(msg.Candidate) {
 			// do not render candidate
 			m.setCandidate(nil)
-			return m, nil // TODO: emit message to status bar
+			return m, m.warnOverwidth(msg.Candidate.NodeFullPath()...)
 		}
 
 		m.setCandidate(msg.Candidate)
@@ -138,6 +139,15 @@ func (m *Model) Focus() tea.Cmd {
 
 func (m *Model) Blur() {
 	m.focus = false
+}
+
+func (m *Model) warnOverwidth(path ...string) tea.Cmd {
+	return func() tea.Msg {
+		return event.SetStatusMsg{
+			Message: fmt.Sprintf("`%s' will over current window's width", strings.Join(path, ".")),
+			Status:  event.Warn,
+		}
+	}
 }
 
 func (m *Model) headerStyle() lipgloss.Style {
