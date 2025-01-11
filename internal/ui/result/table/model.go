@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -94,6 +95,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SetTableMsg:
 		m.setNodes(msg.Nodes)
 		m.setObjs(msg.Objs)
+		cmd = m.tableUpdated()
 	case tea.WindowSizeMsg:
 		m.setViewSize(msg)
 	case tea.KeyMsg:
@@ -112,6 +114,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
+
 	return m, cmd
 }
 
@@ -379,4 +382,10 @@ func displayName(obj *unstructured.Unstructured) string {
 	// 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
 	// }
 	return obj.GetName()
+}
+
+func (m *Model) tableUpdated() tea.Cmd {
+	return func() tea.Msg {
+		return event.TableUpdatedMsg{Width: m.TableWidth()}
+	}
 }

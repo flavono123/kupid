@@ -71,6 +71,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.widthLimPB = pM.(progress.Model)
 
 		cmds = append(cmds, pCmd)
+	case event.TableUpdatedMsg:
+		cmds = append(cmds, m.setWidthLimitRatio(msg.Width))
 	case SetResultMsg:
 		if msg.Picked {
 			cmds = append(cmds, m.setCandidate(nil))
@@ -86,7 +88,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		cmds = append(cmds, m.setTable(msg.Nodes, msg.Objs))
-		cmds = append(cmds, m.setWidthLimitRatio())
+		// cmds = append(cmds, m.setWidthLimitRatio())
 	case SetTableCandidateMsg:
 		cmds = append(cmds, m.setCandidate(msg.Candidate))
 	case tea.WindowSizeMsg:
@@ -180,9 +182,9 @@ func (m *Model) renderTopBar() string {
 	)
 }
 
-func (m *Model) setWidthLimitRatio() tea.Cmd {
+func (m *Model) setWidthLimitRatio(tableWidth int) tea.Cmd {
 	var cmd tea.Cmd
-	ratio := float64(m.table.TableWidth()) / float64(m.width)
+	ratio := float64(tableWidth) / float64(m.width)
 	freq := RESULT_PROGRESS_BAR_INIT_FREQ * math.Log1p(1.0-ratio)
 	m.widthLimPB.SetSpringOptions(freq, RESULT_PROGRESS_BAR_CRITICAL_DAMP)
 	cmd = m.widthLimPB.SetPercent(ratio)

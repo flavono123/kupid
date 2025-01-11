@@ -31,3 +31,8 @@ type UpdateObjsMsg struct {
 	Obj  *unstructured.Unstructured
 	Objs []*unstructured.Unstructured
 }
+
+// table -> result
+type TableUpdatedMsg struct {
+	Width int
+}
