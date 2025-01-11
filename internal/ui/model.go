@@ -22,20 +22,21 @@ type sessionState uint
 const (
 	schemaView sessionState = iota
 	resultView
-	// kbarView
+	kbarView
 )
 
 type Model struct {
-	session       sessionState
-	keys          keyMap
-	vp            viewport.Model
-	nav           *nav.Model
-	result        *result.Model
-	gvk           schema.GroupVersionKind
-	controller    *kube.ResourceController
-	stop          chan struct{}
-	selectedNodes []*kube.Node
-	kbar          *kbar.Model
+	session        sessionState
+	lastTabSession sessionState
+	keys           keyMap
+	vp             viewport.Model
+	nav            *nav.Model
+	result         *result.Model
+	gvk            schema.GroupVersionKind
+	controller     *kube.ResourceController
+	stop           chan struct{}
+	selectedNodes  []*kube.Node
+	kbar           *kbar.Model
 }
 
 func NewModel() *Model {
@@ -52,16 +53,17 @@ func NewModel() *Model {
 	controller.Inform()
 
 	return &Model{
-		session:       schemaView,
-		keys:          newKeyMap(),
-		nav:           nav.NewModel(initGvk, controller.GetObjects(), true),
-		result:        result.NewModel(controller.GetObjects()),
-		vp:            viewport.New(0, 0),
-		gvk:           initGvk,
-		kbar:          kbar.NewModel(),
-		controller:    controller,
-		stop:          nil,
-		selectedNodes: []*kube.Node{},
+		session:        schemaView,
+		lastTabSession: schemaView,
+		keys:           newKeyMap(),
+		nav:            nav.NewModel(initGvk, controller.GetObjects(), true),
+		result:         result.NewModel(controller.GetObjects()),
+		vp:             viewport.New(0, 0),
+		gvk:            initGvk,
+		kbar:           kbar.NewModel(),
+		controller:     controller,
+		stop:           nil,
+		selectedNodes:  []*kube.Node{},
 	}
 }
 
@@ -74,17 +76,29 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		if m.session == schemaView {
+		if key.Matches(keyMsg, m.keys.toggleKbar) {
+			if m.session == kbarView {
+				m.session = m.lastTabSession
+				cmds = append(cmds, kbar.Hide())
+			} else {
+				m.lastTabSession = m.session
+				m.session = kbarView
+				m.nav.Blur()
+				m.result.Blur()
+				cmds = append(cmds, kbar.Show)
+			}
+		}
+
+		switch m.session {
+		case schemaView:
 			nm, nCmd := m.nav.Update(msg)
 			m.nav = nm.(*nav.Model)
 			cmds = append(cmds, nCmd)
-		} else if m.session == resultView && m.result.Focused() {
+		case resultView:
 			rm, rCmd := m.result.Update(msg)
 			m.result = rm.(*result.Model)
 			cmds = append(cmds, rCmd)
-		}
-
-		if m.kbar.Visible() {
+		case kbarView:
 			km, kCmd := m.kbar.Update(msg)
 			m.kbar = km.(*kbar.Model)
 			cmds = append(cmds, kCmd)
@@ -92,21 +106,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch {
 		case key.Matches(keyMsg, m.keys.tabView):
-			if m.session == schemaView {
+			switch m.session {
+			case schemaView:
+				m.lastTabSession = schemaView
 				m.session = resultView
 				m.nav.Blur()
 				cmds = append(cmds, m.result.Focus())
-			} else {
+			case resultView:
+				m.lastTabSession = resultView
 				m.session = schemaView
 				m.result.Blur()
 				cmds = append(cmds, m.nav.Focus())
-			}
-		case key.Matches(keyMsg, m.keys.toggleKbar):
-			if m.kbar.Visible() {
-				cmds = append(cmds, kbar.Hide)
-			} else {
-				cmds = append(cmds, kbar.Show)
-			}
+			} // do nothing when kbar session
 		case key.Matches(keyMsg, m.keys.quit):
 			cmds = append(cmds, tea.Quit)
 		}
@@ -127,6 +138,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.setViewSize(msg)
+	case event.RestoreLastSessionMsg:
+		m.session = m.lastTabSession
+		if m.session == schemaView {
+			cmds = append(cmds, m.nav.Focus())
+		} else {
+			cmds = append(cmds, m.result.Focus())
+		}
 	case event.UpdateObjsMsg:
 		if msg.Obj != nil {
 			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
@@ -150,22 +168,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setController(msg.GVK)
 		m.selectedNodes = []*kube.Node{}
 
-		// TODO: should be updated by msg
 		cmds = append(cmds, m.setNavGVK(msg.GVK, m.getController().GetObjects()))
-
-		// TODO: fix this(actually, nav.Focus() nothing return) each model should handle message
-		if m.session == schemaView {
-			cmds = append(cmds, m.nav.Focus())
-		} else {
-			cmds = append(cmds, m.result.Focus())
-		}
-
-		cmds = append(cmds, func() tea.Msg {
-			return event.UpdateObjsMsg{
-				Objs: m.getController().GetObjects(),
-			}
-		})
-		cmds = append(cmds, kbar.Hide)
+		cmds = append(cmds, m.updateObjs(nil, m.getController().GetObjects()))
+		cmds = append(cmds, kbar.Hide())
 	case event.PickFieldMsg:
 		m.selectedNodes = append(m.selectedNodes, msg.Node)
 		return m, func() tea.Msg {
@@ -219,12 +224,7 @@ func (m *Model) View() string {
 
 	m.vp.SetContent(mainContent)
 
-	// TODO: should render by msg
-	if m.kbar.Visible() {
-		// TODO: should pass by msg
-		m.result.Blur()
-		m.nav.Blur()
-
+	if m.session == kbarView {
 		return lipgloss.Place(
 			m.vp.Width,
 			m.vp.Height,
@@ -270,6 +270,15 @@ func (m *Model) setNavGVK(gvk schema.GroupVersionKind, objs []*unstructured.Unst
 func (m *Model) updateNavObjs(objs []*unstructured.Unstructured) tea.Cmd {
 	return func() tea.Msg {
 		return nav.UpdateObjsMsg{Objs: objs}
+	}
+}
+
+func (m *Model) updateObjs(updatedObj *unstructured.Unstructured, objs []*unstructured.Unstructured) tea.Cmd {
+	return func() tea.Msg {
+		return event.UpdateObjsMsg{
+			Obj:  updatedObj,
+			Objs: objs,
+		}
 	}
 }
 

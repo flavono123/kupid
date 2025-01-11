@@ -51,7 +51,6 @@ func NewModel() *Model {
 	ti.SetCursor(0)
 	ti.Prompt = "🔍 "
 	ti.Width = 30
-	// ti.Cursor.Blink = true
 	m := &Model{
 		keys:    newKeyMap(),
 		visible: false,
@@ -119,8 +118,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, func() tea.Msg {
 					return event.PickGVKMsg{GVK: filtered[actualIndex].GroupVersionKind}
 				})
-			case key.Matches(msg, m.keys.hide):
-				cmds = append(cmds, Hide)
+			case key.Matches(msg, m.keys.hide): // Additional key to hide kbar when only kbar is showing
+				cmds = append(cmds, Hide())
 			}
 		}
 	}

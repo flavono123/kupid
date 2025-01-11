@@ -36,3 +36,6 @@ type UpdateObjsMsg struct {
 type TableUpdatedMsg struct {
 	Width int
 }
+
+// kbar(hiding) -> root
+type RestoreLastSessionMsg struct{}
