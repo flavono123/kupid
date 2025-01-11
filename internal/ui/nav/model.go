@@ -31,9 +31,9 @@ const (
 )
 
 type Model struct {
-	focused bool
-	nodes   map[string]*kube.Node
-	fields  map[string]*kube.Field // cache for objs changed
+	focus  bool
+	nodes  map[string]*kube.Node
+	fields map[string]*kube.Field // cache for objs changed
 
 	vp viewport.Model
 
@@ -49,7 +49,7 @@ type Model struct {
 	help help.Model
 }
 
-func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, focused bool) *Model {
+func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *Model {
 	fields, err := kube.CreateFieldTree(gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
@@ -62,7 +62,7 @@ func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, fo
 
 	vp := viewport.New(0, 0)
 	m := &Model{
-		focused:  focused,
+		focus:    true, // HACK: required to be injected by root
 		nodes:    nodes,
 		fields:   fields,
 		vp:       vp,
@@ -271,7 +271,7 @@ func (m *Model) renderRecursive(lines []*Line) string {
 	leftPadding := len(strconv.Itoa(len(lines) - 1))
 
 	for _, line := range lines {
-		result.WriteString(line.render(leftPadding, m.isCursor(line.index), m.vp.Width, !m.focused) + "\n")
+		result.WriteString(line.render(leftPadding, m.isCursor(line.index), m.vp.Width, !m.focus) + "\n")
 	}
 
 	return result.String()
@@ -344,13 +344,13 @@ func (m *Model) renderTopBar() string {
 }
 
 func (m *Model) Focus() tea.Cmd {
-	m.focused = true
+	m.focus = true
 	m.style = m.style.Border(lipgloss.ThickBorder()).BorderForeground(theme.Blue())
 	// nothing to send
 	return nil
 }
 
 func (m *Model) Blur() {
-	m.focused = false
+	m.focus = false
 	m.style = m.style.Border(lipgloss.NormalBorder()).BorderForeground(theme.Overlay0())
 }

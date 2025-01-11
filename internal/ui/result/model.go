@@ -22,9 +22,9 @@ const (
 )
 
 type Model struct {
-	focused bool // TODO: rename to focus
-	table   *table.Model
-	filter  textinput.Model
+	focus  bool
+	table  *table.Model
+	filter textinput.Model
 
 	width      int
 	widthLimPB progress.Model
@@ -43,9 +43,9 @@ func NewModel(objs []*unstructured.Unstructured) *Model {
 
 	t := table.NewModel(nodes, objs)
 	return &Model{
-		focused: false,
-		table:   t,
-		width:   0,
+		focus: false,
+		table: t,
+		width: 0,
 		widthLimPB: progress.New(
 			progress.WithGradient(theme.LatteYellow, theme.LatteBlue),
 			progress.WithoutPercentage(),
@@ -92,7 +92,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setViewSize(msg)
 	}
 
-	if m.focused {
+	if m.focus {
 		fm, fCmd := m.filter.Update(msg)
 		m.filter = fm
 		if m.filter.Value() != m.table.Keyword() {
@@ -116,23 +116,18 @@ func (m *Model) View() string {
 }
 
 func (m *Model) Focus() tea.Cmd {
-	m.focused = true
+	m.focus = true
 	m.filter.PromptStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.Blue())
 
-	return m.filter.Focus()
+	return tea.Batch(m.filter.Focus(), m.table.Focus())
 }
 
-func (m *Model) Focused() bool {
-	return m.focused
-}
-
-// BUG: k put when show kbar in result tab should blur when kbar rendered
-// maybe mainmodel should have a tristate
 func (m *Model) Blur() {
 	log.Println("Blurring resultModel")
-	m.focused = false
+	m.focus = false
 	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0())
 	m.filter.Blur()
+	m.table.Blur()
 }
 
 func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
