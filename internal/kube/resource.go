@@ -40,7 +40,7 @@ func NewResourceController(gvr schema.GroupVersionResource) *ResourceController 
 	}
 }
 
-func (i *ResourceController) GetObjects() []*unstructured.Unstructured {
+func (i *ResourceController) Objects() []*unstructured.Unstructured {
 	objs := make([]*unstructured.Unstructured, 0)
 	for _, obj := range i.store.List() {
 		objs = append(objs, obj.(*unstructured.Unstructured))

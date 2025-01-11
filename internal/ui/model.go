@@ -56,8 +56,8 @@ func NewModel() *Model {
 		session:        schemaView,
 		lastTabSession: schemaView,
 		keys:           newKeyMap(),
-		nav:            nav.NewModel(initGvk, controller.GetObjects(), true),
-		result:         result.NewModel(controller.GetObjects()),
+		nav:            nav.NewModel(initGvk, controller.Objects(), true),
+		result:         result.NewModel(controller.Objects()),
 		vp:             viewport.New(0, 0),
 		gvk:            initGvk,
 		kbar:           kbar.NewModel(),
@@ -160,7 +160,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(
 			setResultCmd,
-			m.updateNavObjs(m.getController().GetObjects()),
+			m.updateNavObjs(m.controller.Objects()),
 			m.listenController(),
 		)
 	case event.PickGVKMsg:
@@ -168,15 +168,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setController(msg.GVK)
 		m.selectedNodes = []*kube.Node{}
 
-		cmds = append(cmds, m.setNavGVK(msg.GVK, m.getController().GetObjects()))
-		cmds = append(cmds, m.updateObjs(nil, m.getController().GetObjects()))
+		cmds = append(cmds, m.setNavGVK(msg.GVK, m.controller.Objects()))
+		cmds = append(cmds, m.updateObjs(nil, m.controller.Objects()))
 		cmds = append(cmds, kbar.Hide())
 	case event.PickFieldMsg:
 		m.selectedNodes = append(m.selectedNodes, msg.Node)
 		return m, func() tea.Msg {
 			return result.SetResultMsg{
 				Nodes:      m.selectedNodes,
-				Objs:       m.getController().GetObjects(),
+				Objs:       m.controller.Objects(),
 				Picked:     true,
 				PickedNode: msg.Node,
 			}
@@ -191,7 +191,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return result.SetResultMsg{
 				Nodes:      m.selectedNodes,
-				Objs:       m.getController().GetObjects(),
+				Objs:       m.controller.Objects(),
 				Picked:     false,
 				PickedNode: nil,
 			}
@@ -284,17 +284,13 @@ func (m *Model) updateObjs(updatedObj *unstructured.Unstructured, objs []*unstru
 
 // TODO: ? why return?
 func (m *Model) inform() tea.Cmd {
-	stop, err := m.getController().Inform()
+	stop, err := m.controller.Inform()
 	if err != nil {
 		return nil
 	}
 	m.stop = stop
 
 	return nil
-}
-
-func (m *Model) getController() *kube.ResourceController {
-	return m.controller
 }
 
 func (m *Model) currentFocusedView() string {
@@ -308,14 +304,14 @@ func (m *Model) currentFocusedView() string {
 func (m *Model) listenController() tea.Cmd {
 	log.Printf("listen %s", m.gvk)
 	return func() tea.Msg {
-		match, ok := <-m.getController().EventEmitted()
+		match, ok := <-m.controller.EventEmitted()
 		if !ok || match.Obj == nil {
 			return nil
 		}
 
 		return event.UpdateObjsMsg{
 			Obj:  match.Obj,
-			Objs: m.getController().GetObjects(),
+			Objs: m.controller.Objects(),
 		}
 	}
 }
