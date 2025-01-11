@@ -3,7 +3,6 @@ package kube
 import (
 	"context"
 	"fmt"
-	"log"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,17 +67,17 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				u := obj.(*unstructured.Unstructured)
-				log.Printf("add %s/%s [%s %s]", u.GetNamespace(), u.GetName(), u.GetAPIVersion(), u.GetKind())
+
 				go func() { i.emitCh <- emitMsg{Obj: u} }()
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				n := newObj.(*unstructured.Unstructured)
-				log.Printf("update %s/%s [%s %s]", n.GetNamespace(), n.GetName(), n.GetAPIVersion(), n.GetKind())
+
 				go func() { i.emitCh <- emitMsg{Obj: n} }()
 			},
 			DeleteFunc: func(obj interface{}) {
 				d := obj.(*unstructured.Unstructured)
-				log.Printf("delete %s/%s [%s %s]", d.GetNamespace(), d.GetName(), d.GetAPIVersion(), d.GetKind())
+
 				go func() { i.emitCh <- emitMsg{Obj: d} }()
 			},
 		},

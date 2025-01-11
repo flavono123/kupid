@@ -146,10 +146,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.result.Focus())
 		}
 	case event.UpdateObjsMsg:
-		if msg.Obj != nil {
-			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
-		}
-
 		setResultCmd := func() tea.Msg {
 			return result.SetResultMsg{
 				Nodes:      m.selectedNodes,
@@ -294,7 +290,6 @@ func (m *Model) inform() tea.Cmd {
 }
 
 func (m *Model) listenController() tea.Cmd {
-	log.Printf("listen %s", m.gvk)
 	return func() tea.Msg {
 		match, ok := <-m.controller.EventEmitted()
 		if !ok || match.Obj == nil {

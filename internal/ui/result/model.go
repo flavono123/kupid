@@ -1,7 +1,6 @@
 package result
 
 import (
-	"log"
 	"math"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -123,7 +122,6 @@ func (m *Model) Focus() tea.Cmd {
 }
 
 func (m *Model) Blur() {
-	log.Println("Blurring resultModel")
 	m.focus = false
 	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0())
 	m.filter.Blur()
