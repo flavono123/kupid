@@ -8,7 +8,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/event"
+	"github.com/flavono123/kupid/internal/ui/kbar"
+	"github.com/flavono123/kupid/internal/ui/nav"
+	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -17,23 +22,24 @@ type sessionState uint
 const (
 	schemaView sessionState = iota
 	resultView
-	// kbarView
+	kbarView
 )
 
-type mainModel struct {
-	session       sessionState
-	keys          keyMap
-	vp            viewport.Model
-	schema        *schemaModel
-	result        *resultModel
-	gvk           schema.GroupVersionKind
-	controller    *kube.ResourceController
-	stop          chan struct{}
-	selectedNodes []*Node
-	kbar          *kbarModel
+type Model struct {
+	session        sessionState
+	lastTabSession sessionState
+	keys           keyMap
+	vp             viewport.Model
+	nav            *nav.Model
+	result         *result.Model
+	gvk            schema.GroupVersionKind
+	controller     *kube.ResourceController
+	stop           chan struct{}
+	selectedNodes  []*kube.Node
+	kbar           *kbar.Model
 }
 
-func InitModel() *mainModel {
+func NewModel() *Model {
 	initGvk := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
@@ -46,147 +52,159 @@ func InitModel() *mainModel {
 	controller := kube.NewResourceController(gvr)
 	controller.Inform()
 
-	return &mainModel{
-		session:       schemaView,
-		keys:          newKeyMap(),
-		schema:        newSchemaModel(initGvk, controller.GetObjects(), true),
-		result:        newResultModel(controller.GetObjects()),
-		vp:            viewport.New(0, 0),
-		gvk:           initGvk,
-		kbar:          newKbarModel(),
-		controller:    controller,
-		stop:          nil,
-		selectedNodes: []*Node{},
+	return &Model{
+		session:        schemaView,
+		lastTabSession: schemaView,
+		keys:           newKeyMap(),
+		nav:            nav.NewModel(initGvk, controller.Objects(), true),
+		result:         result.NewModel(controller.Objects()),
+		vp:             viewport.New(0, 0),
+		gvk:            initGvk,
+		kbar:           kbar.NewModel(),
+		controller:     controller,
+		stop:           nil,
+		selectedNodes:  []*kube.Node{},
 	}
 }
 
-func (m *mainModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	m.inform()
 	return m.listenController()
 }
 
-func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		if m.session == schemaView {
-			sm, sCmd := m.schema.Update(msg)
-			m.schema = sm.(*schemaModel)
-			cmds = append(cmds, sCmd)
-		} else if m.session == resultView && m.result.focused {
+		if key.Matches(keyMsg, m.keys.toggleKbar) {
+			if m.session == kbarView {
+				m.session = m.lastTabSession
+				cmds = append(cmds, kbar.Hide())
+			} else {
+				m.lastTabSession = m.session
+				m.session = kbarView
+				m.nav.Blur()
+				m.result.Blur()
+				cmds = append(cmds, kbar.Show)
+			}
+		}
+
+		switch m.session {
+		case schemaView:
+			nm, nCmd := m.nav.Update(msg)
+			m.nav = nm.(*nav.Model)
+			cmds = append(cmds, nCmd)
+		case resultView:
 			rm, rCmd := m.result.Update(msg)
-			m.result = rm.(*resultModel)
+			m.result = rm.(*result.Model)
 			cmds = append(cmds, rCmd)
+		case kbarView:
+			km, kCmd := m.kbar.Update(msg)
+			m.kbar = km.(*kbar.Model)
+			cmds = append(cmds, kCmd)
 		}
 
 		switch {
 		case key.Matches(keyMsg, m.keys.tabView):
-			if m.session == schemaView {
+			switch m.session {
+			case schemaView:
+				m.lastTabSession = schemaView
 				m.session = resultView
-				m.schema.blur()
-				cmds = append(cmds, m.result.focus())
-			} else {
+				m.nav.Blur()
+				cmds = append(cmds, m.result.Focus())
+			case resultView:
+				m.lastTabSession = resultView
 				m.session = schemaView
-				m.result.blur()
-				cmds = append(cmds, m.schema.focus())
-			}
+				m.result.Blur()
+				cmds = append(cmds, m.nav.Focus())
+			} // do nothing when kbar session
 		case key.Matches(keyMsg, m.keys.quit):
-			return m, tea.Quit
+			cmds = append(cmds, tea.Quit)
 		}
 	} else {
 		rm, rCmd := m.result.Update(msg)
-		m.result = rm.(*resultModel)
+		m.result = rm.(*result.Model)
 		cmds = append(cmds, rCmd)
 
-		sm, sCmd := m.schema.Update(msg)
-		m.schema = sm.(*schemaModel)
-		cmds = append(cmds, sCmd)
-	}
+		nm, nCmd := m.nav.Update(msg)
+		m.nav = nm.(*nav.Model)
+		cmds = append(cmds, nCmd)
 
-	// TODO: only update when kbar is focused(after refactoring message design for session)
-	km, kCmd := m.kbar.Update(msg)
-	m.kbar = km.(*kbarModel)
-	cmds = append(cmds, kCmd)
+		km, kCmd := m.kbar.Update(msg)
+		m.kbar = km.(*kbar.Model)
+		cmds = append(cmds, kCmd)
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.vp.Width = msg.Width
-		m.vp.Height = msg.Height
-	case updateObjsMsg:
-		if msg.obj != nil {
-			log.Printf("updateObjsMsg since %s/%s is updated", msg.obj.GetNamespace(), msg.obj.GetName())
+		m.setViewSize(msg)
+	case event.RestoreLastSessionMsg:
+		m.session = m.lastTabSession
+		if m.session == schemaView {
+			cmds = append(cmds, m.nav.Focus())
+		} else {
+			cmds = append(cmds, m.result.Focus())
 		}
+	case event.UpdateObjsMsg:
+		if msg.Obj != nil {
+			log.Printf("updateObjsMsg since %s/%s is updated", msg.Obj.GetNamespace(), msg.Obj.GetName())
+		}
+
 		setResultCmd := func() tea.Msg {
-			return resultMsg{
-				nodes:      m.selectedNodes,
-				objs:       msg.objs,
-				picked:     false,
-				pickedNode: nil,
-			}
-		}
-		setSchemaMsg := func() tea.Msg {
-			return setSchemaMsg{
-				objs: msg.objs,
+			return result.SetResultMsg{
+				Nodes:      m.selectedNodes,
+				Objs:       msg.Objs,
+				Picked:     false,
+				PickedNode: nil,
 			}
 		}
 		return m, tea.Batch(
 			setResultCmd,
-			setSchemaMsg,
+			m.updateNavObjs(m.controller.Objects()),
 			m.listenController(),
 		)
-	case selectGVKMsg:
-		m.gvk = msg.gvk
-		m.setController(msg.gvk)
+	case event.PickGVKMsg:
+		m.gvk = msg.GVK
+		m.setController(msg.GVK)
+		m.selectedNodes = []*kube.Node{}
 
-		m.schema.Reset(msg.gvk, m.getController().GetObjects())
-		// TODO: should pass by msg
-		m.kbar.visible = false
-		m.selectedNodes = []*Node{}
-
-		if m.session == schemaView {
-			m.schema.focus()
-		} else {
-			m.result.focus()
-		}
+		cmds = append(cmds, m.setNavGVK(msg.GVK, m.controller.Objects()))
+		cmds = append(cmds, m.updateObjs(nil, m.controller.Objects()))
+		cmds = append(cmds, kbar.Hide())
+	case event.PickFieldMsg:
+		m.selectedNodes = append(m.selectedNodes, msg.Node)
 		return m, func() tea.Msg {
-			return updateObjsMsg{
-				objs: m.getController().GetObjects(),
+			return result.SetResultMsg{
+				Nodes:      m.selectedNodes,
+				Objs:       m.controller.Objects(),
+				Picked:     true,
+				PickedNode: msg.Node,
 			}
 		}
-	case pickFieldMsg:
-		m.selectedNodes = append(m.selectedNodes, msg.node)
-		return m, func() tea.Msg {
-			return resultMsg{
-				nodes:      m.selectedNodes,
-				objs:       m.getController().GetObjects(),
-				picked:     true,
-				pickedNode: msg.node,
-			}
-		}
-	case unpickFieldMsg:
+	case event.UnpickFieldMsg:
 		for idx, node := range m.selectedNodes {
-			if node.Name() == msg.node.Name() {
+			if node.Name() == msg.Node.Name() {
 				m.selectedNodes = append(m.selectedNodes[:idx], m.selectedNodes[idx+1:]...)
 				break
 			}
 		}
 		return m, func() tea.Msg {
-			return resultMsg{
-				nodes:      m.selectedNodes,
-				objs:       m.getController().GetObjects(),
-				picked:     false,
-				pickedNode: nil,
+			return result.SetResultMsg{
+				Nodes:      m.selectedNodes,
+				Objs:       m.controller.Objects(),
+				Picked:     false,
+				PickedNode: nil,
 			}
 		}
-	case cancelPickMsg:
-		if msg.canceled {
-			msg.node.Selected = false
+	case event.CancelPickMsg:
+		if msg.Canceled {
+			msg.Node.Selected = false
 			m.selectedNodes = append(m.selectedNodes[:len(m.selectedNodes)-1], m.selectedNodes[len(m.selectedNodes):]...)
 		}
-	case hoverFieldMsg:
+	case event.HoverFieldMsg:
 		return m, func() tea.Msg {
-			return candidateMsg{
-				candidate: msg.candidate,
+			return result.SetTableCandidateMsg{
+				Candidate: msg.Candidate,
 			}
 		}
 	}
@@ -194,31 +212,26 @@ func (m *mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *mainModel) View() string {
+func (m *Model) View() string {
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			m.schema.View(),
+			m.nav.View(),
 			m.result.View(),
 		),
 	)
 
 	m.vp.SetContent(mainContent)
 
-	// TODO: should render by msg
-	if m.kbar.visible {
-		// TODO: should pass by msg
-		m.result.blur()
-		m.schema.blur()
-
+	if m.session == kbarView {
 		return lipgloss.Place(
 			m.vp.Width,
 			m.vp.Height,
 			lipgloss.Center,
 			UPPER_20,
 			m.kbar.View(),
-			lipgloss.WithWhitespaceBackground(theme.Mantle),
+			lipgloss.WithWhitespaceBackground(theme.Mantle()),
 		)
 	}
 
@@ -228,7 +241,12 @@ func (m *mainModel) View() string {
 	)
 }
 
-func (m *mainModel) setController(gvk schema.GroupVersionKind) {
+func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
+	m.vp.Width = msg.Width
+	m.vp.Height = msg.Height
+}
+
+func (m *Model) setController(gvk schema.GroupVersionKind) {
 	if m.stop != nil {
 		close(m.stop)
 	}
@@ -240,9 +258,33 @@ func (m *mainModel) setController(gvk schema.GroupVersionKind) {
 	m.inform()
 }
 
+func (m *Model) setNavGVK(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) tea.Cmd {
+	return func() tea.Msg {
+		return nav.SetGVKMsg{
+			GVK:  gvk,
+			Objs: objs,
+		}
+	}
+}
+
+func (m *Model) updateNavObjs(objs []*unstructured.Unstructured) tea.Cmd {
+	return func() tea.Msg {
+		return nav.UpdateObjsMsg{Objs: objs}
+	}
+}
+
+func (m *Model) updateObjs(updatedObj *unstructured.Unstructured, objs []*unstructured.Unstructured) tea.Cmd {
+	return func() tea.Msg {
+		return event.UpdateObjsMsg{
+			Obj:  updatedObj,
+			Objs: objs,
+		}
+	}
+}
+
 // TODO: ? why return?
-func (m *mainModel) inform() tea.Cmd {
-	stop, err := m.getController().Inform()
+func (m *Model) inform() tea.Cmd {
+	stop, err := m.controller.Inform()
 	if err != nil {
 		return nil
 	}
@@ -251,11 +293,7 @@ func (m *mainModel) inform() tea.Cmd {
 	return nil
 }
 
-func (m *mainModel) getController() *kube.ResourceController {
-	return m.controller
-}
-
-func (m *mainModel) currentFocusedView() string {
+func (m *Model) currentFocusedView() string {
 	if m.session == resultView {
 		return "result"
 	}
@@ -263,17 +301,17 @@ func (m *mainModel) currentFocusedView() string {
 }
 
 // BUG: listen event only when selectgvk(or just once?)
-func (m *mainModel) listenController() tea.Cmd {
+func (m *Model) listenController() tea.Cmd {
 	log.Printf("listen %s", m.gvk)
 	return func() tea.Msg {
-		match, ok := <-m.getController().EventEmitted()
+		match, ok := <-m.controller.EventEmitted()
 		if !ok || match.Obj == nil {
 			return nil
 		}
 
-		return updateObjsMsg{
-			obj:  match.Obj,
-			objs: m.getController().GetObjects(),
+		return event.UpdateObjsMsg{
+			Obj:  match.Obj,
+			Objs: m.controller.Objects(),
 		}
 	}
 }

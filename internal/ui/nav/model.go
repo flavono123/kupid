@@ -1,4 +1,4 @@
-package ui
+package nav
 
 import (
 	"log"
@@ -9,6 +9,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/ui/event"
+	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,10 +21,19 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type schemaModel struct {
+const (
+	SCHEMA_CURSOR_TOP  = 0
+	SCHEMA_SCROLL_STEP = 1
+
+	SCHEMA_WIDTH_RATIO          = 0.3
+	SCHEMA_HEIGHT_BOTTOM_MARGIN = 4 // topbar 1 + border top, down 2 + help, status 1
+	SCHEMA_EXPAND_MULTI_MARGIN  = 3 // render above 3 lines when cursor moved by fold/expand a lot
+)
+
+type Model struct {
 	focused bool
-	nodes   map[string]*Node
-	fields  map[string]*kube.Field // cache when objs are updated
+	nodes   map[string]*kube.Node
+	fields  map[string]*kube.Field // cache for objs changed
 
 	vp viewport.Model
 
@@ -30,27 +41,27 @@ type schemaModel struct {
 	cursor    int
 	curLines  []*Line
 	curLineNo int
-	prevNode  *Node
+	prevNode  *kube.Node
 
 	gvk schema.GroupVersionKind
 
-	keys schemaKeyMap
+	keys keyMap
 	help help.Model
 }
 
-func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, focused bool) *schemaModel {
+func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, focused bool) *Model {
 	fields, err := kube.CreateFieldTree(gvk)
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	nodes := createNodeTree(fields, objs, []string{})
+	nodes := kube.CreateNodeTree(fields, objs, []string{})
 
 	style := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(theme.Blue)
+		BorderForeground(theme.Blue())
 
 	vp := viewport.New(0, 0)
-	m := &schemaModel{
+	m := &Model{
 		focused:  focused,
 		nodes:    nodes,
 		fields:   fields,
@@ -61,7 +72,7 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 		curLines: []*Line{},
 		prevNode: nil,
 		// curNode:  nil,
-		keys: newSchemaKeyMap(),
+		keys: newKeyMap(),
 		help: help.New(),
 	}
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
@@ -72,20 +83,21 @@ func newSchemaModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructur
 	return m
 }
 
-func (m *schemaModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var retCmd tea.Cmd
 	retCmd = nil
 
 	switch msg := msg.(type) {
-	case setSchemaMsg:
-		// TODO: should 'update' nodes, keep them whether expanded or not
-		// reverted since when gvk is changed, the current message system cannot handle
-		m.nodes = createNodeTree(m.fields, msg.objs, []string{})
-		m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
+	case SetGVKMsg:
+		m.setGVK(msg.GVK)
+		m.setNodes(msg.GVK, msg.Objs)
+		m.reset()
+	case UpdateObjsMsg:
+		m.updateNodes(msg.Objs)
 	case tea.WindowSizeMsg:
 		m.vp.Width = int(float64(msg.Width) * SCHEMA_WIDTH_RATIO)
 		m.vp.Height = msg.Height - SCHEMA_HEIGHT_BOTTOM_MARGIN
@@ -100,11 +112,11 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return hoverFieldMsg{candidate: m.curNode()}
+					return event.HoverFieldMsg{Candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
-					return candidateMsg{candidate: nil}
+					return result.SetTableCandidateMsg{Candidate: nil}
 				}
 			}
 		case key.Matches(msg, m.keys.down):
@@ -116,11 +128,11 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.curIsPickable() {
 				retCmd = func() tea.Msg {
-					return hoverFieldMsg{candidate: m.curNode()}
+					return event.HoverFieldMsg{Candidate: m.curNode()}
 				}
 			} else {
 				retCmd = func() tea.Msg {
-					return candidateMsg{candidate: nil}
+					return result.SetTableCandidateMsg{Candidate: nil}
 				}
 			}
 		case key.Matches(msg, m.keys.action):
@@ -135,12 +147,12 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.curNode().Selected {
 					m.curNode().Selected = false
 					retCmd = func() tea.Msg {
-						return unpickFieldMsg{node: m.curNode()}
+						return event.UnpickFieldMsg{Node: m.curNode()}
 					}
 				} else {
 					m.curNode().Selected = true
 					retCmd = func() tea.Msg {
-						return pickFieldMsg{node: m.curNode()}
+						return event.PickFieldMsg{Node: m.curNode()}
 					}
 				}
 			}
@@ -171,7 +183,7 @@ func (m *schemaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, retCmd
 }
 
-func (m *schemaModel) View() string {
+func (m *Model) View() string {
 	content := m.renderRecursive(m.curLines)
 	content = strings.TrimSuffix(content, "\n")
 	m.vp.SetContent(content)
@@ -185,11 +197,11 @@ func (m *schemaModel) View() string {
 }
 
 // utils
-func (m *schemaModel) isCursor(curLineNo int) bool {
+func (m *Model) isCursor(curLineNo int) bool {
 	return m.cursor == curLineNo-m.vp.YOffset
 }
 
-func (m *schemaModel) setCursor(path []string) {
+func (m *Model) setCursor(path []string) {
 	for _, line := range m.curLines {
 		if reflect.DeepEqual(line.node.FullPath(), path) {
 			actualIndex := line.index
@@ -205,13 +217,13 @@ func (m *schemaModel) setCursor(path []string) {
 	}
 }
 
-func (m *schemaModel) toggleCurrentNodeFolder() {
+func (m *Model) toggleCurrentNodeFolder() {
 	if node := m.curNode(); node != nil {
-		node.toggleFolder()
+		node.ToggleFolder()
 	}
 }
 
-func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool, all bool) {
+func (m *Model) toggleExpandRecursive(nodes map[string]*kube.Node, expand bool, all bool) {
 	node := m.curNode()
 	if node == nil {
 		return
@@ -219,15 +231,15 @@ func (m *schemaModel) toggleExpandRecursive(nodes map[string]*Node, expand bool,
 
 	for _, n := range nodes {
 		if all || (n.Level() == node.Level()) {
-			n.setExpanded(expand)
+			n.SetExpanded(expand)
 		}
 
-		m.toggleExpandRecursive(n.children, expand, all)
+		m.toggleExpandRecursive(n.Children(), expand, all)
 	}
 }
 
 // TODO: remove arg width after horizontal scrollable
-func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) ([]*Line, int) {
+func (m *Model) buildLines(nodes map[string]*kube.Node, width int, lineNo int) ([]*Line, int) {
 	lines := []*Line{}
 	keys := []string{}
 	for key := range nodes {
@@ -245,7 +257,7 @@ func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) 
 		lineNo++
 		lines = append(lines, line)
 		if node.Expanded {
-			childrenLines, childrenLineNo := m.buildLines(node.children, width, lineNo)
+			childrenLines, childrenLineNo := m.buildLines(node.Children(), width, lineNo)
 			lines = append(lines, childrenLines...)
 			lineNo = childrenLineNo
 		}
@@ -254,7 +266,7 @@ func (m *schemaModel) buildLines(nodes map[string]*Node, width int, lineNo int) 
 	return lines, lineNo
 }
 
-func (m *schemaModel) renderRecursive(lines []*Line) string {
+func (m *Model) renderRecursive(lines []*Line) string {
 	var result strings.Builder
 	leftPadding := len(strconv.Itoa(len(lines) - 1))
 
@@ -266,15 +278,30 @@ func (m *schemaModel) renderRecursive(lines []*Line) string {
 }
 
 // TODO: split to each setter
-func (m *schemaModel) Reset(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
+func (m *Model) reset() {
+	m.cursor = 0
+	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
+}
+
+func (m *Model) setGVK(gvk schema.GroupVersionKind) {
 	m.gvk = gvk
-	fields, err := kube.CreateFieldTree(m.gvk)
+}
+
+// set nodes when gvk is changed
+// fields are also changed by gvk
+func (m *Model) setNodes(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) {
+	fields, err := kube.CreateFieldTree(gvk)
+	m.fields = fields
 	if err != nil {
 		log.Fatalf("failed to create field tree: %v", err)
 	}
-	nodes := createNodeTree(fields, objs, []string{})
-	m.nodes = nodes
-	m.cursor = 0
+	m.nodes = kube.CreateNodeTree(fields, objs, []string{})
+}
+
+// update nodes when objs is changed
+// do not update fields
+func (m *Model) updateNodes(objs []*unstructured.Unstructured) {
+	m.nodes = kube.UpdateNodeTree(m.nodes, m.fields, objs, []string{})
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 }
 
@@ -295,35 +322,35 @@ func sortKeys(keys []string) {
 	}
 }
 
-func (m *schemaModel) curNode() *Node {
+func (m *Model) curNode() *kube.Node {
 	return m.curLines[m.cursor+m.vp.YOffset].node
 }
 
-func (m *schemaModel) curIsPickable() bool {
+func (m *Model) curIsPickable() bool {
 	return m.curNode() != nil && !m.curNode().Foldable() && !m.curNode().Selected
 }
 
-func (m *schemaModel) renderTopBar() string {
+func (m *Model) renderTopBar() string {
 	ctx, err := kube.CurrentContext()
 	if err != nil {
 		log.Fatalf("failed to get current context: %v", err)
 	}
 	ctx = lipgloss.NewStyle().Margin(0, 1).Render(ctx)
-	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.gvk.Kind)
+	kind := lipgloss.NewStyle().Foreground(theme.Blue()).Render(m.gvk.Kind)
 	return lipgloss.JoinHorizontal(lipgloss.Left,
 		ctx,
 		kind,
 	)
 }
 
-func (m *schemaModel) focus() tea.Cmd {
+func (m *Model) Focus() tea.Cmd {
 	m.focused = true
-	m.style = m.style.Border(lipgloss.ThickBorder()).BorderForeground(theme.Blue)
+	m.style = m.style.Border(lipgloss.ThickBorder()).BorderForeground(theme.Blue())
 	// nothing to send
 	return nil
 }
 
-func (m *schemaModel) blur() {
+func (m *Model) Blur() {
 	m.focused = false
-	m.style = m.style.Border(lipgloss.NormalBorder()).BorderForeground(theme.Overlay0)
+	m.style = m.style.Border(lipgloss.NormalBorder()).BorderForeground(theme.Overlay0())
 }

@@ -1,16 +1,11 @@
-package ui
+package kube
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/ui/theme"
 )
 
 type Node struct {
@@ -19,7 +14,7 @@ type Node struct {
 	// TODO: new field to represent the values of node are all nil
 	// reversed this would be a Line's Essential field(tbd), to reduce of schema context
 
-	field     *kube.Field
+	field     *Field
 	name      string
 	ancestors []string
 	level     int
@@ -27,13 +22,13 @@ type Node struct {
 }
 
 // line things
-func (n *Node) toggleFolder() {
+func (n *Node) ToggleFolder() {
 	if n.Foldable() {
 		n.Expanded = !n.Expanded
 	}
 }
 
-func (n *Node) setExpanded(expanded bool) {
+func (n *Node) SetExpanded(expanded bool) {
 	n.Expanded = expanded
 }
 
@@ -43,22 +38,9 @@ func (n *Node) Foldable() bool {
 
 // line things end
 
-func (n *Node) render() string {
-	name := lipgloss.NewStyle().Foreground(theme.Green)
-	displayType := lipgloss.NewStyle().Foreground(theme.Peach)
-
-	if n.Type() == "" {
-		return name.Render(n.Name())
-	}
-
-	return lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		name.Render(n.Name()),
-		displayType.Render(fmt.Sprintf("<%s>", n.Type())),
-	)
+func (n *Node) Children() map[string]*Node {
+	return n.children
 }
-
-// delegate to kube.Field's field
 
 func (n *Node) Name() string {
 	if n.field == nil {
@@ -95,7 +77,7 @@ func (n *Node) Required() bool {
 	return n.field.Required
 }
 
-// TODO: move to kube.Field, use for digging array or map(ref?) val to create node
+// TODO: move to kube*Field, use for digging array or map(ref?) val to create node
 func (n *Node) FullPath() []string {
 	fullPath := []string{}
 	if n.field == nil {
@@ -113,7 +95,7 @@ func (n *Node) Level() int {
 	return n.field.Level
 }
 
-func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
+func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
 	result := make(map[string]*Node)
 
 	for key, field := range fieldTree {
@@ -133,7 +115,7 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 				idx := strconv.Itoa(i)
 				grandChildren := map[string]*Node(nil)
 				if field.Children != nil {
-					grandChildren = createNodeTree(field.Children, objs, append(childPrefix, idx))
+					grandChildren = CreateNodeTree(field.Children, objs, append(childPrefix, idx))
 				}
 
 				children[idx] = &Node{
@@ -150,7 +132,7 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 			for _, key := range keys {
 				grandChildren := map[string]*Node(nil)
 				if field.Children != nil {
-					grandChildren = createNodeTree(field.Children, objs, append(childPrefix, key))
+					grandChildren = CreateNodeTree(field.Children, objs, append(childPrefix, key))
 				}
 
 				children[key] = &Node{
@@ -163,7 +145,7 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 			}
 
 		} else if field.Children != nil {
-			children = createNodeTree(field.Children, objs, childPrefix)
+			children = CreateNodeTree(field.Children, objs, childPrefix)
 		}
 
 		result[key] = &Node{
@@ -175,6 +157,44 @@ func createNodeTree(fieldTree map[string]*kube.Field, objs []*unstructured.Unstr
 	}
 
 	return result
+}
+
+// TODO: rename to more generic, not only for array nodes
+func GetNestedValueWithIndex(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
+	var current interface{} = obj
+
+	for i, field := range fields {
+		// 숫자인지 확인 (배열 인덱스)
+		if index, err := strconv.Atoi(field); err == nil {
+			// 현재 값이 슬라이스인지 확인
+			if slice, ok := current.([]interface{}); ok {
+				if index >= len(slice) {
+					return nil, false, fmt.Errorf("index %d out of bounds", index)
+				}
+				current = slice[index]
+			} else {
+				return nil, false, fmt.Errorf("expected array, got %T", current)
+			}
+		} else {
+			// 맵인지 확인
+			if m, ok := current.(map[string]interface{}); ok {
+				var exists bool
+				current, exists = m[field]
+				if !exists {
+					return nil, false, nil
+				}
+			} else {
+				return nil, false, fmt.Errorf("expected map, got %T", current)
+			}
+		}
+
+		// 마지막 필드면 현재 값 반환
+		if i == len(fields)-1 {
+			return current, true, nil
+		}
+	}
+
+	return current, true, nil
 }
 
 func getMaxLength(arrayPath []string, objs []*unstructured.Unstructured) int {
@@ -229,7 +249,7 @@ func getDistinctKeys(mapPath []string, objs []*unstructured.Unstructured) []stri
 
 // TODO: refactor, pull up traverse with create to function
 // TODO: besides, expandedNodes should be a state of the schemaModel(ideally expand would not be a state of node)
-func updateNodeTree(existing map[string]*Node, fieldTree map[string]*kube.Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
+func UpdateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {
 	result := make(map[string]*Node)
 
 	for key, field := range fieldTree {
@@ -258,7 +278,7 @@ func updateNodeTree(existing map[string]*Node, fieldTree map[string]*kube.Field,
 					if exists && existingNode.children != nil {
 						existingChildren = existingNode.children[idx].children
 					}
-					grandChildren = updateNodeTree(existingChildren, field.Children, objs, append(childPrefix, idx))
+					grandChildren = UpdateNodeTree(existingChildren, field.Children, objs, append(childPrefix, idx))
 				}
 
 				children[idx] = &Node{
@@ -285,7 +305,7 @@ func updateNodeTree(existing map[string]*Node, fieldTree map[string]*kube.Field,
 							existingChildren = existingChild.children
 						}
 					}
-					grandChildren = updateNodeTree(existingChildren, field.Children, objs, append(childPrefix, mapKey))
+					grandChildren = UpdateNodeTree(existingChildren, field.Children, objs, append(childPrefix, mapKey))
 				}
 
 				children[mapKey] = &Node{
@@ -303,7 +323,7 @@ func updateNodeTree(existing map[string]*Node, fieldTree map[string]*kube.Field,
 			if exists {
 				existingChildren = existingNode.children
 			}
-			children = updateNodeTree(existingChildren, field.Children, objs, childPrefix)
+			children = UpdateNodeTree(existingChildren, field.Children, objs, childPrefix)
 		}
 
 		result[key] = &Node{

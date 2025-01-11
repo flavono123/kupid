@@ -19,7 +19,7 @@ func main() {
 	}
 
 	program := tea.NewProgram(
-		ui.InitModel(),
+		ui.NewModel(),
 		tea.WithAltScreen(),
 	)
 
