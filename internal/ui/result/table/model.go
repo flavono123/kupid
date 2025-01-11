@@ -66,9 +66,9 @@ func NewModel(nodes []*kube.Node, objs []*unstructured.Unstructured) *Model {
 		nodeMaxWidths: []int{},
 		styles: tableStyles{
 			header:    lipgloss.NewStyle().Bold(true),
-			selected:  lipgloss.NewStyle().Background(theme.Surface0),
-			candidate: lipgloss.NewStyle().Margin(0, 0, 0, 1).Foreground(theme.Surface2),
-			debug:     lipgloss.NewStyle().Italic(true).Foreground(theme.Surface1),
+			selected:  lipgloss.NewStyle().Background(theme.Surface0()),
+			candidate: lipgloss.NewStyle().Margin(0, 0, 0, 1).Foreground(theme.Surface2()),
+			debug:     lipgloss.NewStyle().Italic(true).Foreground(theme.Surface1()),
 		},
 		keyword: "",
 	}
@@ -205,7 +205,7 @@ func (m *Model) renderRow() string {
 				}
 			} else {
 				if match, ok := row.matches[j]; ok {
-					renderedCell = m.cellStyle(j).Render(highlight(cell, match, lipgloss.NewStyle().Foreground(theme.Text)))
+					renderedCell = m.cellStyle(j).Render(highlight(cell, match, lipgloss.NewStyle().Foreground(theme.Text())))
 				} else {
 					renderedCell = m.cellStyle(j).Render(cell)
 				}
@@ -350,7 +350,7 @@ func (m *Model) setKeyword(keyword string) {
 
 // helpers
 func highlight(s string, match fuzzy.Match, unmatchedStyle lipgloss.Style) string {
-	highlightStyle := lipgloss.NewStyle().Foreground(theme.Blue)
+	highlightStyle := lipgloss.NewStyle().Foreground(theme.Blue())
 
 	runes := []rune(s)
 	result := make([]rune, 0, len(runes))

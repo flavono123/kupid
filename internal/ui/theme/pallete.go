@@ -1,37 +1,42 @@
 package theme
 
-import "github.com/charmbracelet/lipgloss"
-
-// TODO: REMOVE and migrate to https://github.com/catppuccin/go
-// https://catppuccin.com/palette
-const (
-	// Default
-	Rosewater = lipgloss.Color("#f5e0dc")
-	Flamingo  = lipgloss.Color("#f2cdcd")
-	Pink      = lipgloss.Color("#f5c2e7")
-	Mauve     = lipgloss.Color("#cba6f7")
-	Red       = lipgloss.Color("#f38ba8")
-	Maroon    = lipgloss.Color("#eba0ac")
-	Peach     = lipgloss.Color("#fab387")
-	Yellow    = lipgloss.Color("#f9e2af")
-	Green     = lipgloss.Color("#a6e3a1")
-	Teal      = lipgloss.Color("#94e2d5")
-	Sky       = lipgloss.Color("#89dceb")
-	Sapphire  = lipgloss.Color("#74c7ec")
-	Blue      = lipgloss.Color("#89b4fa")
-	Lavender  = lipgloss.Color("#b4befe")
-
-	// Background and text
-	Text     = lipgloss.Color("#cdd6f4")
-	Subtext1 = lipgloss.Color("#bac2de")
-	Subtext0 = lipgloss.Color("#a6adc8")
-	Overlay2 = lipgloss.Color("#9399b2")
-	Overlay1 = lipgloss.Color("#7f849c")
-	Overlay0 = lipgloss.Color("#6c7086")
-	Surface2 = lipgloss.Color("#585b70")
-	Surface1 = lipgloss.Color("#45475a")
-	Surface0 = lipgloss.Color("#313244")
-	Base     = lipgloss.Color("#1e1e2e")
-	Mantle   = lipgloss.Color("#181825")
-	Crust    = lipgloss.Color("#11111b")
+import (
+	catppuccin "github.com/catppuccin/go"
+	"github.com/charmbracelet/lipgloss"
 )
+
+var theme = catppuccin.Mocha
+
+var gradientFlavour = catppuccin.Latte
+
+var (
+	LatteYellow string = gradientFlavour.Yellow().Hex // gradient start
+	LatteBlue   string = gradientFlavour.Blue().Hex   // gradient end
+)
+
+func Rosewater() lipgloss.Color { return lipgloss.Color(theme.Rosewater().Hex) }
+func Flamingo() lipgloss.Color  { return lipgloss.Color(theme.Flamingo().Hex) }
+func Pink() lipgloss.Color      { return lipgloss.Color(theme.Pink().Hex) }
+func Mauve() lipgloss.Color     { return lipgloss.Color(theme.Mauve().Hex) }
+func Red() lipgloss.Color       { return lipgloss.Color(theme.Red().Hex) }
+func Maroon() lipgloss.Color    { return lipgloss.Color(theme.Maroon().Hex) }
+func Peach() lipgloss.Color     { return lipgloss.Color(theme.Peach().Hex) }
+func Yellow() lipgloss.Color    { return lipgloss.Color(theme.Yellow().Hex) }
+func Green() lipgloss.Color     { return lipgloss.Color(theme.Green().Hex) }
+func Teal() lipgloss.Color      { return lipgloss.Color(theme.Teal().Hex) }
+func Sky() lipgloss.Color       { return lipgloss.Color(theme.Sky().Hex) }
+func Sapphire() lipgloss.Color  { return lipgloss.Color(theme.Sapphire().Hex) }
+func Blue() lipgloss.Color      { return lipgloss.Color(theme.Blue().Hex) }
+func Lavender() lipgloss.Color  { return lipgloss.Color(theme.Lavender().Hex) }
+func Text() lipgloss.Color      { return lipgloss.Color(theme.Text().Hex) }
+func Subtext0() lipgloss.Color  { return lipgloss.Color(theme.Subtext0().Hex) }
+func Subtext1() lipgloss.Color  { return lipgloss.Color(theme.Subtext1().Hex) }
+func Overlay0() lipgloss.Color  { return lipgloss.Color(theme.Overlay0().Hex) }
+func Overlay1() lipgloss.Color  { return lipgloss.Color(theme.Overlay1().Hex) }
+func Overlay2() lipgloss.Color  { return lipgloss.Color(theme.Overlay2().Hex) }
+func Surface0() lipgloss.Color  { return lipgloss.Color(theme.Surface0().Hex) }
+func Surface1() lipgloss.Color  { return lipgloss.Color(theme.Surface1().Hex) }
+func Surface2() lipgloss.Color  { return lipgloss.Color(theme.Surface2().Hex) }
+func Base() lipgloss.Color      { return lipgloss.Color(theme.Base().Hex) }
+func Mantle() lipgloss.Color    { return lipgloss.Color(theme.Mantle().Hex) }
+func Crust() lipgloss.Color     { return lipgloss.Color(theme.Crust().Hex) }

@@ -196,7 +196,7 @@ func (i kbarItem) render(width int) string {
 	l := lipgloss.NewStyle().
 		MaxWidth(width).
 		Padding(0, 0, 0, 1)
-	g := lipgloss.NewStyle().Foreground(theme.Subtext1)
+	g := lipgloss.NewStyle().Foreground(theme.Subtext1())
 	s := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		i.Kind,
@@ -227,7 +227,7 @@ func (m kbarItems) filter(inputValue string) kbarItems {
 func (sr searchResult) render(width int) string {
 	style := lipgloss.NewStyle()
 	if sr.Hovered {
-		style = style.Background(theme.Overlay0)
+		style = style.Background(theme.Overlay0())
 	}
 	return style.Render(sr.Item.render(width))
 }

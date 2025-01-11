@@ -36,10 +36,10 @@ func NewModel(objs []*unstructured.Unstructured) *Model {
 	filter.Placeholder = "Filter"
 	filter.SetCursor(0)
 	filter.Width = 20
-	filter.Cursor.Style = lipgloss.NewStyle().Foreground(theme.Blue)
+	filter.Cursor.Style = lipgloss.NewStyle().Foreground(theme.Blue())
 	filter.Prompt = "|"
-	filter.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.Overlay0).Background(theme.Mantle)
-	filter.TextStyle = lipgloss.NewStyle().Foreground(theme.Blue).Background(theme.Mantle)
+	filter.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.Overlay0()).Background(theme.Mantle())
+	filter.TextStyle = lipgloss.NewStyle().Foreground(theme.Blue()).Background(theme.Mantle())
 
 	t := table.NewModel(nodes, objs)
 	return &Model{
@@ -47,10 +47,7 @@ func NewModel(objs []*unstructured.Unstructured) *Model {
 		table:   t,
 		width:   0,
 		widthLimPB: progress.New(
-			// ?: catppuccin "latte" yellow to blue,
-			// HACK: with gradient does not support lipgloss.Color weird
-			// this would resolve if using https://github.com/catppuccin/go, it offers hex codes
-			progress.WithGradient("#df8e1d", "#1e66f5"),
+			progress.WithGradient(theme.LatteYellow, theme.LatteBlue),
 			progress.WithoutPercentage(),
 			progress.WithSpringOptions(RESULT_PROGRESS_BAR_INIT_FREQ, RESULT_PROGRESS_BAR_CRITICAL_DAMP),
 		),
@@ -120,7 +117,7 @@ func (m *Model) View() string {
 
 func (m *Model) Focus() tea.Cmd {
 	m.focused = true
-	m.filter.PromptStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.Blue)
+	m.filter.PromptStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.Blue())
 
 	return m.filter.Focus()
 }
@@ -134,7 +131,7 @@ func (m *Model) Focused() bool {
 func (m *Model) Blur() {
 	log.Println("Blurring resultModel")
 	m.focused = false
-	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0)
+	m.filter.PromptStyle = lipgloss.NewStyle().Foreground(theme.Overlay0())
 	m.filter.Blur()
 }
 

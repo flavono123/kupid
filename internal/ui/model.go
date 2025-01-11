@@ -231,7 +231,7 @@ func (m *Model) View() string {
 			lipgloss.Center,
 			UPPER_20,
 			m.kbar.View(),
-			lipgloss.WithWhitespaceBackground(theme.Mantle),
+			lipgloss.WithWhitespaceBackground(theme.Mantle()),
 		)
 	}
 

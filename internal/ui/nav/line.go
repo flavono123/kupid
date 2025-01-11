@@ -36,8 +36,8 @@ func (l *Line) render(leftPadding int, cursored bool, maxWidth int, schemaBlurre
 }
 
 func (l *Line) renderNode() string {
-	name := lipgloss.NewStyle().Foreground(theme.Green)
-	displayType := lipgloss.NewStyle().Foreground(theme.Peach)
+	name := lipgloss.NewStyle().Foreground(theme.Green())
+	displayType := lipgloss.NewStyle().Foreground(theme.Peach())
 
 	if l.node.Type() == "" {
 		return name.Render(l.node.Name())
@@ -51,7 +51,7 @@ func (l *Line) renderNode() string {
 }
 
 func (l *Line) number(leftPadding int) string {
-	number := lipgloss.NewStyle().Foreground(theme.Overlay0)
+	number := lipgloss.NewStyle().Foreground(theme.Overlay0())
 	fmtStr := fmt.Sprintf("%%%dd ", leftPadding)
 	return number.Render(fmt.Sprintf(fmtStr, l.index+1))
 }
@@ -68,16 +68,16 @@ func (l *Line) cursor(cursored bool, schemaBlurred bool) string {
 }
 
 func (l *Line) cursorStyle(schemaBlurred bool) lipgloss.Style {
-	style := lipgloss.NewStyle().Foreground(theme.Blue).Bold(true)
+	style := lipgloss.NewStyle().Foreground(theme.Blue()).Bold(true)
 	if schemaBlurred {
-		style = style.Foreground(theme.Overlay0).Bold(false)
+		style = style.Foreground(theme.Overlay0()).Bold(false)
 	}
 
 	return style
 }
 
 func (l *Line) action() string {
-	action := lipgloss.NewStyle().Foreground(theme.Subtext1)
+	action := lipgloss.NewStyle().Foreground(theme.Subtext1())
 	if l.node.Foldable() {
 		if l.node.Expanded {
 			return action.Render("-")

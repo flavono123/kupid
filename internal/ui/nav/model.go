@@ -58,7 +58,7 @@ func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured, fo
 
 	style := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(theme.Blue)
+		BorderForeground(theme.Blue())
 
 	vp := viewport.New(0, 0)
 	m := &Model{
@@ -336,7 +336,7 @@ func (m *Model) renderTopBar() string {
 		log.Fatalf("failed to get current context: %v", err)
 	}
 	ctx = lipgloss.NewStyle().Margin(0, 1).Render(ctx)
-	kind := lipgloss.NewStyle().Foreground(theme.Blue).Render(m.gvk.Kind)
+	kind := lipgloss.NewStyle().Foreground(theme.Blue()).Render(m.gvk.Kind)
 	return lipgloss.JoinHorizontal(lipgloss.Left,
 		ctx,
 		kind,
@@ -345,12 +345,12 @@ func (m *Model) renderTopBar() string {
 
 func (m *Model) Focus() tea.Cmd {
 	m.focused = true
-	m.style = m.style.Border(lipgloss.ThickBorder()).BorderForeground(theme.Blue)
+	m.style = m.style.Border(lipgloss.ThickBorder()).BorderForeground(theme.Blue())
 	// nothing to send
 	return nil
 }
 
 func (m *Model) Blur() {
 	m.focused = false
-	m.style = m.style.Border(lipgloss.NormalBorder()).BorderForeground(theme.Overlay0)
+	m.style = m.style.Border(lipgloss.NormalBorder()).BorderForeground(theme.Overlay0())
 }
