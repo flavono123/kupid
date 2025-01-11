@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
@@ -26,7 +25,7 @@ const (
 	SCHEMA_SCROLL_STEP = 1
 
 	SCHEMA_WIDTH_RATIO          = 0.3
-	SCHEMA_HEIGHT_BOTTOM_MARGIN = 4 // topbar 1 + border top, down 2 + help, status 1
+	SCHEMA_HEIGHT_BOTTOM_MARGIN = 4 // (topbar 1 + border top, down 2) + root status bar 1
 	SCHEMA_EXPAND_MULTI_MARGIN  = 3 // render above 3 lines when cursor moved by fold/expand a lot
 )
 
@@ -47,7 +46,6 @@ type Model struct {
 	gvk schema.GroupVersionKind
 
 	keys keyMap
-	help help.Model
 }
 
 func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *Model {
@@ -74,7 +72,6 @@ func NewModel(gvk schema.GroupVersionKind, objs []*unstructured.Unstructured) *M
 		curLines: []*Line{},
 		prevNode: nil,
 		keys:     newKeyMap(),
-		help:     help.New(),
 	}
 	m.curLines, m.curLineNo = m.buildLines(m.nodes, m.vp.Width, 0)
 	content := m.renderRecursive(m.curLines)
@@ -196,7 +193,10 @@ func (m *Model) View() string {
 	)
 }
 
-// utils
+func (m *Model) Keys() keyMap {
+	return m.keys
+}
+
 func (m *Model) isCursor(curLineNo int) bool {
 	return m.cursor == curLineNo-m.vp.YOffset
 }

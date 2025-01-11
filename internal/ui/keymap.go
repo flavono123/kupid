@@ -14,8 +14,8 @@ func newKeyMap() keyMap {
 		quit:     key.NewBinding(key.WithKeys("ctrl+c")),
 		hideKbar: key.NewBinding(key.WithKeys("esc", "alt+k")),
 		toggleKbar: key.NewBinding(
-			key.WithKeys("alt+k"),
-			key.WithHelp("alt(opt)+k", "kinds"),
+			key.WithKeys("ctrl+k"),
+			key.WithHelp("^+k", "kinds"),
 		),
 		tabView: key.NewBinding(
 			key.WithKeys("tab"),

@@ -3,6 +3,7 @@ package ui
 import (
 	"log"
 
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -29,6 +30,7 @@ type Model struct {
 	session        sessionState
 	lastTabSession sessionState
 	keys           keyMap
+	help           help.Model
 	vp             viewport.Model
 	nav            *nav.Model
 	result         *result.Model
@@ -52,10 +54,22 @@ func NewModel() *Model {
 	controller := kube.NewResourceController(gvr)
 	controller.Inform()
 
+	helpKeyStyle := lipgloss.NewStyle().Foreground(theme.Lavender())
+	helpDescStyle := lipgloss.NewStyle().Foreground(theme.Subtext0())
+	helpSepStyle := lipgloss.NewStyle().Foreground(theme.Surface1())
+	customHelp := help.Model{
+		ShortSeparator: " · ",
+		Styles: help.Styles{
+			ShortKey:       helpKeyStyle,
+			ShortDesc:      helpDescStyle,
+			ShortSeparator: helpSepStyle,
+		},
+	}
 	return &Model{
 		session:        schemaView,
 		lastTabSession: schemaView,
 		keys:           newKeyMap(),
+		help:           customHelp,
 		nav:            nav.NewModel(initGvk, controller.Objects()),
 		result:         result.NewModel(controller.Objects()),
 		vp:             viewport.New(0, 0),
@@ -234,12 +248,29 @@ func (m *Model) View() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.vp.View(),
+		m.renderStatusBar(),
+	)
+}
+
+func (m *Model) renderStatusBar() string {
+	globalHelp := m.help.View(m.keys)
+	var sessionHelp string
+	if m.session == schemaView {
+		sessionHelp = m.help.View(m.nav.Keys())
+	} else {
+		sessionHelp = ""
+	}
+	return lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		globalHelp,
+		" ",
+		sessionHelp,
 	)
 }
 
 func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
 	m.vp.Width = msg.Width
-	m.vp.Height = msg.Height
+	m.vp.Height = msg.Height - 1 // HACK: status bar 1
 }
 
 func (m *Model) setController(gvk schema.GroupVersionKind) {

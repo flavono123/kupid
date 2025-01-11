@@ -17,15 +17,15 @@ func newKeyMap() keyMap {
 		down: key.NewBinding(key.WithKeys("down")),
 		action: key.NewBinding(
 			key.WithKeys(" "),
-			key.WithHelp("space", "fold/pick"),
+			key.WithHelp("spc", "fold/pick"),
 		),
 		levelExpand: key.NewBinding(
 			key.WithKeys("ctrl+@"),
-			key.WithHelp("ctrl+space", "expand level"),
+			key.WithHelp("^+spc", "expand level"),
 		),
 		allExpand: key.NewBinding(
 			key.WithKeys("ctrl+a"),
-			key.WithHelp("ctrl+a", "expand all"),
+			key.WithHelp("^+a", "expand all"),
 		),
 	}
 }
@@ -33,6 +33,8 @@ func newKeyMap() keyMap {
 func (k keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.action,
+		k.levelExpand,
+		k.allExpand,
 	}
 }
 

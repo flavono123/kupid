@@ -1,7 +1,6 @@
 package table
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -125,7 +124,6 @@ func (m *Model) View() string {
 		lipgloss.Left,
 		m.renderHeader(),
 		m.rowsView.View(),
-		m.renderDebugBar(),
 	)
 }
 
@@ -301,21 +299,13 @@ func (m *Model) isCursorTop() bool {
 }
 
 func (m *Model) isCursorBottom() bool {
-	// objs size as an index(-1) and the debug/help bar(-1)
-	// rowsview height as an index(-1); already adjusted for the debug/help bar
-	return m.cursor < min(len(m.objs)-1, m.rowsView.Height-1)
+	// objs size as an index(-1) and the root status bar(-1)
+	return m.cursor < min(len(m.objs)-1, m.rowsView.Height-2)
 }
 
 func (m *Model) setViewSize(msg tea.WindowSizeMsg) {
 	m.rowsView.Width = int(float64(msg.Width) * TABLE_WIDTH_RATIO)
-	m.rowsView.Height = msg.Height - 3 // HACK: topbar 1 + debug line 1 + header 1
-}
-
-func (m *Model) renderDebugBar() string {
-	return m.styles.debug.Render(
-		fmt.Sprintf("vpwidth: %d, TableWidth: %d, cols: %d",
-			m.rowsView.Width, m.TableWidth(), m.cols()),
-	)
+	m.rowsView.Height = msg.Height - 2 // HACK: (topbar 1 + header 1) + root status bar + 1
 }
 
 func (m *Model) WillOverWidth(node *kube.Node) bool {
