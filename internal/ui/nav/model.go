@@ -335,7 +335,7 @@ func (m *Model) curNode() *kube.Node {
 }
 
 func (m *Model) curIsPickable() bool {
-	return m.curNode() != nil && !m.curNode().Foldable() && !m.curNode().Selected
+	return m.curNode() != nil && m.curNode().Pickable(m.objs) && !m.curNode().Selected
 }
 
 func (m *Model) renderTopBar() string {

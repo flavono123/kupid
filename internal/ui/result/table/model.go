@@ -85,7 +85,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SetCandidateMsg:
 		if m.WillOverWidth(msg.Candidate) {
 			// do not render candidate
-			return m, nil
+			m.setCandidate(nil)
+			return m, nil // TODO: emit message to status bar
 		}
 
 		m.setCandidate(msg.Candidate)

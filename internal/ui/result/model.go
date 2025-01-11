@@ -84,7 +84,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		cmds = append(cmds, m.setTable(msg.Nodes, msg.Objs))
-		// cmds = append(cmds, m.setWidthLimitRatio())
 	case SetTableCandidateMsg:
 		cmds = append(cmds, m.setCandidate(msg.Candidate))
 	case tea.WindowSizeMsg:
