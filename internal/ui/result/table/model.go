@@ -162,9 +162,9 @@ func (m *Model) renderHeader() string {
 	var render strings.Builder
 	// headers
 	if len(m.objs) > 0 {
-		render.WriteString(m.cellStyle(0).Render("Name"))
+		render.WriteString(m.cellStyle(0).Render("NAME"))
 		for i, node := range m.nodes {
-			render.WriteString(m.cellStyle(i + 1).Render(node.Name()))
+			render.WriteString(m.cellStyle(i + 1).Render(node.HeaderName()))
 		}
 	}
 
@@ -172,7 +172,7 @@ func (m *Model) renderHeader() string {
 		return lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			m.headerStyle().Render(render.String()),
-			m.styles.candidate.Render(m.candidate.Name()),
+			m.styles.candidate.Render(m.candidate.HeaderName()),
 		)
 	}
 
@@ -265,7 +265,7 @@ func (m *Model) setNodeMaxWidths(nodes []*kube.Node) {
 	var nodeMaxWidths []int
 
 	for _, node := range nodes {
-		max := len(node.Name())
+		max := len(node.HeaderName())
 		for _, obj := range m.objs {
 			if len(kube.ValStr(node, obj)) > max {
 				max = len(kube.ValStr(node, obj))

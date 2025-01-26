@@ -3,6 +3,7 @@ package kube
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -71,6 +72,14 @@ func (n *Node) Name() string {
 		return n.name
 	}
 	return n.field.Name
+}
+
+func (n *Node) HeaderName() string {
+	// uppercase all char of last part of split by '/'
+	parts := strings.Split(n.name, "/")
+	headerName := strings.ToUpper(parts[len(parts)-1])
+
+	return headerName
 }
 
 func (n *Node) Prefix() []string {
