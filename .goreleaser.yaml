@@ -60,7 +60,8 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-  - format: tar.gz
+  - id: kupid
+    format: tar.gz
     name_template: |-
       kupid_{{ .Tag }}_{{ .Os }}_{{ .Arch -}}
     format_overrides:
