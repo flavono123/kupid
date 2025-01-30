@@ -2,7 +2,7 @@
 
 demo here after release
 
-Pick any Deep schema fields, create your own table view Kubernetes TUI.
+Pick any Deep schema fields, create your own table view of Kubernetes TUI.
 
 ## Installation
 
@@ -12,10 +12,13 @@ tbd
 
 ### Krew
 
-tbd
+
 
 ### Go
 
+```sh
+go install github.com/flavono123/kupid/cmd/kupid@latest
+```
 
 ## LIMITATION
 

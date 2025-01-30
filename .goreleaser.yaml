@@ -21,7 +21,27 @@ builds:
     ldflags:
       - -s -w
 
+krews:
+  - name: pickdeep
+    ids:
+      - krew
+    commit_msg_template: "Krew plugin update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/flavono123/kupid"
+    description: |-
+      Pick any Deep schema fields, create your own table view of Kubernetes TUI.
+    repository:
+      owner: flavono123
+      name: flew
+      branch: main
+
 archives:
+  - id: krew
+    format: tar.gz
+    name_template: |-
+      pickdeep_{{ .Tag }}_{{ .Os }}_{{ .Arch -}}
+    format_overrides:
+      - goos: windows
+        format: zip
   - format: tar.gz
     name_template: |-
       kupid_{{ .Tag }}_{{ .Os }}_{{ .Arch -}}
