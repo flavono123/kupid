@@ -28,6 +28,7 @@ brews:
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
     homepage: https://github.com/flavono123/kupid
     goarm: 8
+    directory: Formula
     description: |-
       Pick any Deep schema fields, create your own table view of Kubernetes TUI.
     install: |
