@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8-alpha](https://github.com/flavono123/kupid/compare/v0.0.7-alpha...v0.0.8-alpha) (2025-01-30)
+
+
+### Bug Fixes
+
+* homebrew default goarm ([5c44068](https://github.com/flavono123/kupid/commit/5c44068dd6f7893d6b4c1114d842f8ec948436c3))
+
 ## [0.0.7-alpha](https://github.com/flavono123/kupid/compare/v0.0.6-alpha...v0.0.7-alpha) (2025-01-30)
 
 
