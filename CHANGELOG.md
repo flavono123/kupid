@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.10-alpha](https://github.com/flavono123/kupid/compare/v0.0.9-alpha...v0.0.10-alpha) (2025-01-30)
+
+
+### Bug Fixes
+
+* homebrew formula directory ([0c9ae1d](https://github.com/flavono123/kupid/commit/0c9ae1dbb925a69794fb8aec4dbf777d3e4ad3cc))
+
 ## [0.0.9-alpha](https://github.com/flavono123/kupid/compare/v0.0.8-alpha...v0.0.9-alpha) (2025-01-30)
 
 
