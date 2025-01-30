@@ -8,16 +8,28 @@ Pick any Deep schema fields, create your own table view of Kubernetes TUI.
 
 ### Homebrew
 
-tbd
+```sh
+brew tap flavono123/tap
+brew install kupid
+
+kupid
+```
 
 ### Krew
 
+```sh
+kubectl krew index add flew https://github.com/flavono123/flew-index.git
+kubectl krew install flew/pickdeep
 
+kubectl pickdeep # general name for this case; https://krew.sigs.k8s.io/docs/developer-guide/develop/naming-guide/
+```
 
 ### Go
 
 ```sh
 go install github.com/flavono123/kupid/cmd/kupid@latest
+
+kupid
 ```
 
 ## LIMITATION

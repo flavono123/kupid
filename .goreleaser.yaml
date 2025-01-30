@@ -21,6 +21,21 @@ builds:
     ldflags:
       - -s -w
 
+brews:
+  - name: kupid
+    ids:
+    - kupid
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: https://github.com/flavono123/kupid
+    description: |-
+      Pick any Deep schema fields, create your own table view of Kubernetes TUI.
+    install: |
+      bin.install "kupid"
+    repository:
+      owner: flavono123
+      name: homebrew-tap
+      branch: main
+
 krews:
   - name: pickdeep
     ids:
