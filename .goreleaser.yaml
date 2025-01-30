@@ -33,7 +33,7 @@ krews:
       Pick any Deep schema fields, create your own table view of Kubernetes TUI.
     repository:
       owner: flavono123
-      name: flew
+      name: flew-index
       branch: main
 
 archives:
