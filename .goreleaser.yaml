@@ -29,6 +29,8 @@ krews:
     homepage: "https://github.com/flavono123/kupid"
     description: |-
       Pick any Deep schema fields, create your own table view of Kubernetes TUI.
+    short_description: |-
+      Pick any Deep schema fields, create your own table view of Kubernetes TUI.
     repository:
       owner: flavono123
       name: flew
