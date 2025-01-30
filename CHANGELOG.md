@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5-alpha](https://github.com/flavono123/kupid/compare/v0.0.4-alpha...v0.0.5-alpha) (2025-01-30)
+
+
+### Bug Fixes
+
+* krew index repo name ([2759193](https://github.com/flavono123/kupid/commit/2759193bd65311fa5610585ab01ac6a7b46f4793))
+
 ## [0.0.4-alpha](https://github.com/flavono123/kupid/compare/v0.0.3-alpha...v0.0.4-alpha) (2025-01-30)
 
 
