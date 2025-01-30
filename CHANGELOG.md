@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7-alpha](https://github.com/flavono123/kupid/compare/v0.0.6-alpha...v0.0.7-alpha) (2025-01-30)
+
+
+### Features
+
+* add homebrew release ([a530d79](https://github.com/flavono123/kupid/commit/a530d790fbbc86914a1228a17ec052d7015142e9))
+
 ## [0.0.6-alpha](https://github.com/flavono123/kupid/compare/v0.0.5-alpha...v0.0.6-alpha) (2025-01-30)
 
 
