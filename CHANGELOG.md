@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9-alpha](https://github.com/flavono123/kupid/compare/v0.0.8-alpha...v0.0.9-alpha) (2025-01-30)
+
+
+### Bug Fixes
+
+* archive id ([2546c50](https://github.com/flavono123/kupid/commit/2546c5087bb16b8d0d4432b056f23842f8703973))
+
 ## [0.0.8-alpha](https://github.com/flavono123/kupid/compare/v0.0.7-alpha...v0.0.8-alpha) (2025-01-30)
 
 
