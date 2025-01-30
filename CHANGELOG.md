@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6-alpha](https://github.com/flavono123/kupid/compare/v0.0.5-alpha...v0.0.6-alpha) (2025-01-30)
+
+
+### Bug Fixes
+
+* use cross repo pat ([ff885df](https://github.com/flavono123/kupid/commit/ff885df309927d150c69ff1cf45b6fe4065002ee))
+
 ## [0.0.5-alpha](https://github.com/flavono123/kupid/compare/v0.0.4-alpha...v0.0.5-alpha) (2025-01-30)
 
 
