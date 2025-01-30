@@ -1,6 +1,6 @@
 # Kupid
 
-demo here after release
+![demo](./assets/kupid.gif)
 
 Pick any Deep schema fields, create your own table view of Kubernetes TUI.
 
@@ -9,8 +9,7 @@ Pick any Deep schema fields, create your own table view of Kubernetes TUI.
 ### Homebrew
 
 ```sh
-brew tap flavono123/tap
-brew install kupid
+brew install flavono123/tap/kupid
 
 kupid
 ```
