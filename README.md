@@ -20,7 +20,7 @@ kupid
 kubectl krew index add flew https://github.com/flavono123/flew-index.git
 kubectl krew install flew/pickdeep
 
-kubectl pickdeep # general name for this case; https://krew.sigs.k8s.io/docs/developer-guide/develop/naming-guide/
+kubectl pickdeep # more general name for this case; https://krew.sigs.k8s.io/docs/developer-guide/develop/naming-guide/
 ```
 
 ### Go
