@@ -2,7 +2,6 @@
 
 ![demo](./assets/kupid.gif)
 
-
 Pick any Deep schema fields, create your own table view of Kubernetes TUI.
 
 ![GitHub License](https://img.shields.io/github/license/flavono123/kupid)
@@ -21,9 +20,12 @@ kupid
 
 ### Krew
 
+> [!NOTE]
+> for a krew plugin, named as `pickdeep`  over `kupid` to follow the [krew's naming guide](https://krew.sigs.k8s.io/docs/developer-guide/develop/naming-guide/).
+
 ```sh
 # from the official krew index
-kubectl krew install pickdeep  # more general name for this case; https://krew.sigs.k8s.io/docs/developer-guide/develop/naming-guide/
+kubectl krew install pickdeep
 
 # from my custom krew index, more latest since follow this repo's package
 kubectl krew index add flew https://github.com/flavono123/flew-index.git
@@ -42,8 +44,9 @@ kupid
 
 ## LIMITATION
 
-- for kinds with more than 8000 schema fields, the program goes very slow down; i experienced with a 'Pod' with about 8000+ fields.
-  - the bubbletea' viewport is not optimized for this case. should implement one for lazy loading of rendering content.
+> [!WARNING]
+> for kinds with more than 8000 schema fields, the program goes very slow down; i experienced with a 'Pod' with about 8000+ fields.
+> the bubbletea' viewport is not optimized for this case. should implement one for lazy loading of rendering content.
 
 ## Roadmap
 
