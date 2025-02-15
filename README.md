@@ -4,9 +4,10 @@
 
 Pick any Deep schema fields, create your own table view of Kubernetes TUI.
 
-![GitHub License](https://img.shields.io/github/license/flavono123/kupid)
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/flavono123/kupid)
-[![Go Report Card](https://goreportcard.com/badge/github.com/flavono123/kupid)](https://goreportcard.com/report/github.com/flavono123/kupid)
+![GitHub License](https://img.shields.io/github/license/flavono123/kupid?colorA=363a4f&colorB=b7bdf8)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/flavono123/kupid?colorA=363a4f&colorB=f5a97f)
+[![Go Report Card](https://goreportcard.com/badge/github.com/flavono123/kupid?colorA=363a4f&colorB=b7bdf8)](https://goreportcard.com/report/github.com/flavono123/kupid)
+[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?colorA=363a4f&colorB=a6da95)](https://github.com/flavono123/kupid/issues)
 
 ## Installation
 
@@ -27,7 +28,7 @@ kupid
 # from the official krew index
 kubectl krew install pickdeep
 
-# from my custom krew index, more latest since follow this repo's package
+# from my custom krew index, the most latest
 kubectl krew index add flew https://github.com/flavono123/flew-index.git
 kubectl krew install flew/pickdeep
 
