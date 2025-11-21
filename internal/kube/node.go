@@ -41,6 +41,10 @@ func (n *Node) Foldable() bool {
 }
 
 func (n *Node) Pickable(objs []*unstructured.Unstructured) bool {
+	if n.hasChildren() {
+		return false
+	}
+
 	if n.field == nil {
 		return !n.allNil(objs)
 	}
