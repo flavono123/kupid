@@ -19,6 +19,7 @@ import (
 const (
 	TABLE_WIDTH_RATIO = 0.7
 	TABLE_SCROLL_STEP = 1
+	MAX_COLUMN_WIDTH  = 50
 )
 
 type fuzzyMatchedRow struct {
@@ -230,9 +231,9 @@ func (m *Model) renderRow() string {
 				}
 			} else {
 				if match, ok := row.matches[j]; ok {
-					renderedCell = m.cellStyle(j).Render(highlight(cell, match, lipgloss.NewStyle().Foreground(theme.Text())))
+					renderedCell = m.cellStyle(j).Render(highlight(truncate(cell, m.colMaxWidth(j)), match, lipgloss.NewStyle().Foreground(theme.Text())))
 				} else {
-					renderedCell = m.cellStyle(j).Render(cell)
+					renderedCell = m.cellStyle(j).Render(truncate(cell, m.colMaxWidth(j)))
 				}
 			}
 			builder.WriteString(renderedCell)
@@ -267,9 +268,13 @@ func (m *Model) setNodeMaxWidths(nodes []*kube.Node) {
 	for _, node := range nodes {
 		max := len(node.HeaderName())
 		for _, obj := range m.objs {
-			if len(kube.ValStr(node, obj)) > max {
-				max = len(kube.ValStr(node, obj))
+			val := kube.ValStr(node, obj)
+			if len(val) > max {
+				max = len(val)
 			}
+		}
+		if max > MAX_COLUMN_WIDTH {
+			max = MAX_COLUMN_WIDTH
 		}
 		nodeMaxWidths = append(nodeMaxWidths, max)
 	}
@@ -333,6 +338,9 @@ func (m *Model) maxWidth(node *kube.Node) int {
 			max = len(kube.ValStr(node, obj))
 		}
 	}
+	if max > MAX_COLUMN_WIDTH {
+		return MAX_COLUMN_WIDTH
+	}
 	return max
 }
 
@@ -392,4 +400,11 @@ func (m *Model) tableUpdated() tea.Cmd {
 	return func() tea.Msg {
 		return event.TableUpdatedMsg{Width: m.TableWidth()}
 	}
+}
+
+func truncate(s string, max int) string {
+	if len(s) > max {
+		return s[:max-3] + "..."
+	}
+	return s
 }
