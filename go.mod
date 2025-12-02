@@ -1,6 +1,6 @@
 module github.com/flavono123/kupid
 
-go 1.23.4
+go 1.25.4
 
 require (
 	github.com/catppuccin/go v0.2.0
