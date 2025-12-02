@@ -1,5 +1,10 @@
 .vscode
+.serena
 
 /bin
 
 *.log
+*.test
+
+# Planning and analysis documents
+/planning
