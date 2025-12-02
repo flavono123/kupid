@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.11-alpha](https://github.com/flavono123/kupid/compare/v0.0.10-alpha...v0.0.11-alpha) (2025-12-02)
+
+
+### Bug Fixes
+
+* **kube:** prevent object array items from being pickable ([#26](https://github.com/flavono123/kupid/issues/26)) ([8c5744d](https://github.com/flavono123/kupid/commit/8c5744d3241bc9ad76e18a6b0360617c574efd81))
+* **ui:** cap column width and truncate long values ([#27](https://github.com/flavono123/kupid/issues/27)) ([9cf91ba](https://github.com/flavono123/kupid/commit/9cf91bae198c01f07f0978d7dc0b91f094824917))
+
 ## [0.0.10-alpha](https://github.com/flavono123/kupid/compare/v0.0.9-alpha...v0.0.10-alpha) (2025-01-30)
 
 
