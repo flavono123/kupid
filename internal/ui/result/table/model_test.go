@@ -1,92 +1,60 @@
 package table
 
 import (
-	"testing"
-
 	"github.com/flavono123/kupid/internal/kube"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestTruncate(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		max      int
-		expected string
-	}{
-		{
-			name:     "short string",
-			input:    "hello",
-			max:      10,
-			expected: "hello",
-		},
-		{
-			name:     "exact length",
-			input:    "hello",
-			max:      5,
-			expected: "hello",
-		},
-		{
-			name:     "long string",
-			input:    "hello world",
-			max:      5,
-			expected: "he...",
-		},
-		{
-			name:     "very long string",
-			input:    "this is a very long string",
-			max:      10,
-			expected: "this is...",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := truncate(tt.input, tt.max)
-			if got != tt.expected {
-				t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.max, got, tt.expected)
-			}
+var _ = Describe("Table", func() {
+	Describe("Truncate", func() {
+		It("should return original string if shorter than width", func() {
+			Expect(truncate("hello", 10)).To(Equal("hello"))
 		})
-	}
-}
 
-func TestWillOverWidth(t *testing.T) {
-	// Setup
-	longStr := ""
-	for i := 0; i < 100; i++ {
-		longStr += "a"
-	}
+		It("should return original string if equal to width", func() {
+			Expect(truncate("hello", 5)).To(Equal("hello"))
+		})
 
-	objs := []*unstructured.Unstructured{
-		{
-			Object: map[string]interface{}{
-				"long": longStr,
-			},
-		},
-	}
+		It("should truncate string if longer than width", func() {
+			Expect(truncate("hello world", 5)).To(Equal("he..."))
+		})
 
-	m := NewModel(nil, objs)
-	m.rowsView.Width = 100 // ample space
+		It("should truncate very long string", func() {
+			Expect(truncate("this is a very long string", 10)).To(Equal("this is..."))
+		})
+	})
 
-	// Create a node using CreateNodeTree
-	fieldTree := map[string]*kube.Field{
-		"long": {
-			Name: "long",
-			Type: "string",
-		},
-	}
-	nodes := kube.CreateNodeTree(fieldTree, objs, nil)
-	longNode := nodes["long"]
+	Describe("WillOverWidth", func() {
+		It("should cap max width and return false if within limit", func() {
+			longStr := ""
+			for i := 0; i < 100; i++ {
+				longStr += "a"
+			}
 
-	// Test: WillOverWidth should return false because maxWidth is capped at 50
-	// TableWidth is initially small (just name column).
-	// 50 + small < 100 - 9
-	if m.WillOverWidth(longNode) {
-		t.Errorf("WillOverWidth(longNode) = true, want false (should be capped)")
-	}
+			objs := []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"long": longStr,
+					},
+				},
+			}
 
-	// Verify maxWidth is capped
-	if width := m.maxWidth(longNode); width != MAX_COLUMN_WIDTH {
-		t.Errorf("maxWidth(longNode) = %d, want %d", width, MAX_COLUMN_WIDTH)
-	}
-}
+			m := NewModel(nil, objs)
+			m.rowsView.Width = 100
+
+			fieldTree := map[string]*kube.Field{
+				"long": {
+					Name: "long",
+					Type: "string",
+				},
+			}
+			nodes := kube.CreateNodeTree(fieldTree, objs, nil)
+			longNode := nodes["long"]
+
+			Expect(m.WillOverWidth(longNode)).To(BeFalse())
+			Expect(m.maxWidth(longNode)).To(Equal(MAX_COLUMN_WIDTH))
+		})
+	})
+})

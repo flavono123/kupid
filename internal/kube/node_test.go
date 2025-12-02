@@ -1,82 +1,67 @@
 package kube
 
 import (
-	"testing"
-
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestNode_Pickable(t *testing.T) {
-	tests := []struct {
-		name     string
-		node     *Node
-		objs     []*unstructured.Unstructured
-		expected bool
-	}{
-		{
-			name: "has children",
-			node: &Node{
+var _ = Describe("Node", func() {
+	Describe("Pickable", func() {
+		It("should return false if node has children", func() {
+			node := &Node{
 				children: map[string]*Node{"child": {}},
-			},
-			objs:     nil, // Should not be checked
-			expected: false,
-		},
-		{
-			name: "primitive field with value",
-			node: &Node{
+			}
+			Expect(node.Pickable(nil)).To(BeFalse())
+		})
+
+		It("should return true for primitive field with value", func() {
+			node := &Node{
 				name: "foo",
 				field: &Field{
 					Type: "string",
 				},
-			},
-			objs: []*unstructured.Unstructured{
+			}
+			objs := []*unstructured.Unstructured{
 				{
 					Object: map[string]interface{}{
 						"foo": "bar",
 					},
 				},
-			},
-			expected: true,
-		},
-		{
-			name: "primitive field without value",
-			node: &Node{
+			}
+			Expect(node.Pickable(objs)).To(BeTrue())
+		})
+
+		It("should return false for primitive field without value", func() {
+			node := &Node{
 				name: "foo",
 				field: &Field{
 					Type: "string",
 				},
-			},
-			objs: []*unstructured.Unstructured{
+			}
+			objs := []*unstructured.Unstructured{
 				{
 					Object: map[string]interface{}{},
 				},
-			},
-			expected: false,
-		},
-		{
-			name: "non-primitive field",
-			node: &Node{
+			}
+			Expect(node.Pickable(objs)).To(BeFalse())
+		})
+
+		It("should return false for non-primitive field", func() {
+			node := &Node{
 				name: "foo",
 				field: &Field{
 					Type: "map[string]string",
 				},
-			},
-			objs: []*unstructured.Unstructured{
+			}
+			objs := []*unstructured.Unstructured{
 				{
 					Object: map[string]interface{}{
 						"foo": map[string]interface{}{"a": "b"},
 					},
 				},
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.node.Pickable(tt.objs); got != tt.expected {
-				t.Errorf("Node.Pickable() = %v, want %v", got, tt.expected)
 			}
+			Expect(node.Pickable(objs)).To(BeFalse())
 		})
-	}
-}
+	})
+})
