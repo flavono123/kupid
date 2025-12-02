@@ -7,10 +7,17 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
+// GetGVKs returns all available GVKs from the current context (legacy, kept for TUI compatibility)
 func GetGVKs() ([]schema.GroupVersionKind, error) {
+	return GetGVKsForContext("")
+}
+
+// GetGVKsForContext returns all available GVKs from the specified context
+// If contextName is empty, uses the current context
+func GetGVKsForContext(contextName string) ([]schema.GroupVersionKind, error) {
 	var result []schema.GroupVersionKind
 
-	discoveryClient, err := DiscoveryClient()
+	discoveryClient, err := DiscoveryClientForContext(contextName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery client: %v", err)
 	}
@@ -33,8 +40,15 @@ func GetGVKs() ([]schema.GroupVersionKind, error) {
 	return result, nil
 }
 
+// GetGVR converts a GVK to GVR using the current context (legacy, kept for TUI compatibility)
 func GetGVR(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
-	discoveryClient, err := DiscoveryClient()
+	return GetGVRForContext("", gvk)
+}
+
+// GetGVRForContext converts a GVK to GVR using the specified context
+// If contextName is empty, uses the current context
+func GetGVRForContext(contextName string, gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+	discoveryClient, err := DiscoveryClientForContext(contextName)
 	if err != nil {
 		return schema.GroupVersionResource{}, err
 	}

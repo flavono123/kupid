@@ -20,23 +20,41 @@ type emitMsg struct {
 }
 
 type ResourceController struct {
-	client dynamic.Interface
-	gvr    schema.GroupVersionResource
-	store  cache.Store
-	emitCh chan emitMsg
+	contextName string // optional, for GUI multi-context support
+	client      dynamic.Interface
+	gvr         schema.GroupVersionResource
+	store       cache.Store
+	emitCh      chan emitMsg
 }
 
+// NewResourceController creates a controller for the current context (legacy, kept for TUI compatibility)
 func NewResourceController(gvr schema.GroupVersionResource) *ResourceController {
-	client, err := DynamicClient()
+	return NewResourceControllerForContext("", gvr)
+}
+
+// NewResourceControllerForContext creates a controller for the specified context
+// If contextName is empty, uses the current context
+func NewResourceControllerForContext(contextName string, gvr schema.GroupVersionResource) *ResourceController {
+	client, err := DynamicClientForContext(contextName)
 	if err != nil {
 		panic(err)
 	}
 
-	return &ResourceController{
-		client: client,
-		gvr:    gvr,
-		emitCh: make(chan emitMsg, 1),
+	if contextName == "" {
+		contextName, _ = GetCurrentContext()
 	}
+
+	return &ResourceController{
+		contextName: contextName,
+		client:      client,
+		gvr:         gvr,
+		emitCh:      make(chan emitMsg, 1),
+	}
+}
+
+// Context returns the context name this controller is connected to
+func (i *ResourceController) Context() string {
+	return i.contextName
 }
 
 func (i *ResourceController) Objects() []*unstructured.Unstructured {

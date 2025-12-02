@@ -12,10 +12,17 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
+// GetDocument retrieves the OpenAPI document for a GVR from the current context (legacy, kept for TUI compatibility)
 func GetDocument(gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
+	return GetDocumentForContext("", gvr)
+}
+
+// GetDocumentForContext retrieves the OpenAPI document for a GVR from the specified context
+// If contextName is empty, uses the current context
+func GetDocumentForContext(contextName string, gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
 	var result *spec3.OpenAPI
 
-	discoveryClient, err := DiscoveryClient()
+	discoveryClient, err := DiscoveryClientForContext(contextName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery client: %v", err)
 	}
@@ -127,12 +134,19 @@ func matchXKubeGVK(extension spec.Extensions, gvk schema.GroupVersionKind) bool 
 	return false
 }
 
+// CreateFieldTree creates a field tree for a GVK from the current context (legacy, kept for TUI compatibility)
 func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
-	gvr, err := GetGVR(gvk)
+	return CreateFieldTreeForContext("", gvk)
+}
+
+// CreateFieldTreeForContext creates a field tree for a GVK from the specified context
+// If contextName is empty, uses the current context
+func CreateFieldTreeForContext(contextName string, gvk schema.GroupVersionKind) (map[string]*Field, error) {
+	gvr, err := GetGVRForContext(contextName, gvk)
 	if err != nil {
 		return nil, err
 	}
-	document, err := GetDocument(gvr)
+	document, err := GetDocumentForContext(contextName, gvr)
 	if err != nil {
 		return nil, err
 	}
@@ -142,10 +156,10 @@ func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
 	}
 	history := make(map[string]bool)
 
-	// 참조 문자열 가져오기
+	// Get reference string
 	refString := schema.Ref.String()
 
-	// 순환 참조 감지
+	// Circular reference detection (commented out for now)
 	// if refString != "" {
 	// 	if history[refString] {
 	// 		return nil, nil
@@ -153,7 +167,7 @@ func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
 	// 	history[refString] = true
 	// }
 
-	// 스키마 해석 (참조인 경우 참조를 따라감
+	// Resolve schema reference if exists
 	if resolved := resolveRef(refString, document); resolved != nil {
 		schema = resolved
 	}
