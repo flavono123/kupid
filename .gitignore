@@ -8,3 +8,10 @@
 
 # Planning and analysis documents
 /planning
+
+# Wails
+*.md5
+cmd/gui/frontend/context-gallery-preview.html
+
+# macOS
+.DS_Store
