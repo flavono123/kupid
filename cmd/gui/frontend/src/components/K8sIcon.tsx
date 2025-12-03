@@ -9,7 +9,7 @@ export function K8sIcon({ className }: K8sIconProps) {
   return (
     <div
       className={cn(
-        "bg-gradient-to-br from-[#326CE5] to-[#5B8FF9] rounded-lg flex items-center justify-center",
+        "rounded-lg flex items-center justify-center",
         className
       )}
     >
