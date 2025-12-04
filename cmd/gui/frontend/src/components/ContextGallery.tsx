@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { ListContexts, GetCurrentContext } from "../../wailsjs/go/main/App";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ListContexts } from "../../wailsjs/go/main/App";
 import { K8sIcon } from "./K8sIcon";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -28,26 +28,28 @@ export function ContextGallery() {
   // Results are already processed by useFuzzySearch
   const filteredContexts = results;
 
-  const handleCardClick = (context: string) => {
-    const newSelected = new Set(selectedContexts);
-    if (newSelected.has(context)) {
-      newSelected.delete(context);
-    } else {
-      newSelected.add(context);
-    }
-    setSelectedContexts(newSelected);
-  };
+  const handleCardClick = useCallback((context: string) => {
+    setSelectedContexts((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(context)) {
+        newSelected.delete(context);
+      } else {
+        newSelected.add(context);
+      }
+      return newSelected;
+    });
+  }, []);
 
-  const handleConnect = () => {
+  const handleConnect = useCallback(() => {
     if (selectedContexts.size > 0) {
       console.log("Connecting to:", Array.from(selectedContexts));
       // TODO: Navigate to main view
     }
-  };
+  }, [selectedContexts]);
 
-  const handleClearAll = () => {
+  const handleClearAll = useCallback(() => {
     setSelectedContexts(new Set());
-  };
+  }, []);
 
   // Keyboard navigation
   useEffect(() => {
@@ -132,8 +134,10 @@ export function ContextGallery() {
       // Space: Toggle selection of focused item
       if (e.key === ' ' && focusedIndex !== null) {
         e.preventDefault();
-        const context = filteredContexts[focusedIndex].item;
-        handleCardClick(context);
+        const focusedContext = filteredContexts[focusedIndex];
+        if (focusedContext) {
+          handleCardClick(focusedContext.item);
+        }
         return;
       }
 
@@ -147,7 +151,7 @@ export function ContextGallery() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedIndex, filteredContexts, selectedContexts, isSearchFocused]);
+  }, [focusedIndex, filteredContexts, selectedContexts, isSearchFocused, handleCardClick, handleConnect, handleClearAll]);
 
   // Reset focused index when filtered contexts change
   useEffect(() => {

@@ -42,13 +42,14 @@ export function indexesToRanges(indexes: readonly number[]): [number, number][] 
 export function useFuzzySearch(items: string[]) {
   const [query, setQuery] = useState('');
 
-  const results = useMemo(() => {
+  const results = useMemo<FuzzySearchResult[]>(() => {
     if (!query) {
       // No search query: return all items sorted alphabetically
       const sorted = [...items].sort((a, b) => a.localeCompare(b));
-      return sorted.map(item => ({
+      const emptyIndices: [number, number][] = [];
+      return sorted.map((item): FuzzySearchResult => ({
         item,
-        indices: [] as [number, number][],
+        indices: emptyIndices,
         score: 0,
       }));
     }
@@ -56,7 +57,7 @@ export function useFuzzySearch(items: string[]) {
     // Use fuzzysort for subsequence matching
     const searchResults = fuzzysort.go(query, items);
 
-    return searchResults.map(result => ({
+    return searchResults.map((result): FuzzySearchResult => ({
       item: result.target,
       indices: indexesToRanges(result.indexes),
       score: result.score,

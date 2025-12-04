@@ -1,6 +1,8 @@
+import { ReactNode } from "react";
+
 interface HighlightedTextProps {
   text: string;
-  indices?: readonly [number, number][]; // fuse.js match indices
+  indices?: readonly [number, number][]; // fuzzysort match indices
   highlightClassName?: string; // Customizable highlight style
 }
 
@@ -11,17 +13,22 @@ export function HighlightedText({
 }: HighlightedTextProps) {
   if (indices.length === 0) return <>{text}</>;
 
-  const parts: React.ReactNode[] = [];
+  const parts: ReactNode[] = [];
   let lastIndex = 0;
+  let keyCounter = 0;
 
-  indices.forEach(([start, end], idx) => {
+  indices.forEach(([start, end]) => {
     // Non-matched part
     if (start > lastIndex) {
-      parts.push(text.substring(lastIndex, start));
+      parts.push(
+        <span key={`text-${keyCounter++}`}>
+          {text.substring(lastIndex, start)}
+        </span>
+      );
     }
     // Matched part (highlighted)
     parts.push(
-      <mark key={idx} className={highlightClassName}>
+      <mark key={`mark-${keyCounter++}`} className={highlightClassName}>
         {text.substring(start, end + 1)}
       </mark>
     );
@@ -30,7 +37,11 @@ export function HighlightedText({
 
   // Remaining part
   if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
+    parts.push(
+      <span key={`text-${keyCounter++}`}>
+        {text.substring(lastIndex)}
+      </span>
+    );
   }
 
   return <>{parts}</>;
