@@ -5,16 +5,23 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Search, Grid3X3 } from "lucide-react";
+import { useFuzzySearch } from "@/hooks/useFuzzySearch";
+import { HighlightedText } from "./HighlightedText";
 
 export function ContextGallery() {
   const [contexts, setContexts] = useState<string[]>([]);
   const [selectedContexts, setSelectedContexts] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     // Load contexts on mount
     ListContexts().then(setContexts);
   }, []);
+
+  // Fuzzy search hook with fuzzysort
+  const { query: searchQuery, setQuery: setSearchQuery, results } = useFuzzySearch(contexts);
+
+  // Results are already processed by useFuzzySearch
+  const filteredContexts = results;
 
   const handleCardClick = (context: string) => {
     const newSelected = new Set(selectedContexts);
@@ -25,10 +32,6 @@ export function ContextGallery() {
     }
     setSelectedContexts(newSelected);
   };
-
-  const filteredContexts = contexts
-    .filter((ctx) => ctx.toLowerCase().includes(searchQuery.toLowerCase()))
-    .sort((a, b) => a.localeCompare(b));
 
   const handleConnect = () => {
     if (selectedContexts.size > 0) {
@@ -92,13 +95,13 @@ export function ContextGallery() {
         {/* Scrollable Context Cards Grid */}
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredContexts.map((context) => {
-              const isSelected = selectedContexts.has(context);
+            {filteredContexts.map(({ item, indices }) => {
+              const isSelected = selectedContexts.has(item);
 
               return (
                 <Card
-                  key={context}
-                  onClick={() => handleCardClick(context)}
+                  key={item}
+                  onClick={() => handleCardClick(item)}
                   className={`
                     p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5
                     border-l-4
@@ -112,7 +115,7 @@ export function ContextGallery() {
                     <K8sIcon className="w-10 h-10 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base truncate">
-                        {context}
+                        <HighlightedText text={item} indices={indices} />
                       </h3>
                     </div>
                   </div>
