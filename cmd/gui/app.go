@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/flavono123/kupid/internal/kube"
 )
@@ -36,4 +37,102 @@ func (a *App) ListContexts() ([]string, error) {
 // GetCurrentContext returns the current active Kubernetes context
 func (a *App) GetCurrentContext() (string, error) {
 	return kube.GetCurrentContext()
+}
+
+// ContextConnectionResult represents the result of connecting to a context
+type ContextConnectionResult struct {
+	Context string `json:"context"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// ConnectToContexts attempts to create clients for the specified contexts
+// Returns a list of results indicating success or failure for each context
+func (a *App) ConnectToContexts(contexts []string) []ContextConnectionResult {
+	results := make([]ContextConnectionResult, 0, len(contexts))
+
+	for _, contextName := range contexts {
+		result := ContextConnectionResult{
+			Context: contextName,
+			Success: false,
+		}
+
+		// Try to create a client for this context
+		// This validates the context and ensures we can connect
+		_, err := kube.DiscoveryClientForContext(contextName)
+		if err != nil {
+			result.Error = err.Error()
+		} else {
+			result.Success = true
+		}
+
+		results = append(results, result)
+	}
+
+	return results
+}
+
+// ResourceInfo represents a Kubernetes resource with context availability
+type ResourceInfo struct {
+	Group    string   `json:"group"`
+	Version  string   `json:"version"`
+	Kind     string   `json:"kind"`
+	Contexts []string `json:"contexts"`  // Contexts where this resource is available
+	AllCount int      `json:"allCount"`  // Total number of contexts
+}
+
+// GetResourcesForContexts retrieves all unique resources from the specified contexts
+// Returns a merged and deduplicated list of resources with context availability info
+func (a *App) GetResourcesForContexts(contexts []string) []ResourceInfo {
+	// Map to track unique resources: key = "group/version/kind"
+	resourceMap := make(map[string]*ResourceInfo)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Process contexts in parallel
+	for _, contextName := range contexts {
+		wg.Add(1)
+		go func(ctx string) {
+			defer wg.Done()
+
+			gvks, err := kube.GetGVKsForContext(ctx)
+			if err != nil {
+				// Skip contexts that fail
+				return
+			}
+
+			for _, gvk := range gvks {
+				// Create unique key using GVK (no GVR conversion needed)
+				key := fmt.Sprintf("%s/%s/%s", gvk.Group, gvk.Version, gvk.Kind)
+
+				// Thread-safe map update
+				mu.Lock()
+				if info, exists := resourceMap[key]; exists {
+					// Add context to existing resource
+					info.Contexts = append(info.Contexts, ctx)
+				} else {
+					// Create new resource entry
+					resourceMap[key] = &ResourceInfo{
+						Group:    gvk.Group,
+						Version:  gvk.Version,
+						Kind:     gvk.Kind,
+						Contexts: []string{ctx},
+						AllCount: len(contexts),
+					}
+				}
+				mu.Unlock()
+			}
+		}(contextName)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
+	// Convert map to slice
+	results := make([]ResourceInfo, 0, len(resourceMap))
+	for _, info := range resourceMap {
+		results = append(results, *info)
+	}
+
+	return results
 }

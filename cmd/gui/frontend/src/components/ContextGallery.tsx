@@ -8,12 +8,14 @@ import { Search, X } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { Kbd } from "./ui/kbd";
+import { ResourceSelector } from "./ResourceSelector";
 
 export function ContextGallery() {
   const [contexts, setContexts] = useState<string[]>([]);
   const [selectedContexts, setSelectedContexts] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [showResourceSelector, setShowResourceSelector] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -41,11 +43,18 @@ export function ContextGallery() {
   }, []);
 
   const handleConnect = useCallback(() => {
+    console.log("handleConnect called, selectedContexts:", selectedContexts);
     if (selectedContexts.size > 0) {
-      console.log("Connecting to:", Array.from(selectedContexts));
-      // TODO: Navigate to main view
+      console.log("Setting showResourceSelector to true");
+      setShowResourceSelector(true);
+    } else {
+      console.log("No contexts selected");
     }
   }, [selectedContexts]);
+
+  const handleBackToGallery = useCallback(() => {
+    setShowResourceSelector(false);
+  }, []);
 
   const handleClearAll = useCallback(() => {
     setSelectedContexts(new Set());
@@ -169,6 +178,17 @@ export function ContextGallery() {
       }
     }
   }, [focusedIndex]);
+
+  // Show resource selector if user clicked Connect
+  if (showResourceSelector) {
+    console.log("Rendering ResourceSelector with contexts:", Array.from(selectedContexts));
+    return (
+      <ResourceSelector
+        contexts={Array.from(selectedContexts)}
+        onBack={handleBackToGallery}
+      />
+    );
+  }
 
   return (
     <div className="h-screen bg-background flex flex-col">
