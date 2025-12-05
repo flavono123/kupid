@@ -39,7 +39,7 @@ func getRawConfig() (*api.Config, error) {
 
 		cfg, err := kubeConfig.RawConfig()
 		if err != nil {
-			rawConfigErr = fmt.Errorf("failed to load kubeconfig: %v", err)
+			rawConfigErr = fmt.Errorf("failed to load kubeconfig: %w", err)
 			return
 		}
 		rawConfig = &cfg
@@ -75,25 +75,10 @@ func CurrentContext() (string, error) {
 	return GetCurrentContext()
 }
 
-// DiscoveryClient returns a discovery client for the current context (legacy, kept for TUI compatibility)
-func DiscoveryClient() (discovery.DiscoveryInterface, error) {
-	return DiscoveryClientForContext("")
-}
-
-// DynamicClient returns a dynamic client for the current context (legacy, kept for TUI compatibility)
-func DynamicClient() (dynamic.Interface, error) {
-	return DynamicClientForContext("")
-}
-
-// clientSet returns a clientset for the current context (legacy, kept for TUI compatibility)
-func clientSet() (*kubernetes.Clientset, error) {
-	return clientSetForContext("")
-}
-
 func kubeConfig() (*rest.Config, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get kubeconfig: %v", err)
+		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
 	return config, nil
 }
@@ -113,7 +98,7 @@ func kubeConfigForContext(contextName string) (*rest.Config, error) {
 
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get config for context %s: %v", contextName, err)
+		return nil, fmt.Errorf("failed to get config for context %s: %w", contextName, err)
 	}
 	return config, nil
 }
@@ -153,7 +138,7 @@ func clientSetForContext(contextName string) (*kubernetes.Clientset, error) {
 
 	cs, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create clientset for context %s: %v", contextName, err)
+		return nil, fmt.Errorf("failed to create clientset for context %s: %w", contextName, err)
 	}
 
 	clientSets[contextName] = cs
@@ -195,7 +180,7 @@ func DynamicClientForContext(contextName string) (dynamic.Interface, error) {
 
 	dc, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamic client for context %s: %v", contextName, err)
+		return nil, fmt.Errorf("failed to create dynamic client for context %s: %w", contextName, err)
 	}
 
 	dynamicClients[contextName] = dc
@@ -246,7 +231,7 @@ func TryTshKubeLogin(contextName string) (bool, error) {
 
 	err = cmd.Run()
 	if err != nil {
-		return true, fmt.Errorf("tsh kube login failed: %v", err)
+		return true, fmt.Errorf("tsh kube login failed: %w", err)
 	}
 
 	return true, nil
