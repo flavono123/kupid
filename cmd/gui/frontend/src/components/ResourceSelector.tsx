@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { GetResourcesForContexts } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import {
@@ -123,14 +123,19 @@ export function ResourceSelector({ contexts, onBack }: ResourceSelectorProps) {
     }
 
     // With search query: use fuzzy search results
-    return results.map((result) => {
-      const resourceIndex = searchableTexts.indexOf(result.item);
-      return {
-        resource: resources[resourceIndex],
-        indices: result.indices,
-        originalIndex: resourceIndex,
-      };
-    });
+    return results
+      .map((result) => {
+        const resourceIndex = searchableTexts.indexOf(result.item);
+        if (resourceIndex === -1) {
+          return null;
+        }
+        return {
+          resource: resources[resourceIndex],
+          indices: result.indices,
+          originalIndex: resourceIndex,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [resources, results, query, searchableTexts]);
 
   const handleSelect = (resource: main.ResourceInfo) => {

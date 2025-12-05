@@ -28,7 +28,7 @@ export function ContextGallery() {
   }, []);
 
   // Fuzzy search hook with fuzzysort
-  const { query: searchQuery, setQuery: setSearchQuery, results } = useFuzzySearch(contexts);
+  const { query, setQuery, results } = useFuzzySearch(contexts);
 
   // Results are already processed by useFuzzySearch
   const filteredContexts = results;
@@ -298,8 +298,8 @@ export function ContextGallery() {
                   ref={searchInputRef}
                   type="text"
                   placeholder="Search contexts..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => setIsSearchFocused(true)}
                   onBlur={() => setIsSearchFocused(false)}
                   className="pl-9"
