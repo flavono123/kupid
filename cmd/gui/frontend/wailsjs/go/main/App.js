@@ -21,3 +21,7 @@ export function Greet(arg1) {
 export function ListContexts() {
   return window['go']['main']['App']['ListContexts']();
 }
+
+export function RefreshContexts() {
+  return window['go']['main']['App']['RefreshContexts']();
+}

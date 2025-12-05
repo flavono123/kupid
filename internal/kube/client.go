@@ -263,3 +263,21 @@ func InvalidateClientCache(contextName string) {
 	delete(dynamicClients, contextName)
 	dynamicClientsMu.Unlock()
 }
+
+// InvalidateKubeconfigCache clears the cached kubeconfig
+// This forces a reload from disk on the next call to getRawConfig
+func InvalidateKubeconfigCache() {
+	// Reset sync.Once to allow re-execution
+	kubeConfigOnce = sync.Once{}
+	rawConfig = nil
+	rawConfigErr = nil
+
+	// Also clear all client caches since they're based on the old config
+	clientSetsMu.Lock()
+	clientSets = make(map[string]*kubernetes.Clientset)
+	clientSetsMu.Unlock()
+
+	dynamicClientsMu.Lock()
+	dynamicClients = make(map[string]dynamic.Interface)
+	dynamicClientsMu.Unlock()
+}

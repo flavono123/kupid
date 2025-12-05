@@ -35,6 +35,12 @@ func (a *App) ListContexts() ([]string, error) {
 	return kube.ListContexts()
 }
 
+// RefreshContexts invalidates the kubeconfig cache and reloads contexts
+func (a *App) RefreshContexts() ([]string, error) {
+	kube.InvalidateKubeconfigCache()
+	return kube.ListContexts()
+}
+
 // GetCurrentContext returns the current active Kubernetes context
 func (a *App) GetCurrentContext() (string, error) {
 	return kube.GetCurrentContext()

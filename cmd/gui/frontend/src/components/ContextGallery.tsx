@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ListContexts, ConnectToContexts } from "../../wailsjs/go/main/App";
+import { ListContexts, RefreshContexts, ConnectToContexts } from "../../wailsjs/go/main/App";
 import { K8sIcon } from "./K8sIcon";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
-import { Search, X, Loader2 } from "lucide-react";
+import { Search, X, Loader2, RefreshCw } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { Kbd } from "./ui/kbd";
@@ -103,9 +103,22 @@ export function ContextGallery() {
     setSelectedContexts(new Set());
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    const newContexts = await RefreshContexts();
+    setContexts(newContexts);
+    toast.success("Contexts refreshed");
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+R / Ctrl+R: Refresh contexts
+      if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+        e.preventDefault();
+        handleRefresh();
+        return;
+      }
+
       // Cmd+F / Ctrl+F: Focus search input
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
@@ -203,7 +216,7 @@ export function ContextGallery() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedIndex, filteredContexts, selectedContexts, isSearchFocused, handleCardClick, handleConnect, handleClearAll]);
+  }, [focusedIndex, filteredContexts, selectedContexts, isSearchFocused, handleCardClick, handleConnect, handleClearAll, handleRefresh]);
 
   // Reset focused index when filtered contexts change
   useEffect(() => {
@@ -252,13 +265,23 @@ export function ContextGallery() {
                   <circle cx="12" cy="12" r="2.5" fill="hsl(var(--primary))" />
                 </svg>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  Contexts{" "}
-                  <span className="text-muted-foreground">
-                    ({selectedContexts.size > 0 ? `${selectedContexts.size}/` : ""}{filteredContexts.length})
-                  </span>
-                </h1>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-foreground">
+                    Contexts{" "}
+                    <span className="text-muted-foreground">
+                      ({selectedContexts.size > 0 ? `${selectedContexts.size}/` : ""}{filteredContexts.length})
+                    </span>
+                  </h1>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleRefresh}
+                    className="h-8 w-8 p-0"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Select one or more contexts to get started
                 </p>
@@ -366,6 +389,11 @@ export function ContextGallery() {
 
           {/* Keyboard shortcuts guide */}
           <div className="flex-shrink-0 pb-4 flex gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Kbd>⌘</Kbd>
+              <Kbd>R</Kbd>
+              <span>Refresh</span>
+            </div>
             <div className="flex items-center gap-1">
               <Kbd>⌘</Kbd>
               <Kbd>F</Kbd>

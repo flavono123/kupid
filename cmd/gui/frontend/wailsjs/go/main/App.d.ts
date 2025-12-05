@@ -11,3 +11,5 @@ export function GetResourcesForContexts(arg1:Array<string>):Promise<Array<main.R
 export function Greet(arg1:string):Promise<string>;
 
 export function ListContexts():Promise<Array<string>>;
+
+export function RefreshContexts():Promise<Array<string>>;
