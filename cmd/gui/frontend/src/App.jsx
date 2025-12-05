@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { ContextGallery } from './components/ContextGallery';
+import { MainView } from './components/MainView';
 import { ColorPalette } from './components/ColorPalette';
 import { Toaster } from './components/ui/sonner';
 import { ThemeProvider } from 'next-themes';
 
 function App() {
     const [showColors, setShowColors] = useState(false);
+    const [showMainView, setShowMainView] = useState(false);
+    const [connectedContexts, setConnectedContexts] = useState([]);
 
     useEffect(() => {
         // ============================================================================
@@ -40,6 +43,16 @@ function App() {
         };
     }, []);
 
+    const handleContextsConnected = (contexts) => {
+        setConnectedContexts(contexts);
+        setShowMainView(true);
+    };
+
+    const handleBackToContexts = () => {
+        setShowMainView(false);
+        setConnectedContexts([]);
+    };
+
     const handleBackToGallery = () => {
         window.location.hash = '';
     };
@@ -48,8 +61,10 @@ function App() {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             {showColors ? (
                 <ColorPalette onBack={handleBackToGallery} />
+            ) : showMainView ? (
+                <MainView contexts={connectedContexts} onBackToContexts={handleBackToContexts} />
             ) : (
-                <ContextGallery />
+                <ContextGallery onContextsConnected={handleContextsConnected} />
             )}
             <Toaster position="top-right" />
         </ThemeProvider>

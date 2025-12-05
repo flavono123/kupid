@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { GetResourcesForContexts } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import {
   Command,
@@ -9,51 +8,35 @@ import {
   CommandItem,
 } from "./ui/command";
 import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
 import { Kbd } from "./ui/kbd";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Check, X, Loader2, ArrowLeft } from "lucide-react";
+import { Check, X, Loader2 } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { K8sIcon } from "./K8sIcon";
 
 interface ResourceSelectorProps {
   contexts: string[];
-  onBack: () => void;
+  resources: main.ResourceInfo[];
+  loading: boolean;
+  onClose: () => void;
 }
 
-export function ResourceSelector({ contexts, onBack }: ResourceSelectorProps) {
+export function ResourceSelector({ contexts, resources, loading, onClose }: ResourceSelectorProps) {
   console.log("ResourceSelector rendered with contexts:", contexts);
-  const [resources, setResources] = useState<main.ResourceInfo[]>([]);
-  const [loading, setLoading] = useState(true);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
-  const loadedRef = useRef(false);
   const contextsRef = useRef(contexts);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Auto-focus search input when modal opens
   useEffect(() => {
-    // Prevent multiple loads
-    if (loadedRef.current) return;
-    loadedRef.current = true;
+    // Small delay to ensure modal is rendered
+    const timeoutId = setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
 
-    const loadResources = async () => {
-      console.log("Loading resources for contexts:", contextsRef.current);
-      setLoading(true);
-      try {
-        const resourceList = await GetResourcesForContexts(contextsRef.current);
-        console.log("Loaded resources:", resourceList.length, "items");
-        setResources(resourceList);
-      } catch (error) {
-        console.error("Failed to load resources:", error);
-      } finally {
-        setLoading(false);
-        console.log("Loading complete");
-      }
-    };
-
-    loadResources();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Keyboard shortcuts
@@ -66,17 +49,24 @@ export function ResourceSelector({ contexts, onBack }: ResourceSelectorProps) {
         return;
       }
 
-      // Cmd+K / Ctrl+K: Close
+      // Cmd+K / Ctrl+K: Close modal
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        onBack();
+        onClose();
+        return;
+      }
+
+      // Escape: Close modal
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
         return;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onBack]);
+  }, [onClose]);
 
   // Extract searchable text (group + kind) for fuzzy search
   const searchableTexts = useMemo(() => {
@@ -144,20 +134,21 @@ export function ResourceSelector({ contexts, onBack }: ResourceSelectorProps) {
   };
 
   return (
-    <div className="h-screen bg-background flex items-center justify-center p-8">
-      <div className="w-full max-w-2xl">
-        {/* Back button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onBack}
-          className="mb-4 gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Contexts
-        </Button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop with blur */}
+      <div
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
-        <Command className="rounded-lg border shadow-md" shouldFilter={false}>
+      {/* Modal content */}
+      <div className="relative w-full max-w-2xl p-8">
+        {/*
+          NOTE: `loop` prop removed due to buggy behavior with scroll position.
+          When enabled, causes unexpected upward scrolling (set 0 jumps incorrectly).
+          TODO: Re-enable once cmdk fixes the loop + scroll interaction bug.
+        */}
+        <Command className="rounded-lg border shadow-lg" shouldFilter={false}>
           <CommandInput
             ref={searchInputRef}
             placeholder="Search resources..."
@@ -335,6 +326,8 @@ export function ResourceSelector({ contexts, onBack }: ResourceSelectorProps) {
             <div className="flex items-center gap-2">
               <Kbd>⌘</Kbd>
               <Kbd>K</Kbd>
+              <span>or</span>
+              <Kbd>Esc</Kbd>
               <span>Close</span>
             </div>
             <div className="flex items-center gap-2">

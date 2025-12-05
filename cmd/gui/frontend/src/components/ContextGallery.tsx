@@ -8,17 +8,18 @@ import { Search, X, Loader2, RefreshCw } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { Kbd } from "./ui/kbd";
-import { ResourceSelector } from "./ResourceSelector";
 import { toast } from "sonner";
 
-export function ContextGallery() {
+interface ContextGalleryProps {
+  onContextsConnected: (contexts: string[]) => void;
+}
+
+export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
   const [contexts, setContexts] = useState<string[]>([]);
   const [selectedContexts, setSelectedContexts] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [connectedContexts, setConnectedContexts] = useState<string[]>([]);
-  const [showResourceSelector, setShowResourceSelector] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -81,10 +82,9 @@ export function ContextGallery() {
         });
       }
 
-      // If at least one context connected successfully, show resource selector
+      // If at least one context connected successfully, navigate to main view
       if (successful.length > 0) {
-        setConnectedContexts(successful);
-        setShowResourceSelector(true);
+        onContextsConnected(successful);
       }
     } catch (error) {
       console.error("Connection error:", error);
@@ -94,11 +94,7 @@ export function ContextGallery() {
     } finally {
       setIsConnecting(false);
     }
-  }, [selectedContexts]);
-
-  const handleBackToGallery = useCallback(() => {
-    setShowResourceSelector(false);
-  }, []);
+  }, [selectedContexts, onContextsConnected]);
 
   const handleClearAll = useCallback(() => {
     setSelectedContexts(new Set());
@@ -235,17 +231,6 @@ export function ContextGallery() {
       }
     }
   }, [focusedIndex]);
-
-  // Show resource selector if user clicked Connect
-  if (showResourceSelector) {
-    console.log("Rendering ResourceSelector with contexts:", connectedContexts);
-    return (
-      <ResourceSelector
-        contexts={connectedContexts}
-        onBack={handleBackToGallery}
-      />
-    );
-  }
 
   return (
     <div className="h-screen bg-background flex flex-col">
