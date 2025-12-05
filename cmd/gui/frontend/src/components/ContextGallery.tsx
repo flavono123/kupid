@@ -33,7 +33,7 @@ export function ContextGallery() {
   // Results are already processed by useFuzzySearch
   const filteredContexts = results;
 
-  const handleCardClick = useCallback((context: string) => {
+  const handleCardClick = useCallback((context: string, index: number) => {
     setSelectedContexts((prev) => {
       const newSelected = new Set(prev);
       if (newSelected.has(context)) {
@@ -43,6 +43,7 @@ export function ContextGallery() {
       }
       return newSelected;
     });
+    setFocusedIndex(index);
   }, []);
 
   const handleConnect = useCallback(async () => {
@@ -201,7 +202,7 @@ export function ContextGallery() {
         e.preventDefault();
         const focusedContext = filteredContexts[focusedIndex];
         if (focusedContext) {
-          handleCardClick(focusedContext.item);
+          handleCardClick(focusedContext.item, focusedIndex);
         }
         return;
       }
@@ -278,6 +279,7 @@ export function ContextGallery() {
                     size="icon"
                     onClick={handleRefresh}
                     className="h-8 w-8 p-0"
+                    title="Refresh contexts"
                   >
                     <RefreshCw className="h-4 w-4" />
                   </Button>
@@ -339,14 +341,10 @@ export function ContextGallery() {
                   }}
                 >
                   <Card
-                    onClick={() => handleCardClick(item)}
+                    onClick={() => handleCardClick(item, index)}
                     className={`
                       p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5
-                      border-l-4
-                      ${isSelected
-                        ? "border-l-green-500 bg-accent"
-                        : "border-l-transparent"
-                      }
+                      ${isSelected ? "bg-accent" : ""}
                       ${isFocused
                         ? "ring-2 ring-ring ring-offset-2"
                         : ""
