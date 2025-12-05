@@ -1,20 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ListContexts } from "../../wailsjs/go/main/App";
+import { ListContexts, ConnectToContexts } from "../../wailsjs/go/main/App";
 import { K8sIcon } from "./K8sIcon";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
-import { Search, X } from "lucide-react";
+import { Search, X, Loader2 } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { Kbd } from "./ui/kbd";
 import { ResourceSelector } from "./ResourceSelector";
+import { toast } from "sonner";
 
 export function ContextGallery() {
   const [contexts, setContexts] = useState<string[]>([]);
   const [selectedContexts, setSelectedContexts] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectedContexts, setConnectedContexts] = useState<string[]>([]);
   const [showResourceSelector, setShowResourceSelector] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -42,13 +45,53 @@ export function ContextGallery() {
     });
   }, []);
 
-  const handleConnect = useCallback(() => {
+  const handleConnect = useCallback(async () => {
     console.log("handleConnect called, selectedContexts:", selectedContexts);
-    if (selectedContexts.size > 0) {
-      console.log("Setting showResourceSelector to true");
-      setShowResourceSelector(true);
-    } else {
+    if (selectedContexts.size === 0) {
       console.log("No contexts selected");
+      return;
+    }
+
+    setIsConnecting(true);
+    const contextsArray = Array.from(selectedContexts);
+
+    try {
+      const results = await ConnectToContexts(contextsArray);
+
+      // Filter successful connections
+      const successful = results
+        .filter((r) => r.success)
+        .map((r) => r.context);
+
+      const failed = results.filter((r) => !r.success);
+
+      // Show toast notifications
+      if (successful.length > 0) {
+        toast.success(`Connected to ${successful.length} context${successful.length > 1 ? 's' : ''}`, {
+          description: successful.join(', '),
+        });
+      }
+
+      if (failed.length > 0) {
+        failed.forEach((f) => {
+          toast.error(`Failed to connect to ${f.context}`, {
+            description: f.error,
+          });
+        });
+      }
+
+      // If at least one context connected successfully, show resource selector
+      if (successful.length > 0) {
+        setConnectedContexts(successful);
+        setShowResourceSelector(true);
+      }
+    } catch (error) {
+      console.error("Connection error:", error);
+      toast.error("Connection failed", {
+        description: String(error),
+      });
+    } finally {
+      setIsConnecting(false);
     }
   }, [selectedContexts]);
 
@@ -181,10 +224,10 @@ export function ContextGallery() {
 
   // Show resource selector if user clicked Connect
   if (showResourceSelector) {
-    console.log("Rendering ResourceSelector with contexts:", Array.from(selectedContexts));
+    console.log("Rendering ResourceSelector with contexts:", connectedContexts);
     return (
       <ResourceSelector
-        contexts={Array.from(selectedContexts)}
+        contexts={connectedContexts}
         onBack={handleBackToGallery}
       />
     );
@@ -307,10 +350,17 @@ export function ContextGallery() {
           <div className="flex-shrink-0 flex justify-center border-t pt-6">
             <Button
               onClick={handleConnect}
-              disabled={selectedContexts.size === 0}
+              disabled={selectedContexts.size === 0 || isConnecting}
               size="lg"
             >
-              Connect →
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                "Connect →"
+              )}
             </Button>
           </div>
 

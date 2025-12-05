@@ -3,7 +3,9 @@ package kube
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"k8s.io/client-go/discovery"
@@ -208,4 +210,56 @@ func DiscoveryClientForContext(contextName string) (discovery.DiscoveryInterface
 		return nil, err
 	}
 	return cs.Discovery(), nil
+}
+
+// TryTshKubeLogin attempts to run tsh kube login for a context
+// Returns true if login was attempted (regardless of success), false if context doesn't use tsh
+func TryTshKubeLogin(contextName string) (bool, error) {
+	cfg, err := getRawConfig()
+	if err != nil {
+		return false, err
+	}
+
+	// Get context
+	ctx, exists := cfg.Contexts[contextName]
+	if !exists {
+		return false, fmt.Errorf("context %s not found", contextName)
+	}
+
+	// Get auth info (user)
+	authInfo, exists := cfg.AuthInfos[ctx.AuthInfo]
+	if !exists {
+		return false, fmt.Errorf("auth info %s not found for context %s", ctx.AuthInfo, contextName)
+	}
+
+	// Check if using exec with tsh
+	if authInfo.Exec == nil || !strings.Contains(authInfo.Exec.Command, "tsh") {
+		return false, nil // Not using tsh, no need to login
+	}
+
+	// Convert "tsh kube credentials ..." to "tsh kube login"
+
+	cmd := exec.Command("tsh", "login")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	err = cmd.Run()
+	if err != nil {
+		return true, fmt.Errorf("tsh kube login failed: %v", err)
+	}
+
+	return true, nil
+}
+
+// InvalidateClientCache removes cached clients for a context
+// This is needed after tsh kube login to force recreation of clients
+func InvalidateClientCache(contextName string) {
+	clientSetsMu.Lock()
+	delete(clientSets, contextName)
+	clientSetsMu.Unlock()
+
+	dynamicClientsMu.Lock()
+	delete(dynamicClients, contextName)
+	dynamicClientsMu.Unlock()
 }

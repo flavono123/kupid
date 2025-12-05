@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/flavono123/kupid/internal/kube"
@@ -59,8 +60,53 @@ func (a *App) ConnectToContexts(contexts []string) []ContextConnectionResult {
 
 		// Try to create a client for this context
 		// This validates the context and ensures we can connect
-		_, err := kube.DiscoveryClientForContext(contextName)
+		discoveryClient, err := kube.DiscoveryClientForContext(contextName)
 		if err != nil {
+			result.Error = err.Error()
+			results = append(results, result)
+			continue
+		}
+
+		// Actually verify authentication by making a lightweight API call
+		_, err = discoveryClient.ServerVersion()
+		if err != nil {
+			// Check if error is related to tsh authentication
+			if strings.Contains(err.Error(), "tsh") {
+				// Try tsh kube login
+				attempted, loginErr := kube.TryTshKubeLogin(contextName)
+				if attempted {
+					if loginErr != nil {
+						result.Error = fmt.Sprintf("tsh kube login failed: %v", loginErr)
+						results = append(results, result)
+						continue
+					}
+
+					// Login succeeded, invalidate cache and retry
+					kube.InvalidateClientCache(contextName)
+
+					// Recreate client and retry
+					discoveryClient, err = kube.DiscoveryClientForContext(contextName)
+					if err != nil {
+						result.Error = err.Error()
+						results = append(results, result)
+						continue
+					}
+
+					_, err = discoveryClient.ServerVersion()
+					if err != nil {
+						result.Error = err.Error()
+						results = append(results, result)
+						continue
+					}
+
+					// Success after retry
+					result.Success = true
+					results = append(results, result)
+					continue
+				}
+			}
+
+			// Original error (not relogin or not using tsh)
 			result.Error = err.Error()
 		} else {
 			result.Success = true
