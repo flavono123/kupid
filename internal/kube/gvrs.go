@@ -29,6 +29,12 @@ func GetGVKsForContext(contextName string) ([]schema.GroupVersionKind, error) {
 
 	for _, apiResource := range apiResourceList {
 		for _, r := range apiResource.APIResources {
+			// Filter: only include resources that support "list" verb
+			// This excludes internal resources like Binding that only support "create"
+			if !supportsVerb(r.Verbs, "list") {
+				continue
+			}
+
 			gv, err := schema.ParseGroupVersion(apiResource.GroupVersion)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse group version: %w", err)
@@ -64,4 +70,14 @@ func GetGVRForContext(contextName string, gvk schema.GroupVersionKind) (schema.G
 	}
 
 	return mapping.Resource, nil
+}
+
+// supportsVerb checks if a verb is in the list of supported verbs
+func supportsVerb(verbs []string, verb string) bool {
+	for _, v := range verbs {
+		if v == verb {
+			return true
+		}
+	}
+	return false
 }
