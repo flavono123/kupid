@@ -255,64 +255,66 @@ export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPale
                       </div>
 
                       {/* Right side: Context availability badge */}
-                      <Popover
-                        open={openPopoverIndex === index}
-                        onOpenChange={(open) => {
-                          setOpenPopoverIndex(open ? index : null);
-                        }}
-                      >
-                        <PopoverTrigger asChild>
-                          <div
-                            className="flex items-center gap-1 px-1 py-0.5 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                      {contexts.length > 1 && (
+                        <Popover
+                          open={openPopoverIndex === index}
+                          onOpenChange={(open) => {
+                            setOpenPopoverIndex(open ? index : null);
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <div
+                              className="flex items-center gap-1 px-1 py-0.5 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                              onMouseEnter={() => setOpenPopoverIndex(index)}
+                              onMouseLeave={() => setOpenPopoverIndex(null)}
+                            >
+                              <K8sIcon className="w-9 h-9" />
+                              <span className="text-xs text-blue-700">
+                                {availableCount}
+                              </span>
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-auto max-w-md p-3"
+                            align="end"
+                            side="top"
+                            sideOffset={8}
                             onMouseEnter={() => setOpenPopoverIndex(index)}
                             onMouseLeave={() => setOpenPopoverIndex(null)}
                           >
-                            <K8sIcon className="w-9 h-9" />
-                            <span className="text-xs text-blue-700">
-                              {availableCount}
-                            </span>
-                          </div>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-auto max-w-md p-3"
-                          align="end"
-                          side="top"
-                          sideOffset={8}
-                          onMouseEnter={() => setOpenPopoverIndex(index)}
-                          onMouseLeave={() => setOpenPopoverIndex(null)}
-                        >
-                          <div className="space-y-1 text-xs">
-                            {contextsRef.current
-                              .slice()
-                              .sort((a, b) => {
-                                const aAvailable = gvk.contexts?.includes(a) ? 1 : 0;
-                                const bAvailable = gvk.contexts?.includes(b) ? 1 : 0;
-                                // Sort by availability (checked first), then alphabetically
-                                if (aAvailable !== bAvailable) {
-                                  return bAvailable - aAvailable;
-                                }
-                                return a.localeCompare(b);
-                              })
-                              .map((ctx) => {
-                                const isAvailable = gvk.contexts?.includes(ctx);
-                                return (
-                                  <div
-                                    key={ctx}
-                                    className={`flex items-center gap-2 ${isAvailable ? "" : "text-muted-foreground"
-                                      }`}
-                                  >
-                                    {isAvailable ? (
-                                      <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                                    ) : (
-                                      <X className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                    )}
-                                    <span className="break-all">{ctx}</span>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                            <div className="space-y-1 text-xs">
+                              {contextsRef.current
+                                .slice()
+                                .sort((a, b) => {
+                                  const aAvailable = gvk.contexts?.includes(a) ? 1 : 0;
+                                  const bAvailable = gvk.contexts?.includes(b) ? 1 : 0;
+                                  // Sort by availability (checked first), then alphabetically
+                                  if (aAvailable !== bAvailable) {
+                                    return bAvailable - aAvailable;
+                                  }
+                                  return a.localeCompare(b);
+                                })
+                                .map((ctx) => {
+                                  const isAvailable = gvk.contexts?.includes(ctx);
+                                  return (
+                                    <div
+                                      key={ctx}
+                                      className={`flex items-center gap-2 ${isAvailable ? "" : "text-muted-foreground"
+                                        }`}
+                                    >
+                                      {isAvailable ? (
+                                        <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                      ) : (
+                                        <X className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                      )}
+                                      <span className="break-all">{ctx}</span>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </CommandItem>
                   );
                 })}
