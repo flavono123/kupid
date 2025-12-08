@@ -8,6 +8,8 @@ export function GetCurrentContext():Promise<string>;
 
 export function GetGVKs(arg1:Array<string>):Promise<Array<main.MultiClusterGVK>>;
 
+export function GetNodeTree(arg1:main.MultiClusterGVK,arg2:Array<string>):Promise<Array<main.TreeNode>>;
+
 export function Greet(arg1:string):Promise<string>;
 
 export function ListContexts():Promise<Array<string>>;
