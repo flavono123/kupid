@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ContextGallery } from './components/ContextGallery';
 import { MainView } from './components/MainView';
-import { ColorPalette } from './components/ColorPalette';
+import { ColorPalette } from './components/debug/ColorPalette';
 import { Toaster } from './components/ui/sonner';
 import { ThemeProvider } from 'next-themes';
 
