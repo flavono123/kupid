@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -22,6 +22,120 @@ interface TreeNode {
   level: number;
   children: TreeNode[];
 }
+
+interface TreeNodeItemProps {
+  node: TreeNode;
+  expandedPaths: Set<string>;
+  selectedPaths: Set<string>;
+  onToggleExpand: (path: string[]) => void;
+  onToggleSelect: (path: string[]) => void;
+  matchIndices?: number[] | null;
+}
+
+// Memoized TreeNode component to prevent unnecessary re-renders
+const TreeNodeItem = memo(({
+  node,
+  expandedPaths,
+  selectedPaths,
+  onToggleExpand,
+  onToggleSelect,
+  matchIndices,
+}: TreeNodeItemProps) => {
+  const hasChildren = node.children && node.children.length > 0;
+  const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+  const isLeaf = !hasChildren && !isArrayOrMap;
+  const pathKey = node.fullPath.join('/');
+  const expanded = expandedPaths.has(pathKey);
+  const selected = selectedPaths.has(pathKey);
+
+  const handleExpandClick = useCallback(() => {
+    onToggleExpand(node.fullPath);
+  }, [node.fullPath, onToggleExpand]);
+
+  const handleSelectChange = useCallback(() => {
+    onToggleSelect(node.fullPath);
+  }, [node.fullPath, onToggleSelect]);
+
+  return (
+    <div>
+      <div
+        className="flex items-center hover:bg-accent py-1 px-2 rounded-sm"
+        style={{ paddingLeft: `${node.level * 16 + 8}px` }}
+      >
+        {/* Expand/Collapse button */}
+        {hasChildren ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 p-0"
+            onClick={handleExpandClick}
+          >
+            {expanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
+        ) : (
+          <span className="w-5" />
+        )}
+
+        {/* Selection checkbox (for leaf nodes only) */}
+        {isLeaf && (
+          <Checkbox
+            checked={selected}
+            onCheckedChange={handleSelectChange}
+            className="ml-1 mr-2"
+          />
+        )}
+        {!isLeaf && <span className="w-5 ml-1 mr-2" />}
+
+        {/* Field name */}
+        <span className="text-sm text-foreground">
+          {matchIndices ? (
+            <HighlightedText text={node.name} indices={matchIndices} />
+          ) : (
+            node.name
+          )}
+        </span>
+
+        {/* Type */}
+        {node.type && (
+          <span className="text-xs text-muted-foreground ml-2">
+            {`<${node.type}>`}
+          </span>
+        )}
+      </div>
+
+      {/* Children (if expanded) */}
+      {expanded && (
+        <div>
+          {hasChildren ? (
+            node.children.map((child, idx) => (
+              <TreeNodeItem
+                key={`${child.fullPath.join('/')}-${idx}`}
+                node={child}
+                expandedPaths={expandedPaths}
+                selectedPaths={selectedPaths}
+                onToggleExpand={onToggleExpand}
+                onToggleSelect={onToggleSelect}
+              />
+            ))
+          ) : (
+            <div
+              className="text-xs text-muted-foreground italic"
+              style={{ paddingLeft: `${(node.level + 1) * 16 + 8}px` }}
+            >
+              (empty)
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+TreeNodeItem.displayName = 'TreeNodeItem';
 
 export function NavigationPanel({
   selectedGVK,
@@ -77,31 +191,50 @@ export function NavigationPanel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchVisible]);
 
-  // Flatten tree for search
-  const flattenTree = (nodes: TreeNode[], acc: TreeNode[] = []): TreeNode[] => {
-    for (const node of nodes) {
-      acc.push(node);
-      if (node.children && node.children.length > 0) {
-        flattenTree(node.children, acc);
+  // Flatten tree for search - create a Map for O(1) lookup
+  const flatNodesMap = useMemo(() => {
+    const map = new Map<string, TreeNode>();
+    const flatten = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        const pathKey = node.fullPath.join('/');
+        map.set(pathKey, node);
+        if (node.children && node.children.length > 0) {
+          flatten(node.children);
+        }
       }
-    }
-    return acc;
-  };
+    };
+    flatten(nodeTree);
+    return map;
+  }, [nodeTree]);
 
-  const flatNodes = useMemo(() => flattenTree(nodeTree), [nodeTree]);
-
-  // Prepare searchable texts
-  const searchableTexts = useMemo(() => {
-    return flatNodes.map((node) => {
-      // Search by name + type
-      return `${node.name} ${node.type}`;
+  // Prepare searchable texts - use same order as Map
+  const { searchableTexts, pathKeys } = useMemo(() => {
+    const texts: string[] = [];
+    const keys: string[] = [];
+    flatNodesMap.forEach((node, pathKey) => {
+      texts.push(`${node.name} ${node.type}`);
+      keys.push(pathKey);
     });
-  }, [flatNodes]);
+    return { searchableTexts: texts, pathKeys: keys };
+  }, [flatNodesMap]);
 
   const { query, setQuery, results } = useFuzzySearch(searchableTexts);
 
-  // Toggle expand
-  const toggleExpand = (path: string[]) => {
+  // Create a Map of search results for O(1) lookup
+  const searchResultsMap = useMemo(() => {
+    const map = new Map<string, number[] | null>();
+    results.forEach((result) => {
+      const index = searchableTexts.indexOf(result.item);
+      if (index !== -1) {
+        const pathKey = pathKeys[index];
+        map.set(pathKey, result.indices);
+      }
+    });
+    return map;
+  }, [results, searchableTexts, pathKeys]);
+
+  // Memoized toggle functions
+  const toggleExpand = useCallback((path: string[]) => {
     const pathKey = path.join('/');
     setExpandedPaths((prev) => {
       const next = new Set(prev);
@@ -112,10 +245,9 @@ export function NavigationPanel({
       }
       return next;
     });
-  };
+  }, []);
 
-  // Toggle select
-  const toggleSelect = (path: string[]) => {
+  const toggleSelect = useCallback((path: string[]) => {
     const pathKey = path.join('/');
     setSelectedPaths((prev) => {
       const next = new Set(prev);
@@ -133,100 +265,7 @@ export function NavigationPanel({
 
       return next;
     });
-  };
-
-  // Check if path is expanded
-  const isExpanded = (path: string[]) => {
-    return expandedPaths.has(path.join('/'));
-  };
-
-  // Check if path is selected
-  const isSelected = (path: string[]) => {
-    return selectedPaths.has(path.join('/'));
-  };
-
-  // Render tree recursively
-  const renderNode = (node: TreeNode, index: number): JSX.Element => {
-    const hasChildren = node.children && node.children.length > 0;
-    // Arrays and maps are never leaf nodes, even if empty
-    const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
-    const isLeaf = !hasChildren && !isArrayOrMap;
-    const expanded = isExpanded(node.fullPath);
-    const selected = isSelected(node.fullPath);
-
-    // Check if this node matches search
-    const nodeIndex = flatNodes.indexOf(node);
-    const matchResult = results.find((r) => searchableTexts.indexOf(r.item) === nodeIndex);
-
-    return (
-      <div key={`${node.fullPath.join('/')}-${index}`}>
-        <div
-          className="flex items-center hover:bg-accent py-1 px-2 rounded-sm"
-          style={{ paddingLeft: `${node.level * 16 + 8}px` }}
-        >
-          {/* Expand/Collapse button */}
-          {hasChildren ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 p-0"
-              onClick={() => toggleExpand(node.fullPath)}
-            >
-              {expanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          ) : (
-            <span className="w-5" />
-          )}
-
-          {/* Selection checkbox (for leaf nodes only) */}
-          {isLeaf && (
-            <Checkbox
-              checked={selected}
-              onCheckedChange={() => toggleSelect(node.fullPath)}
-              className="ml-1 mr-2"
-            />
-          )}
-          {!isLeaf && <span className="w-5 ml-1 mr-2" />}
-
-          {/* Field name */}
-          <span className="text-sm text-foreground">
-            {matchResult ? (
-              <HighlightedText text={node.name} indices={matchResult.indices} />
-            ) : (
-              node.name
-            )}
-          </span>
-
-          {/* Type */}
-          {node.type && (
-            <span className="text-xs text-muted-foreground ml-2">
-              {`<${node.type}>`}
-            </span>
-          )}
-        </div>
-
-        {/* Children (if expanded) */}
-        {expanded && (
-          <div>
-            {hasChildren ? (
-              node.children.map((child, idx) => renderNode(child, idx))
-            ) : (
-              <div
-                className="text-xs text-muted-foreground italic"
-                style={{ paddingLeft: `${(node.level + 1) * 16 + 8}px` }}
-              >
-                (empty)
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  }, [onFieldsSelected]);
 
   return (
     <div className="flex flex-col h-full">
@@ -265,7 +304,17 @@ export function NavigationPanel({
           </div>
         ) : (
           <div className="p-2" style={{ minWidth: 'max-content' }}>
-            {nodeTree.map((node, idx) => renderNode(node, idx))}
+            {nodeTree.map((node, idx) => (
+              <TreeNodeItem
+                key={`${node.fullPath.join('/')}-${idx}`}
+                node={node}
+                expandedPaths={expandedPaths}
+                selectedPaths={selectedPaths}
+                onToggleExpand={toggleExpand}
+                onToggleSelect={toggleSelect}
+                matchIndices={searchResultsMap.get(node.fullPath.join('/')) || null}
+              />
+            ))}
           </div>
         )}
       </div>
