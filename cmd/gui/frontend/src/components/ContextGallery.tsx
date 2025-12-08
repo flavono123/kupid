@@ -253,7 +253,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-foreground">
+                  <h1 className="text-2xl text-foreground">
                     Contexts{" "}
                     <span className="text-muted-foreground">
                       ({selectedContexts.size > 0 ? `${selectedContexts.size}/` : ""}{filteredContexts.length})
@@ -309,7 +309,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
 
         {/* Middle Content - 1/3 */}
         <div className="flex-1 overflow-y-auto py-8">
-          <div className="grid grid-cols-3 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-3 gap-x-2 gap-y-2">
             {filteredContexts.map(({ item, indices }, index) => {
               const isSelected = selectedContexts.has(item);
               const isFocused = focusedIndex === index;
@@ -328,7 +328,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
                   <Card
                     onClick={() => handleCardClick(item, index)}
                     className={`
-                      p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5
+                      px-3 py-1 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5
                       ${isSelected ? "bg-accent" : ""}
                       ${isFocused
                         ? "ring-2 ring-ring ring-offset-2"
@@ -339,7 +339,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
                     <div className="flex items-center gap-3">
                       <K8sIcon className="w-10 h-10 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base truncate">
+                        <h3 className="text-base truncate">
                           <HighlightedText text={item} indices={indices} />
                         </h3>
                       </div>

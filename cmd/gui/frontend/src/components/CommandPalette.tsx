@@ -221,11 +221,11 @@ export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPale
                       key={`${gvk.group}-${gvk.version}-${gvk.kind}-${index}`}
                       value={gvk.kind}
                       onSelect={() => handleSelect(gvk)}
-                      className="flex items-center justify-between py-3"
+                      className="flex items-center justify-between py-2"
                     >
                       {/* Left side: Kind name and Group badge */}
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold ml-2">
+                        <span className="ml-2">
                           {kindIndices.length > 0 ? (
                             <HighlightedText
                               text={gvk.kind}
@@ -262,16 +262,16 @@ export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPale
                         }}
                       >
                         <PopoverTrigger asChild>
-                          <button
-                            className="flex items-center gap-2 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                          <div
+                            className="flex items-center gap-1 px-1 py-0.5 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
                             onMouseEnter={() => setOpenPopoverIndex(index)}
                             onMouseLeave={() => setOpenPopoverIndex(null)}
                           >
-                            <K8sIcon className="w-10 h-10" />
-                            <span className="text-xs font-semibold text-blue-700">
+                            <K8sIcon className="w-9 h-9" />
+                            <span className="text-xs text-blue-700">
                               {availableCount}
                             </span>
-                          </button>
+                          </div>
                         </PopoverTrigger>
                         <PopoverContent
                           className="w-auto max-w-md p-3"
@@ -298,9 +298,8 @@ export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPale
                                 return (
                                   <div
                                     key={ctx}
-                                    className={`flex items-center gap-2 ${
-                                      isAvailable ? "" : "text-muted-foreground"
-                                    }`}
+                                    className={`flex items-center gap-2 ${isAvailable ? "" : "text-muted-foreground"
+                                      }`}
                                   >
                                     {isAvailable ? (
                                       <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -322,7 +321,7 @@ export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPale
           </CommandList>
 
           {/* Footer */}
-          <div className="border-t px-4 py-3 flex gap-6 text-xs text-muted-foreground">
+          <div className="border-t px-4 py-2 flex gap-6 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <Kbd>⌘</Kbd>
               <Kbd>K</Kbd>

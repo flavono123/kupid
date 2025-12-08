@@ -56,7 +56,7 @@ export function ConnectionResult({ contexts, onBack }: ConnectionResultProps) {
             Back to Contexts
           </Button>
 
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-3xl text-foreground mb-2">
             Connection Results
           </h1>
           {!loading && (
@@ -105,7 +105,7 @@ export function ConnectionResult({ contexts, onBack }: ConnectionResultProps) {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-lg mb-1">
+                    <h3 className="text-lg mb-1">
                       {result.context}
                     </h3>
                     {result.success ? (

@@ -72,18 +72,13 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
             </Button>
             <div className="h-6 w-px bg-border" />
             <div>
-              <h2 className="text-sm font-semibold text-foreground">
+              <h2 className="text-sm text-foreground">
                 Connected Contexts ({contexts.length})
               </h2>
               <p className="text-xs text-muted-foreground">
                 {contexts.join(', ')}
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Kbd>⌘</Kbd>
-            <Kbd>K</Kbd>
-            <span>Open Command Palette</span>
           </div>
         </div>
       </div>
@@ -94,7 +89,7 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
         <div className="flex-1 border-r border-border p-8 overflow-auto">
           <Card className="h-full flex items-center justify-center bg-muted/20">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-foreground mb-2">
+              <h3 className="text-lg text-foreground mb-2">
                 Left Panel
               </h3>
               <p className="text-sm text-muted-foreground">
@@ -108,7 +103,7 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
         <div className="flex-1 p-8 overflow-auto">
           <Card className="h-full flex items-center justify-center bg-muted/20">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-foreground mb-2">
+              <h3 className="text-lg text-foreground mb-2">
                 Right Panel
               </h3>
               <p className="text-sm text-muted-foreground">
