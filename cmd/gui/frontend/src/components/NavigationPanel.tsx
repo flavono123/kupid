@@ -74,41 +74,50 @@ const TreeNodeItem = memo(({
     <div>
       <div
         ref={nodeRef}
-        className={`flex items-center py-1 px-2 rounded-sm ${
+        className={`flex items-center py-0.5 px-2 rounded-sm relative ${
           isFocused ? 'bg-primary/20 border-l-2 border-primary' : 'hover:bg-accent'
         }`}
-        style={{ paddingLeft: `${node.level * 16 + 8}px` }}
+        style={{ paddingLeft: `${node.level * 12}px` }}
       >
-        {/* Expand/Collapse button */}
+        {/* Indent guide lines */}
+        {node.level > 0 && (
+          <div className="absolute left-0 top-0 bottom-0 flex">
+            {Array.from({ length: node.level }).map((_, i) => (
+              <div
+                key={i}
+                className="border-l border-border/40"
+                style={{ marginLeft: `${i * 12}px` }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Expand/Collapse button OR Checkbox (mutually exclusive) */}
         {hasChildren ? (
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5 p-0"
+            className="h-4 w-4 p-0 mr-1.5 shrink-0 text-muted-foreground hover:text-foreground"
             onClick={handleExpandClick}
           >
             {expanded ? (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-3 w-3" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3 w-3" />
             )}
           </Button>
-        ) : (
-          <span className="w-5" />
-        )}
-
-        {/* Selection checkbox (for leaf nodes only) */}
-        {isLeaf && (
+        ) : isLeaf ? (
           <Checkbox
             checked={selected}
             onCheckedChange={handleSelectChange}
-            className="ml-1 mr-2"
+            className="mr-1.5 h-3.5 w-3.5 shrink-0"
           />
+        ) : (
+          <span className="w-4 mr-1.5 shrink-0" />
         )}
-        {!isLeaf && <span className="w-5 ml-1 mr-2" />}
 
         {/* Field name */}
-        <span className="text-sm text-foreground">
+        <span className="text-sm text-foreground font-mono">
           {matchIndices ? (
             <HighlightedText text={node.name} indices={matchIndices} />
           ) : (
@@ -116,38 +125,29 @@ const TreeNodeItem = memo(({
           )}
         </span>
 
-        {/* Type */}
+        {/* Type - styled with color, no angle brackets */}
         {node.type && (
-          <span className="text-xs text-muted-foreground ml-2">
-            {`<${node.type}>`}
+          <span className="text-xs text-primary/70 ml-2 font-mono">
+            {node.type}
           </span>
         )}
       </div>
 
       {/* Children (if expanded) */}
-      {expanded && (
+      {expanded && hasChildren && (
         <div>
-          {hasChildren ? (
-            node.children.map((child, idx) => (
-              <TreeNodeItem
-                key={`${child.fullPath.join('/')}-${idx}`}
-                node={child}
-                expandedPaths={expandedPaths}
-                selectedPaths={selectedPaths}
-                onToggleExpand={onToggleExpand}
-                onToggleSelect={onToggleSelect}
-                searchResultsMap={searchResultsMap}
-                focusedPath={focusedPath}
-              />
-            ))
-          ) : (
-            <div
-              className="text-xs text-muted-foreground italic"
-              style={{ paddingLeft: `${(node.level + 1) * 16 + 8}px` }}
-            >
-              (empty)
-            </div>
-          )}
+          {node.children.map((child, idx) => (
+            <TreeNodeItem
+              key={`${child.fullPath.join('/')}-${idx}`}
+              node={child}
+              expandedPaths={expandedPaths}
+              selectedPaths={selectedPaths}
+              onToggleExpand={onToggleExpand}
+              onToggleSelect={onToggleSelect}
+              searchResultsMap={searchResultsMap}
+              focusedPath={focusedPath}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -353,15 +353,22 @@ export function NavigationPanel({
   }, [onFieldsSelected]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Search Bar (conditional) */}
+    <div className="flex flex-col h-full relative">
+      {/* Search Bar (conditional) - Float on wide screens, full width on narrow */}
       {searchVisible && (
-        <div className="p-2 border-b border-border flex items-center gap-2">
+        <div className="
+          p-2 flex items-center gap-1.5
+          border-b border-border
+          md:absolute md:top-2 md:right-2 md:z-10
+          md:w-64 md:border md:rounded-md md:shadow-lg
+          md:bg-background/95 md:backdrop-blur-sm
+          md:p-1.5
+        ">
           <Input
-            placeholder="Search fields and types..."
+            placeholder="Search..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1"
+            className="flex-1 h-8 text-sm"
             autoFocus
           />
           {query && matchedPaths.length > 0 && (
