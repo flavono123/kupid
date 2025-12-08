@@ -15,25 +15,29 @@ function App() {
         // ============================================================================
         // 🚧 DEV-ONLY DEBUGGING FEATURES
         // ============================================================================
-        // - Color Palette Viewer (Cmd+P / Ctrl+P or #colors hash)
+        // - Color Palette Viewer (Cmd+P / Ctrl+P)
         // - Theme Toggle (Cmd+T / Ctrl+T)
         // These features are ONLY available in development mode and will NOT be
         // included in production builds.
         // ============================================================================
 
-        // Check URL hash on mount and hash change (DEV only)
-        const checkHash = () => {
-            setShowColors(import.meta.env.DEV && window.location.hash === '#colors');
-        };
-
-        checkHash();
-        window.addEventListener('hashchange', checkHash);
+        // Initialize with default state if none exists
+        if (!window.history.state) {
+            window.history.replaceState({ view: 'gallery' }, '', '');
+        }
 
         // Global keyboard shortcut: Cmd+P / Ctrl+P to toggle color palette (DEV only)
         const handleGlobalKeydown = (e) => {
             if (import.meta.env.DEV && (e.metaKey || e.ctrlKey) && e.key === 'p') {
                 e.preventDefault();
-                window.location.hash = window.location.hash === '#colors' ? '' : '#colors';
+                if (showColors) {
+                    // Close color palette (go back)
+                    window.history.back();
+                } else {
+                    // Open color palette
+                    setShowColors(true);
+                    window.history.pushState({ view: 'colors' }, '', '');
+                }
             }
 
             // Theme toggle: Cmd+T / Ctrl+T (DEV only)
@@ -60,18 +64,37 @@ function App() {
         window.addEventListener('keydown', handleGlobalKeydown);
 
         return () => {
-            window.removeEventListener('hashchange', checkHash);
             window.removeEventListener('keydown', handleGlobalKeydown);
         };
-    }, []);
+    }, [showColors]);
 
     // Handle browser back/forward navigation
     useEffect(() => {
         const handlePopState = (event) => {
-            // Back to context gallery
-            setShowMainView(false);
-            setSelectedContexts([]);
-            setConnectedContexts([]);
+            const state = event.state || { view: 'gallery' };
+
+            if (state.view === 'colors') {
+                // Show color palette
+                setShowColors(true);
+                setShowMainView(false);
+            } else if (state.view === 'main') {
+                // Show main view
+                setShowColors(false);
+                setShowMainView(true);
+                // Restore context data if available
+                if (state.selectedContexts) {
+                    setSelectedContexts(state.selectedContexts);
+                }
+                if (state.connectedContexts) {
+                    setConnectedContexts(state.connectedContexts);
+                }
+            } else {
+                // Back to context gallery
+                setShowColors(false);
+                setShowMainView(false);
+                setSelectedContexts([]);
+                setConnectedContexts([]);
+            }
         };
 
         window.addEventListener('popstate', handlePopState);
@@ -82,12 +105,16 @@ function App() {
         setSelectedContexts(selected);
         setConnectedContexts(connected);
         setShowMainView(true);
-        // Push history state for navigation
-        window.history.pushState({ view: 'main' }, '', '');
+        // Push history state with context data for navigation
+        window.history.pushState({
+            view: 'main',
+            selectedContexts: selected,
+            connectedContexts: connected
+        }, '', '');
     };
 
     const handleBackToGallery = () => {
-        window.location.hash = '';
+        window.history.back();
     };
 
     return (
