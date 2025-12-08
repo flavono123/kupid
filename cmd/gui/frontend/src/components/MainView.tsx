@@ -3,16 +3,18 @@ import { Card } from "./ui/card";
 import { CommandPalette } from "./CommandPalette";
 import { Kbd } from "./ui/kbd";
 import { Button } from "./ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { ArrowLeft, Plug, Unplug } from "lucide-react";
 import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 
 interface MainViewProps {
-  contexts: string[];
+  selectedContexts: string[];
+  connectedContexts: string[];
   onBackToContexts: () => void;
 }
 
-export function MainView({ contexts, onBackToContexts }: MainViewProps) {
+export function MainView({ selectedContexts, connectedContexts, onBackToContexts }: MainViewProps) {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,10 +27,10 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
     loadedRef.current = true;
 
     const loadGVKs = async () => {
-      console.log("MainView: Loading GVKs for contexts:", contexts);
+      console.log("MainView: Loading GVKs for contexts:", connectedContexts);
       setLoading(true);
       try {
-        const gvkList = await GetGVKs(contexts);
+        const gvkList = await GetGVKs(connectedContexts);
         console.log("MainView: Loaded GVKs:", gvkList.length, "items");
         setGVKs(gvkList);
       } catch (error) {
@@ -40,7 +42,7 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
     };
 
     loadGVKs();
-  }, [contexts]);
+  }, [connectedContexts]);
 
   useEffect(() => {
     // cmd+k to toggle CommandPalette
@@ -71,14 +73,66 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
               Back to Contexts
             </Button>
             <div className="h-6 w-px bg-border" />
-            <div>
-              <h2 className="text-sm text-foreground">
-                Connected Contexts ({contexts.length})
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {contexts.join(', ')}
-              </p>
-            </div>
+            {selectedContexts.length === 1 ? (
+              // Single context: show icon + name only, no popover
+              <div className="flex items-center gap-2 px-3 py-2">
+                <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <h2 className="text-sm text-foreground">
+                  {connectedContexts[0]}
+                </h2>
+              </div>
+            ) : (
+              // Multiple contexts: show popover with count
+              <Popover>
+                <PopoverTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 px-3 py-2 rounded-md transition-colors">
+                    <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <div>
+                      <h2 className="text-sm text-foreground">
+                        Contexts ({
+                          connectedContexts.length === selectedContexts.length
+                            ? selectedContexts.length  // All succeeded: "3"
+                            : `${connectedContexts.length}/${selectedContexts.length}`  // Some failed: "2/3"
+                        })
+                      </h2>
+                    </div>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto max-w-md p-3" align="start">
+                  <div className="space-y-1 text-xs">
+                    {selectedContexts
+                      .slice()
+                      .sort((a, b) => {
+                        const aConnected = connectedContexts.includes(a) ? 1 : 0;
+                        const bConnected = connectedContexts.includes(b) ? 1 : 0;
+                        // Sort by connection status (connected first), then alphabetically
+                        if (aConnected !== bConnected) {
+                          return bConnected - aConnected;
+                        }
+                        return a.localeCompare(b);
+                      })
+                      .map((ctx) => {
+                        const isConnected = connectedContexts.includes(ctx);
+                        return (
+                          <div
+                            key={ctx}
+                            className={`flex items-center gap-2 ${
+                              isConnected ? "" : "text-muted-foreground"
+                            }`}
+                          >
+                            {isConnected ? (
+                              <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
+                            ) : (
+                              <Unplug className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            )}
+                            <span className="break-all">{ctx}</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         </div>
       </div>
@@ -117,7 +171,7 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
       {/* CommandPalette Modal */}
       {showCommandPalette && (
         <CommandPalette
-          contexts={contexts}
+          contexts={connectedContexts}
           gvks={gvks}
           loading={loading}
           onClose={() => setShowCommandPalette(false)}
