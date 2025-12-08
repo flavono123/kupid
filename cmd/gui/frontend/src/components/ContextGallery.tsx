@@ -4,7 +4,8 @@ import { K8sIcon } from "./K8sIcon";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
-import { Search, X, Loader2, RefreshCw } from "lucide-react";
+import { Spinner } from "./ui/spinner";
+import { Search, X, RefreshCw } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { Kbd } from "./ui/kbd";
@@ -361,7 +362,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
             >
               {isConnecting ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner className="w-4 h-4 mr-2" />
                   Connecting...
                 </>
               ) : (

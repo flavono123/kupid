@@ -10,7 +10,8 @@ import {
 import { Badge } from "./ui/badge";
 import { Kbd } from "./ui/kbd";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Check, X, Loader2 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
+import { Check, X } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { K8sIcon } from "./K8sIcon";
@@ -159,7 +160,7 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
           <CommandList ref={listRef} className="max-h-96">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <Spinner className="w-8 h-8 text-primary" />
                 <p className="text-sm text-muted-foreground">
                   Loading GVKs from {contextsRef.current.length} context
                   {contextsRef.current.length > 1 ? "s" : ""}...

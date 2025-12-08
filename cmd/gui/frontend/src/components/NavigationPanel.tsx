@@ -3,6 +3,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
+import { Spinner } from "./ui/spinner";
 import { GetNodeTree } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
@@ -393,7 +394,8 @@ export function NavigationPanel({
       {/* Tree View */}
       <div className="flex-1 overflow-x-auto overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <Spinner className="w-8 h-8" />
             <p className="text-sm text-muted-foreground">Loading schema...</p>
           </div>
         ) : nodeTree.length === 0 ? (
