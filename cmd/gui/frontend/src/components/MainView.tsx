@@ -18,6 +18,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedGVK, setSelectedGVK] = useState<main.MultiClusterGVK | null>(null);
   const loadedRef = useRef(false);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -90,63 +91,91 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
               <div className="flex-1 min-w-0">
                 {selectedContexts.length === 1 ? (
                   // Single context: show icon + name only, no popover
-                  <div className="flex items-center gap-2 px-3 py-2">
-                    <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <h2 className="text-sm text-foreground truncate">
-                      {connectedContexts[0]}
-                    </h2>
+                  <div className="flex items-center gap-4 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
+                      <h2 className="text-sm text-foreground truncate">
+                        {connectedContexts[0]}
+                      </h2>
+                    </div>
+                    {selectedGVK && (
+                      <div className="flex items-center gap-2 border-l border-border pl-4">
+                        <h3 className="text-sm font-medium text-foreground">
+                          {selectedGVK.kind}
+                        </h3>
+                        {selectedGVK.group && (
+                          <span className="text-xs text-muted-foreground">
+                            {selectedGVK.group}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   // Multiple contexts: show popover with count
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 px-3 py-2 rounded-md transition-colors">
-                        <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
-                        <div>
-                          <h2 className="text-sm text-foreground">
-                            Contexts ({
-                              connectedContexts.length === selectedContexts.length
-                                ? selectedContexts.length  // All succeeded: "3"
-                                : `${connectedContexts.length}/${selectedContexts.length}`  // Some failed: "2/3"
-                            })
-                          </h2>
+                  <div className="flex items-center gap-4">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 px-3 py-2 rounded-md transition-colors">
+                          <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <div>
+                            <h2 className="text-sm text-foreground">
+                              Contexts ({
+                                connectedContexts.length === selectedContexts.length
+                                  ? selectedContexts.length  // All succeeded: "3"
+                                  : `${connectedContexts.length}/${selectedContexts.length}`  // Some failed: "2/3"
+                              })
+                            </h2>
+                          </div>
                         </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto max-w-md p-3" align="start">
+                        <div className="space-y-1 text-xs">
+                          {selectedContexts
+                            .slice()
+                            .sort((a, b) => {
+                              const aConnected = connectedContexts.includes(a) ? 1 : 0;
+                              const bConnected = connectedContexts.includes(b) ? 1 : 0;
+                              // Sort by connection status (connected first), then alphabetically
+                              if (aConnected !== bConnected) {
+                                return bConnected - aConnected;
+                              }
+                              return a.localeCompare(b);
+                            })
+                            .map((ctx) => {
+                              const isConnected = connectedContexts.includes(ctx);
+                              return (
+                                <div
+                                  key={ctx}
+                                  className={`flex items-center gap-2 ${
+                                    isConnected ? "" : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {isConnected ? (
+                                    <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                  ) : (
+                                    <Unplug className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                  <span className="break-all">{ctx}</span>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {selectedGVK && (
+                      <div className="flex items-center gap-2 border-l border-border pl-4">
+                        <h3 className="text-sm font-medium text-foreground">
+                          {selectedGVK.kind}
+                        </h3>
+                        {selectedGVK.group && (
+                          <span className="text-xs text-muted-foreground">
+                            {selectedGVK.group}
+                          </span>
+                        )}
                       </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto max-w-md p-3" align="start">
-                      <div className="space-y-1 text-xs">
-                        {selectedContexts
-                          .slice()
-                          .sort((a, b) => {
-                            const aConnected = connectedContexts.includes(a) ? 1 : 0;
-                            const bConnected = connectedContexts.includes(b) ? 1 : 0;
-                            // Sort by connection status (connected first), then alphabetically
-                            if (aConnected !== bConnected) {
-                              return bConnected - aConnected;
-                            }
-                            return a.localeCompare(b);
-                          })
-                          .map((ctx) => {
-                            const isConnected = connectedContexts.includes(ctx);
-                            return (
-                              <div
-                                key={ctx}
-                                className={`flex items-center gap-2 ${
-                                  isConnected ? "" : "text-muted-foreground"
-                                }`}
-                              >
-                                {isConnected ? (
-                                  <Plug className="w-4 h-4 text-green-500 flex-shrink-0" />
-                                ) : (
-                                  <Unplug className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                )}
-                                <span className="break-all">{ctx}</span>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -215,6 +244,10 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
           gvks={gvks}
           loading={loading}
           onClose={() => setShowCommandPalette(false)}
+          onGVKSelect={(gvk) => {
+            setSelectedGVK(gvk);
+            setShowCommandPalette(false);
+          }}
         />
       )}
     </div>

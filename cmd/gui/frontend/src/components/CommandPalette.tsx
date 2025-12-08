@@ -20,9 +20,10 @@ interface CommandPaletteProps {
   gvks: main.MultiClusterGVK[];
   loading: boolean;
   onClose: () => void;
+  onGVKSelect: (gvk: main.MultiClusterGVK) => void;
 }
 
-export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPaletteProps) {
+export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }: CommandPaletteProps) {
   console.log("CommandPalette rendered with contexts:", contexts);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const contextsRef = useRef(contexts);
@@ -130,7 +131,7 @@ export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPale
 
   const handleSelect = (gvk: main.MultiClusterGVK) => {
     console.log("Selected GVK:", gvk);
-    // TODO: Navigate to GVK view
+    onGVKSelect(gvk);
   };
 
   return (
