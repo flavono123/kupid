@@ -10,8 +10,8 @@ export function GetCurrentContext() {
   return window['go']['main']['App']['GetCurrentContext']();
 }
 
-export function GetResourcesForContexts(arg1) {
-  return window['go']['main']['App']['GetResourcesForContexts'](arg1);
+export function GetGVKs(arg1) {
+  return window['go']['main']['App']['GetGVKs'](arg1);
 }
 
 export function Greet(arg1) {

@@ -124,20 +124,20 @@ func (a *App) ConnectToContexts(contexts []string) []ContextConnectionResult {
 	return results
 }
 
-// ResourceInfo represents a Kubernetes resource with context availability
-type ResourceInfo struct {
+// MultiClusterGVK represents a Kubernetes resource (Group/Version/Kind) with context availability
+type MultiClusterGVK struct {
 	Group    string   `json:"group"`
 	Version  string   `json:"version"`
 	Kind     string   `json:"kind"`
-	Contexts []string `json:"contexts"`  // Contexts where this resource is available
+	Contexts []string `json:"contexts"`  // Contexts where this GVK is available
 	AllCount int      `json:"allCount"`  // Total number of contexts
 }
 
-// GetResourcesForContexts retrieves all unique resources from the specified contexts
-// Returns a merged and deduplicated list of resources with context availability info
-func (a *App) GetResourcesForContexts(contexts []string) []ResourceInfo {
-	// Map to track unique resources: key = "group/version/kind"
-	resourceMap := make(map[string]*ResourceInfo)
+// GetGVKs retrieves all unique GVKs from the specified contexts
+// Returns a merged and deduplicated list of GVKs with context availability info
+func (a *App) GetGVKs(contexts []string) []MultiClusterGVK {
+	// Map to track unique GVKs: key = "group/version/kind"
+	resourceMap := make(map[string]*MultiClusterGVK)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -160,11 +160,11 @@ func (a *App) GetResourcesForContexts(contexts []string) []ResourceInfo {
 				// Thread-safe map update
 				mu.Lock()
 				if info, exists := resourceMap[key]; exists {
-					// Add context to existing resource
+					// Add context to existing GVK
 					info.Contexts = append(info.Contexts, ctx)
 				} else {
-					// Create new resource entry
-					resourceMap[key] = &ResourceInfo{
+					// Create new GVK entry
+					resourceMap[key] = &MultiClusterGVK{
 						Group:    gvk.Group,
 						Version:  gvk.Version,
 						Kind:     gvk.Kind,
@@ -181,7 +181,7 @@ func (a *App) GetResourcesForContexts(contexts []string) []ResourceInfo {
 	wg.Wait()
 
 	// Convert map to slice
-	results := make([]ResourceInfo, 0, len(resourceMap))
+	results := make([]MultiClusterGVK, 0, len(resourceMap))
 	for _, info := range resourceMap {
 		results = append(results, *info)
 	}

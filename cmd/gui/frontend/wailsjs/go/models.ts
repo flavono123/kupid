@@ -16,7 +16,7 @@ export namespace main {
 	        this.error = source["error"];
 	    }
 	}
-	export class ResourceInfo {
+	export class MultiClusterGVK {
 	    group: string;
 	    version: string;
 	    kind: string;
@@ -24,7 +24,7 @@ export namespace main {
 	    allCount: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new ResourceInfo(source);
+	        return new MultiClusterGVK(source);
 	    }
 	
 	    constructor(source: any = {}) {

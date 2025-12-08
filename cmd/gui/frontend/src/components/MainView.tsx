@@ -4,7 +4,7 @@ import { ResourceSelector } from "./ResourceSelector";
 import { Kbd } from "./ui/kbd";
 import { Button } from "./ui/button";
 import { ArrowLeft } from "lucide-react";
-import { GetResourcesForContexts } from "../../wailsjs/go/main/App";
+import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 
 interface MainViewProps {
@@ -14,32 +14,32 @@ interface MainViewProps {
 
 export function MainView({ contexts, onBackToContexts }: MainViewProps) {
   const [showResourceSelector, setShowResourceSelector] = useState(false);
-  const [resources, setResources] = useState<main.ResourceInfo[]>([]);
+  const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
   const loadedRef = useRef(false);
 
-  // Load resources once when MainView mounts
+  // Load GVKs once when MainView mounts
   useEffect(() => {
     // Prevent multiple loads
     if (loadedRef.current) return;
     loadedRef.current = true;
 
-    const loadResources = async () => {
-      console.log("MainView: Loading resources for contexts:", contexts);
+    const loadGVKs = async () => {
+      console.log("MainView: Loading GVKs for contexts:", contexts);
       setLoading(true);
       try {
-        const resourceList = await GetResourcesForContexts(contexts);
-        console.log("MainView: Loaded resources:", resourceList.length, "items");
-        setResources(resourceList);
+        const gvkList = await GetGVKs(contexts);
+        console.log("MainView: Loaded GVKs:", gvkList.length, "items");
+        setGVKs(gvkList);
       } catch (error) {
-        console.error("MainView: Failed to load resources:", error);
+        console.error("MainView: Failed to load GVKs:", error);
       } finally {
         setLoading(false);
         console.log("MainView: Loading complete");
       }
     };
 
-    loadResources();
+    loadGVKs();
   }, [contexts]);
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
       {showResourceSelector && (
         <ResourceSelector
           contexts={contexts}
-          resources={resources}
+          gvks={gvks}
           loading={loading}
           onClose={() => setShowResourceSelector(false)}
         />

@@ -17,12 +17,12 @@ import { K8sIcon } from "./K8sIcon";
 
 interface ResourceSelectorProps {
   contexts: string[];
-  resources: main.ResourceInfo[];
+  gvks: main.MultiClusterGVK[];
   loading: boolean;
   onClose: () => void;
 }
 
-export function ResourceSelector({ contexts, resources, loading, onClose }: ResourceSelectorProps) {
+export function ResourceSelector({ contexts, gvks, loading, onClose }: ResourceSelectorProps) {
   console.log("ResourceSelector rendered with contexts:", contexts);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const contextsRef = useRef(contexts);
@@ -70,11 +70,11 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
 
   // Extract searchable text (group + kind) for fuzzy search
   const searchableTexts = useMemo(() => {
-    return resources.map((r) => {
+    return gvks.map((gvk) => {
       // Combine group and kind for searching (e.g., "apps Deployment" or "Deployment" for core)
-      return r.group ? `${r.group} ${r.kind}` : r.kind;
+      return gvk.group ? `${gvk.group} ${gvk.kind}` : gvk.kind;
     });
-  }, [resources]);
+  }, [gvks]);
 
   const { query, setQuery, results } = useFuzzySearch(searchableTexts);
 
@@ -92,11 +92,11 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
     }
   }, [query]);
 
-  // Map fuzzy search results back to full resource info
-  const filteredResources = useMemo(() => {
+  // Map fuzzy search results back to full GVK info
+  const filteredGVKs = useMemo(() => {
     if (query === "") {
       // No search query: sort by group -> kind
-      return resources
+      return gvks
         .slice()
         .sort((a, b) => {
           // Sort by group first (empty group comes first)
@@ -105,8 +105,8 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
           // Then by kind
           return a.kind.localeCompare(b.kind);
         })
-        .map((r, index) => ({
-          resource: r,
+        .map((gvk, index) => ({
+          gvk: gvk,
           indices: null,
           originalIndex: index,
         }));
@@ -115,22 +115,22 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
     // With search query: use fuzzy search results
     return results
       .map((result) => {
-        const resourceIndex = searchableTexts.indexOf(result.item);
-        if (resourceIndex === -1) {
+        const gvkIndex = searchableTexts.indexOf(result.item);
+        if (gvkIndex === -1) {
           return null;
         }
         return {
-          resource: resources[resourceIndex],
+          gvk: gvks[gvkIndex],
           indices: result.indices,
-          originalIndex: resourceIndex,
+          originalIndex: gvkIndex,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [resources, results, query, searchableTexts]);
+  }, [gvks, results, query, searchableTexts]);
 
-  const handleSelect = (resource: main.ResourceInfo) => {
-    console.log("Selected resource:", resource);
-    // TODO: Navigate to resource view
+  const handleSelect = (gvk: main.MultiClusterGVK) => {
+    console.log("Selected GVK:", gvk);
+    // TODO: Navigate to GVK view
   };
 
   return (
@@ -160,17 +160,17 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">
-                  Loading resources from {contextsRef.current.length} context
+                  Loading GVKs from {contextsRef.current.length} context
                   {contextsRef.current.length > 1 ? "s" : ""}...
                 </p>
               </div>
             ) : (
               <>
-                <CommandEmpty>No resources found.</CommandEmpty>
-                {filteredResources.map(({ resource, indices }, index) => {
-                  const isCore = resource.group === "";
-                  const availableCount = resource.contexts?.length || 0;
-                  const totalCount = resource.allCount;
+                <CommandEmpty>No GVKs found.</CommandEmpty>
+                {filteredGVKs.map(({ gvk, indices }, index) => {
+                  const isCore = gvk.group === "";
+                  const availableCount = gvk.contexts?.length || 0;
+                  const totalCount = gvk.allCount;
 
                   // Calculate indices for group and kind separately
                   // indices is in range format: [number, number][]
@@ -178,9 +178,9 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
                   let kindIndices: readonly [number, number][] = [];
 
                   if (indices && indices.length > 0) {
-                    if (resource.group) {
+                    if (gvk.group) {
                       // searchableText is "group kind" format (e.g., "apps Deployment")
-                      const groupLength = resource.group.length;
+                      const groupLength = gvk.group.length;
                       const kindStart = groupLength + 1; // +1 for space
 
                       // Process each range
@@ -218,9 +218,9 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
 
                   return (
                     <CommandItem
-                      key={`${resource.group}-${resource.version}-${resource.kind}-${index}`}
-                      value={resource.kind}
-                      onSelect={() => handleSelect(resource)}
+                      key={`${gvk.group}-${gvk.version}-${gvk.kind}-${index}`}
+                      value={gvk.kind}
+                      onSelect={() => handleSelect(gvk)}
                       className="flex items-center justify-between py-3"
                     >
                       {/* Left side: Kind name and Group badge */}
@@ -228,11 +228,11 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
                         <span className="font-semibold ml-2">
                           {kindIndices.length > 0 ? (
                             <HighlightedText
-                              text={resource.kind}
+                              text={gvk.kind}
                               indices={kindIndices}
                             />
                           ) : (
-                            resource.kind
+                            gvk.kind
                           )}
                         </span>
 
@@ -244,11 +244,11 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
                           >
                             {groupIndices.length > 0 ? (
                               <HighlightedText
-                                text={resource.group}
+                                text={gvk.group}
                                 indices={groupIndices}
                               />
                             ) : (
-                              resource.group
+                              gvk.group
                             )}
                           </Badge>
                         )}
@@ -285,8 +285,8 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
                             {contextsRef.current
                               .slice()
                               .sort((a, b) => {
-                                const aAvailable = resource.contexts?.includes(a) ? 1 : 0;
-                                const bAvailable = resource.contexts?.includes(b) ? 1 : 0;
+                                const aAvailable = gvk.contexts?.includes(a) ? 1 : 0;
+                                const bAvailable = gvk.contexts?.includes(b) ? 1 : 0;
                                 // Sort by availability (checked first), then alphabetically
                                 if (aAvailable !== bAvailable) {
                                   return bAvailable - aAvailable;
@@ -294,7 +294,7 @@ export function ResourceSelector({ contexts, resources, loading, onClose }: Reso
                                 return a.localeCompare(b);
                               })
                               .map((ctx) => {
-                                const isAvailable = resource.contexts?.includes(ctx);
+                                const isAvailable = gvk.contexts?.includes(ctx);
                                 return (
                                   <div
                                     key={ctx}

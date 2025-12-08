@@ -6,7 +6,7 @@ export function ConnectToContexts(arg1:Array<string>):Promise<Array<main.Context
 
 export function GetCurrentContext():Promise<string>;
 
-export function GetResourcesForContexts(arg1:Array<string>):Promise<Array<main.ResourceInfo>>;
+export function GetGVKs(arg1:Array<string>):Promise<Array<main.MultiClusterGVK>>;
 
 export function Greet(arg1:string):Promise<string>;
 
