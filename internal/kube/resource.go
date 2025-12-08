@@ -29,12 +29,12 @@ type ResourceController struct {
 
 // NewResourceController creates a controller for the current context (legacy, kept for TUI compatibility)
 func NewResourceController(gvr schema.GroupVersionResource) *ResourceController {
-	return newResourceControllerForContext("", gvr)
+	return NewResourceControllerForContext("", gvr)
 }
 
-// newResourceControllerForContext creates a controller for the specified context
+// NewResourceControllerForContext creates a controller for the specified context
 // If contextName is empty, uses the current context
-func newResourceControllerForContext(contextName string, gvr schema.GroupVersionResource) *ResourceController {
+func NewResourceControllerForContext(contextName string, gvr schema.GroupVersionResource) *ResourceController {
 	client, err := DynamicClientForContext(contextName)
 	if err != nil {
 		panic(err)

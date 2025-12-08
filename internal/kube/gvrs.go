@@ -42,12 +42,12 @@ func GetGVKsForContext(contextName string) ([]schema.GroupVersionKind, error) {
 
 // GetGVR converts a GVK to GVR using the current context (legacy, kept for TUI compatibility)
 func GetGVR(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
-	return getGVRForContext("", gvk)
+	return GetGVRForContext("", gvk)
 }
 
-// getGVRForContext converts a GVK to GVR using the specified context
+// GetGVRForContext converts a GVK to GVR using the specified context
 // If contextName is empty, uses the current context
-func getGVRForContext(contextName string, gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+func GetGVRForContext(contextName string, gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 	discoveryClient, err := DiscoveryClientForContext(contextName)
 	if err != nil {
 		return schema.GroupVersionResource{}, err

@@ -93,7 +93,7 @@ func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
 // createFieldTreeForContext creates a field tree for a GVK from the specified context
 // If contextName is empty, uses the current context
 func createFieldTreeForContext(contextName string, gvk schema.GroupVersionKind) (map[string]*Field, error) {
-	gvr, err := getGVRForContext(contextName, gvk)
+	gvr, err := GetGVRForContext(contextName, gvk)
 	if err != nil {
 		return nil, err
 	}

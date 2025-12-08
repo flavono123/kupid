@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { CommandPalette } from "./CommandPalette";
+import { NavigationPanel } from "./NavigationPanel";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./ui/button";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "./ui/resizable";
@@ -191,17 +192,23 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
             </div>
 
             {/* Navigation Content */}
-            <div className="flex-1 overflow-auto p-4">
-              <Card className="h-full flex items-center justify-center bg-muted/20">
-                <div className="text-center">
-                  <h3 className="text-lg text-foreground mb-2">
-                    Navigation
-                  </h3>
+            <div className="flex-1 overflow-auto">
+              {selectedGVK ? (
+                <NavigationPanel
+                  selectedGVK={selectedGVK}
+                  connectedContexts={connectedContexts}
+                  onFieldsSelected={(fields) => {
+                    console.log("Selected fields:", fields);
+                    // TODO: Update table columns in right panel
+                  }}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center">
                   <p className="text-sm text-muted-foreground">
-                    Resource tree will go here
+                    Press <kbd className="px-2 py-1 text-xs rounded border bg-muted">⌘K</kbd> to select a resource
                   </p>
                 </div>
-              </Card>
+              )}
             </div>
           </div>
         </ResizablePanel>

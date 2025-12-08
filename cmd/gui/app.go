@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/flavono123/kupid/internal/kube"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // App struct
@@ -187,4 +191,138 @@ func (a *App) GetGVKs(contexts []string) []MultiClusterGVK {
 	}
 
 	return results
+}
+
+// TreeNode represents a node in the navigation tree (frontend format)
+type TreeNode struct {
+	Name     string      `json:"name"`
+	Type     string      `json:"type"`       // e.g., "string", "[]Pod", "map[string]"
+	FullPath []string    `json:"fullPath"`  // for selection/search
+	Level    int         `json:"level"`
+	Children []*TreeNode `json:"children"`
+	// Note: Expanded and Selected state are managed in the frontend
+}
+
+// GetNodeTree retrieves the node tree for a given GVK and contexts
+// Returns a tree structure representing the schema + actual data
+func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, error) {
+	// Convert MultiClusterGVK to schema.GroupVersionKind
+	schemaGVK := schema.GroupVersionKind{
+		Group:   gvk.Group,
+		Version: gvk.Version,
+		Kind:    gvk.Kind,
+	}
+
+	// 1. Get field tree from schema
+	fields, err := kube.CreateFieldTree(schemaGVK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create field tree: %w", err)
+	}
+
+	// 2. Get resources from all contexts
+	objs, err := getResourcesForContexts(schemaGVK, contexts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resources: %w", err)
+	}
+
+	// 3. Create node tree
+	nodes := kube.CreateNodeTree(fields, objs, []string{})
+
+	// 4. Convert to frontend format (remove UI state, convert to array)
+	return convertNodeTree(nodes), nil
+}
+
+// getResourcesForContexts retrieves resources from multiple contexts
+func getResourcesForContexts(gvk schema.GroupVersionKind, contexts []string) ([]*unstructured.Unstructured, error) {
+	var allObjs []*unstructured.Unstructured
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, contextName := range contexts {
+		wg.Add(1)
+		go func(ctx string) {
+			defer wg.Done()
+
+			// Get GVR from GVK
+			gvr, err := kube.GetGVRForContext(ctx, gvk)
+			if err != nil {
+				fmt.Printf("Warning: failed to get GVR for %s in context %s: %v\n", gvk.Kind, ctx, err)
+				return
+			}
+
+			// Create resource controller for this context
+			controller := kube.NewResourceControllerForContext(ctx, gvr)
+
+			// Start the informer
+			_, err = controller.Inform()
+			if err != nil {
+				// Some resources (like Binding) may not support list operations
+				// Log the error but don't fail the entire request
+				fmt.Printf("Warning: failed to start informer for %s in context %s: %v\n", gvk.Kind, ctx, err)
+				// Return empty object list for this context
+				return
+			}
+
+			// Get objects from controller
+			objs := controller.Objects()
+
+			mu.Lock()
+			allObjs = append(allObjs, objs...)
+			mu.Unlock()
+		}(contextName)
+	}
+
+	wg.Wait()
+
+	// Note: We no longer fail the entire request if some contexts fail to start informers
+	// Individual context errors are logged as warnings instead
+
+	return allObjs, nil
+}
+
+// convertNodeTree converts kube.Node map to frontend TreeNode array
+func convertNodeTree(nodes map[string]*kube.Node) []*TreeNode {
+	result := make([]*TreeNode, 0, len(nodes))
+
+	for name, node := range nodes {
+		// Skip apiVersion and kind (TUI also skips these)
+		if name == "apiVersion" || name == "kind" {
+			continue
+		}
+
+		treeNode := &TreeNode{
+			Name:     node.Name(),
+			Type:     node.Type(),
+			FullPath: node.NodeFullPath(), // Use NodeFullPath instead of FullPath to include array indices
+			Level:    node.Level(),
+			Children: convertNodeTree(node.Children()),
+		}
+
+		result = append(result, treeNode)
+	}
+
+	// Sort result: numeric indices first (sorted numerically), then alphabetically
+	sort.Slice(result, func(i, j int) bool {
+		// Try to parse as numbers
+		numI, errI := strconv.Atoi(result[i].Name)
+		numJ, errJ := strconv.Atoi(result[j].Name)
+
+		// Both are numbers: sort numerically
+		if errI == nil && errJ == nil {
+			return numI < numJ
+		}
+
+		// One is a number, one is not: numbers come first
+		if errI == nil {
+			return true
+		}
+		if errJ == nil {
+			return false
+		}
+
+		// Both are strings: sort alphabetically
+		return result[i].Name < result[j].Name
+	})
+
+	return result
 }
