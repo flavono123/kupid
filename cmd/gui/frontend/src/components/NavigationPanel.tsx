@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -29,7 +29,8 @@ interface TreeNodeItemProps {
   selectedPaths: Set<string>;
   onToggleExpand: (path: string[]) => void;
   onToggleSelect: (path: string[]) => void;
-  matchIndices?: number[] | null;
+  searchResultsMap: Map<string, readonly [number, number][] | null>;
+  focusedPath?: string;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -39,7 +40,8 @@ const TreeNodeItem = memo(({
   selectedPaths,
   onToggleExpand,
   onToggleSelect,
-  matchIndices,
+  searchResultsMap,
+  focusedPath,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
@@ -47,6 +49,19 @@ const TreeNodeItem = memo(({
   const pathKey = node.fullPath.join('/');
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
+  const matchIndices = searchResultsMap.get(pathKey) || null;
+  const isFocused = focusedPath === pathKey;
+  const nodeRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to focused node
+  useEffect(() => {
+    if (isFocused && nodeRef.current) {
+      nodeRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [isFocused]);
 
   const handleExpandClick = useCallback(() => {
     onToggleExpand(node.fullPath);
@@ -59,7 +74,10 @@ const TreeNodeItem = memo(({
   return (
     <div>
       <div
-        className="flex items-center hover:bg-accent py-1 px-2 rounded-sm"
+        ref={nodeRef}
+        className={`flex items-center py-1 px-2 rounded-sm ${
+          isFocused ? 'bg-primary/20 border-l-2 border-primary' : 'hover:bg-accent'
+        }`}
         style={{ paddingLeft: `${node.level * 16 + 8}px` }}
       >
         {/* Expand/Collapse button */}
@@ -119,6 +137,8 @@ const TreeNodeItem = memo(({
                 selectedPaths={selectedPaths}
                 onToggleExpand={onToggleExpand}
                 onToggleSelect={onToggleSelect}
+                searchResultsMap={searchResultsMap}
+                focusedPath={focusedPath}
               />
             ))
           ) : (
@@ -147,6 +167,8 @@ export function NavigationPanel({
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [searchVisible, setSearchVisible] = useState(false);
+  const [savedExpandedPaths, setSavedExpandedPaths] = useState<Set<string> | null>(null);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
   // Fetch node tree
   useEffect(() => {
@@ -168,28 +190,6 @@ export function NavigationPanel({
         setLoading(false);
       });
   }, [selectedGVK, connectedContexts]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+F / Ctrl+F: Toggle search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault();
-        setSearchVisible((prev) => !prev);
-        return;
-      }
-
-      // Esc: Close search
-      if (e.key === 'Escape' && searchVisible) {
-        setSearchVisible(false);
-        setQuery('');
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchVisible]);
 
   // Flatten tree for search - create a Map for O(1) lookup
   const flatNodesMap = useMemo(() => {
@@ -218,11 +218,12 @@ export function NavigationPanel({
     return { searchableTexts: texts, pathKeys: keys };
   }, [flatNodesMap]);
 
-  const { query, setQuery, results } = useFuzzySearch(searchableTexts);
+  // Use stricter threshold for navigation panel (0.3 instead of default 0)
+  const { query, setQuery, results } = useFuzzySearch(searchableTexts, 0.3);
 
   // Create a Map of search results for O(1) lookup
   const searchResultsMap = useMemo(() => {
-    const map = new Map<string, number[] | null>();
+    const map = new Map<string, readonly [number, number][] | null>();
     results.forEach((result) => {
       const index = searchableTexts.indexOf(result.item);
       if (index !== -1) {
@@ -232,6 +233,91 @@ export function NavigationPanel({
     });
     return map;
   }, [results, searchableTexts, pathKeys]);
+
+  // Get list of matched paths for navigation
+  const matchedPaths = useMemo(() => {
+    return Array.from(searchResultsMap.keys());
+  }, [searchResultsMap]);
+
+  // Navigate to next/previous match
+  const navigateMatches = useCallback((direction: 'next' | 'prev') => {
+    if (matchedPaths.length === 0) return;
+
+    setCurrentMatchIndex((prevIndex) => {
+      let newIndex: number;
+      if (direction === 'next') {
+        newIndex = (prevIndex + 1) % matchedPaths.length;
+      } else {
+        newIndex = (prevIndex - 1 + matchedPaths.length) % matchedPaths.length;
+      }
+      return newIndex;
+    });
+  }, [matchedPaths.length]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+F / Ctrl+F: Toggle search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setSearchVisible((prev) => !prev);
+        return;
+      }
+
+      if (!searchVisible) return;
+
+      // Esc: Close search
+      if (e.key === 'Escape') {
+        setSearchVisible(false);
+        setQuery('');
+        return;
+      }
+
+      // Enter: Next match, Shift+Enter: Previous match
+      if (e.key === 'Enter' && query) {
+        e.preventDefault();
+        navigateMatches(e.shiftKey ? 'prev' : 'next');
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchVisible, query, navigateMatches]);
+
+  // Reset match index when search results change
+  useEffect(() => {
+    setCurrentMatchIndex(0);
+  }, [matchedPaths.length]);
+
+  // Auto-expand parent nodes when search has results
+  useEffect(() => {
+    if (query && searchResultsMap.size > 0) {
+      // Save current expanded state before first search
+      if (!savedExpandedPaths) {
+        setSavedExpandedPaths(new Set(expandedPaths));
+      }
+
+      // Collect all parent paths of matched nodes
+      // Start with empty set - only expand parents of matched nodes
+      const pathsToExpand = new Set<string>();
+
+      searchResultsMap.forEach((_, pathKey) => {
+        const pathParts = pathKey.split('/');
+        // Add all parent paths
+        for (let i = 1; i < pathParts.length; i++) {
+          const parentPath = pathParts.slice(0, i).join('/');
+          pathsToExpand.add(parentPath);
+        }
+      });
+
+      setExpandedPaths(pathsToExpand);
+    } else if (!query && savedExpandedPaths) {
+      // Restore saved state when search is cleared
+      setExpandedPaths(savedExpandedPaths);
+      setSavedExpandedPaths(null);
+    }
+  }, [query, searchResultsMap]);
 
   // Memoized toggle functions
   const toggleExpand = useCallback((path: string[]) => {
@@ -279,6 +365,11 @@ export function NavigationPanel({
             className="flex-1"
             autoFocus
           />
+          {query && matchedPaths.length > 0 && (
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {currentMatchIndex + 1}/{matchedPaths.length}
+            </span>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -312,7 +403,8 @@ export function NavigationPanel({
                 selectedPaths={selectedPaths}
                 onToggleExpand={toggleExpand}
                 onToggleSelect={toggleSelect}
-                matchIndices={searchResultsMap.get(node.fullPath.join('/')) || null}
+                searchResultsMap={searchResultsMap}
+                focusedPath={query && matchedPaths.length > 0 ? matchedPaths[currentMatchIndex] : undefined}
               />
             ))}
           </div>

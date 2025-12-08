@@ -39,7 +39,7 @@ export function indexesToRanges(indexes: readonly number[]): [number, number][] 
   return ranges;
 }
 
-export function useFuzzySearch(items: string[]) {
+export function useFuzzySearch(items: string[], threshold: number = 0) {
   const [query, setQuery] = useState('');
 
   const results = useMemo<FuzzySearchResult[]>(() => {
@@ -54,15 +54,20 @@ export function useFuzzySearch(items: string[]) {
       }));
     }
 
-    // Use fuzzysort for subsequence matching
-    const searchResults = fuzzysort.go(query, items);
+    // Use fuzzysort for subsequence matching with threshold
+    // Threshold range: 0 (accept all) to 1 (perfect match only)
+    // Higher threshold = stricter matching (fewer results)
+    // Default 0 accepts all matches, 0.3-0.4 is moderately strict
+    const searchResults = fuzzysort.go(query, items, {
+      threshold: threshold,
+    });
 
     return searchResults.map((result): FuzzySearchResult => ({
       item: result.target,
       indices: indexesToRanges(result.indexes),
       score: result.score,
     }));
-  }, [query, items]);
+  }, [query, items, threshold]);
 
   return { query, setQuery, results };
 }
