@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
-import { ResourceSelector } from "./ResourceSelector";
+import { CommandPalette } from "./CommandPalette";
 import { Kbd } from "./ui/kbd";
 import { Button } from "./ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -13,7 +13,7 @@ interface MainViewProps {
 }
 
 export function MainView({ contexts, onBackToContexts }: MainViewProps) {
-  const [showResourceSelector, setShowResourceSelector] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
   const loadedRef = useRef(false);
@@ -43,11 +43,11 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
   }, [contexts]);
 
   useEffect(() => {
-    // cmd+k to toggle ResourceSelector
+    // cmd+k to toggle CommandPalette
     const handleKeydown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setShowResourceSelector((prev) => !prev);
+        setShowCommandPalette((prev) => !prev);
       }
     };
 
@@ -83,7 +83,7 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Kbd>⌘</Kbd>
             <Kbd>K</Kbd>
-            <span>Open Resource Selector</span>
+            <span>Open Command Palette</span>
           </div>
         </div>
       </div>
@@ -119,13 +119,13 @@ export function MainView({ contexts, onBackToContexts }: MainViewProps) {
         </div>
       </div>
 
-      {/* ResourceSelector Modal */}
-      {showResourceSelector && (
-        <ResourceSelector
+      {/* CommandPalette Modal */}
+      {showCommandPalette && (
+        <CommandPalette
           contexts={contexts}
           gvks={gvks}
           loading={loading}
-          onClose={() => setShowResourceSelector(false)}
+          onClose={() => setShowCommandPalette(false)}
         />
       )}
     </div>

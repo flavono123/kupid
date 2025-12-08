@@ -15,15 +15,15 @@ import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { K8sIcon } from "./K8sIcon";
 
-interface ResourceSelectorProps {
+interface CommandPaletteProps {
   contexts: string[];
   gvks: main.MultiClusterGVK[];
   loading: boolean;
   onClose: () => void;
 }
 
-export function ResourceSelector({ contexts, gvks, loading, onClose }: ResourceSelectorProps) {
-  console.log("ResourceSelector rendered with contexts:", contexts);
+export function CommandPalette({ contexts, gvks, loading, onClose }: CommandPaletteProps) {
+  console.log("CommandPalette rendered with contexts:", contexts);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const contextsRef = useRef(contexts);
   const searchInputRef = useRef<HTMLInputElement>(null);
