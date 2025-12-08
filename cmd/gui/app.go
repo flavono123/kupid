@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -133,8 +134,8 @@ type MultiClusterGVK struct {
 	Group    string   `json:"group"`
 	Version  string   `json:"version"`
 	Kind     string   `json:"kind"`
-	Contexts []string `json:"contexts"`  // Contexts where this GVK is available
-	AllCount int      `json:"allCount"`  // Total number of contexts
+	Contexts []string `json:"contexts"` // Contexts where this GVK is available
+	AllCount int      `json:"allCount"` // Total number of contexts
 }
 
 // GetGVKs retrieves all unique GVKs from the specified contexts
@@ -196,8 +197,8 @@ func (a *App) GetGVKs(contexts []string) []MultiClusterGVK {
 // TreeNode represents a node in the navigation tree (frontend format)
 type TreeNode struct {
 	Name     string      `json:"name"`
-	Type     string      `json:"type"`       // e.g., "string", "[]Pod", "map[string]"
-	FullPath []string    `json:"fullPath"`  // for selection/search
+	Type     string      `json:"type"`     // e.g., "string", "[]Pod", "map[string]"
+	FullPath []string    `json:"fullPath"` // for selection/search
 	Level    int         `json:"level"`
 	Children []*TreeNode `json:"children"`
 	// Note: Expanded and Selected state are managed in the frontend
@@ -246,7 +247,7 @@ func getResourcesForContexts(gvk schema.GroupVersionKind, contexts []string) ([]
 			// Get GVR from GVK
 			gvr, err := kube.GetGVRForContext(ctx, gvk)
 			if err != nil {
-				fmt.Printf("Warning: failed to get GVR for %s in context %s: %v\n", gvk.Kind, ctx, err)
+				log.Printf("Warning: failed to get GVR for %s in context %s: %v", gvk.Kind, ctx, err)
 				return
 			}
 
@@ -258,7 +259,7 @@ func getResourcesForContexts(gvk schema.GroupVersionKind, contexts []string) ([]
 			if err != nil {
 				// Some resources (like Binding) may not support list operations
 				// Log the error but don't fail the entire request
-				fmt.Printf("Warning: failed to start informer for %s in context %s: %v\n", gvk.Kind, ctx, err)
+				log.Printf("Warning: failed to start informer for %s in context %s: %v", gvk.Kind, ctx, err)
 				// Return empty object list for this context
 				return
 			}

@@ -56,17 +56,17 @@ func GetGVR(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 func GetGVRForContext(contextName string, gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 	discoveryClient, err := DiscoveryClientForContext(contextName)
 	if err != nil {
-		return schema.GroupVersionResource{}, err
+		return schema.GroupVersionResource{}, fmt.Errorf("failed to get discovery client: %w", err)
 	}
 	groupResources, err := restmapper.GetAPIGroupResources(discoveryClient)
 	if err != nil {
-		return schema.GroupVersionResource{}, err
+		return schema.GroupVersionResource{}, fmt.Errorf("failed to get API group resources: %w", err)
 	}
 
 	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return schema.GroupVersionResource{}, err
+		return schema.GroupVersionResource{}, fmt.Errorf("failed to get REST mapping for %s: %w", gvk.String(), err)
 	}
 
 	return mapping.Resource, nil
