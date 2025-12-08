@@ -51,6 +51,7 @@ const createMockGVK = (
 
 describe('CommandPalette - Context Availability Badge Visibility', () => {
   const mockOnClose = () => {};
+  const mockOnGVKSelect = () => {};
 
   describe('Single context connected', () => {
     it('should NOT show context availability badge when only 1 context is connected', () => {
@@ -65,6 +66,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
           gvks={gvks}
           loading={false}
           onClose={mockOnClose}
+          onGVKSelect={mockOnGVKSelect}
         />
       );
 
@@ -86,6 +88,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
           gvks={gvks}
           loading={false}
           onClose={mockOnClose}
+          onGVKSelect={mockOnGVKSelect}
         />
       );
 
@@ -104,6 +107,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
           gvks={gvks}
           loading={false}
           onClose={mockOnClose}
+          onGVKSelect={mockOnGVKSelect}
         />
       );
 
@@ -124,6 +128,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
           gvks={gvks}
           loading={false}
           onClose={mockOnClose}
+          onGVKSelect={mockOnGVKSelect}
         />
       );
 
@@ -147,6 +152,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
           gvks={[]}
           loading={false}
           onClose={mockOnClose}
+          onGVKSelect={mockOnGVKSelect}
         />
       );
 
@@ -161,6 +167,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
           gvks={[]}
           loading={true}
           onClose={mockOnClose}
+          onGVKSelect={mockOnGVKSelect}
         />
       );
 

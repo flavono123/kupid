@@ -171,7 +171,6 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
                 {filteredGVKs.map(({ gvk, indices }, index) => {
                   const isCore = gvk.group === "";
                   const availableCount = gvk.contexts?.length || 0;
-                  const totalCount = gvk.allCount;
 
                   // Calculate indices for group and kind separately
                   // indices is in range format: [number, number][]

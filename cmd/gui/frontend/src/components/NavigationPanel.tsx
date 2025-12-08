@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
-import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
