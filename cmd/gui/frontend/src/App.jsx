@@ -13,11 +13,12 @@ function App() {
 
     useEffect(() => {
         // ============================================================================
-        // 🚧 DEV-ONLY DEBUGGING FEATURE
+        // 🚧 DEV-ONLY DEBUGGING FEATURES
         // ============================================================================
-        // Color Palette Viewer (Cmd+P / Ctrl+P or #colors hash)
-        // This feature is ONLY available in development mode and will NOT be
-        // included in production builds. Used for inspecting shadcn/ui theme colors.
+        // - Color Palette Viewer (Cmd+P / Ctrl+P or #colors hash)
+        // - Theme Toggle (Cmd+T / Ctrl+T)
+        // These features are ONLY available in development mode and will NOT be
+        // included in production builds.
         // ============================================================================
 
         // Check URL hash on mount and hash change (DEV only)
@@ -33,6 +34,16 @@ function App() {
             if (import.meta.env.DEV && (e.metaKey || e.ctrlKey) && e.key === 'p') {
                 e.preventDefault();
                 window.location.hash = window.location.hash === '#colors' ? '' : '#colors';
+            }
+
+            // Theme toggle: Cmd+T / Ctrl+T (DEV only)
+            if (import.meta.env.DEV && (e.metaKey || e.ctrlKey) && e.key === 't') {
+                e.preventDefault();
+                const currentTheme = localStorage.getItem('theme') || 'system';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                localStorage.setItem('theme', newTheme);
+                document.documentElement.classList.remove('light', 'dark');
+                document.documentElement.classList.add(newTheme);
             }
 
             // Navigation shortcuts: Cmd+[ (back) and Cmd+] (forward)
