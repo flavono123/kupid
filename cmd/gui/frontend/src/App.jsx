@@ -8,6 +8,7 @@ import { ThemeProvider } from 'next-themes';
 function App() {
     const [showColors, setShowColors] = useState(false);
     const [showMainView, setShowMainView] = useState(false);
+    const [selectedContexts, setSelectedContexts] = useState([]);
     const [connectedContexts, setConnectedContexts] = useState([]);
 
     useEffect(() => {
@@ -33,6 +34,16 @@ function App() {
                 e.preventDefault();
                 window.location.hash = window.location.hash === '#colors' ? '' : '#colors';
             }
+
+            // Navigation shortcuts: Cmd+[ (back) and Cmd+] (forward)
+            if ((e.metaKey || e.ctrlKey) && e.key === '[') {
+                e.preventDefault();
+                window.history.back();
+            }
+            if ((e.metaKey || e.ctrlKey) && e.key === ']') {
+                e.preventDefault();
+                window.history.forward();
+            }
         };
 
         window.addEventListener('keydown', handleGlobalKeydown);
@@ -43,14 +54,25 @@ function App() {
         };
     }, []);
 
-    const handleContextsConnected = (contexts) => {
-        setConnectedContexts(contexts);
-        setShowMainView(true);
-    };
+    // Handle browser back/forward navigation
+    useEffect(() => {
+        const handlePopState = (event) => {
+            // Back to context gallery
+            setShowMainView(false);
+            setSelectedContexts([]);
+            setConnectedContexts([]);
+        };
 
-    const handleBackToContexts = () => {
-        setShowMainView(false);
-        setConnectedContexts([]);
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    const handleContextsConnected = (selected, connected) => {
+        setSelectedContexts(selected);
+        setConnectedContexts(connected);
+        setShowMainView(true);
+        // Push history state for navigation
+        window.history.pushState({ view: 'main' }, '', '');
     };
 
     const handleBackToGallery = () => {
@@ -62,7 +84,10 @@ function App() {
             {showColors ? (
                 <ColorPalette onBack={handleBackToGallery} />
             ) : showMainView ? (
-                <MainView contexts={connectedContexts} onBackToContexts={handleBackToContexts} />
+                <MainView
+                    selectedContexts={selectedContexts}
+                    connectedContexts={connectedContexts}
+                />
             ) : (
                 <ContextGallery onContextsConnected={handleContextsConnected} />
             )}

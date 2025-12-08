@@ -11,7 +11,7 @@ import { Kbd } from "./ui/kbd";
 import { toast } from "sonner";
 
 interface ContextGalleryProps {
-  onContextsConnected: (contexts: string[]) => void;
+  onContextsConnected: (selectedContexts: string[], connectedContexts: string[]) => void;
 }
 
 export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
@@ -84,7 +84,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
 
       // If at least one context connected successfully, navigate to main view
       if (successful.length > 0) {
-        onContextsConnected(successful);
+        onContextsConnected(Array.from(selectedContexts), successful);
       }
     } catch (error) {
       console.error("Connection error:", error);

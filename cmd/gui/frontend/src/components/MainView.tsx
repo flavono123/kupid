@@ -1,20 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { CommandPalette } from "./CommandPalette";
-import { Kbd } from "./ui/kbd";
-import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { ArrowLeft, Plug, Unplug } from "lucide-react";
+import { Plug, Unplug } from "lucide-react";
 import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 
 interface MainViewProps {
   selectedContexts: string[];
   connectedContexts: string[];
-  onBackToContexts: () => void;
 }
 
-export function MainView({ selectedContexts, connectedContexts, onBackToContexts }: MainViewProps) {
+export function MainView({ selectedContexts, connectedContexts }: MainViewProps) {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,16 +60,6 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
       <div className="border-b border-border p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBackToContexts}
-              className="gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Contexts
-            </Button>
-            <div className="h-6 w-px bg-border" />
             {selectedContexts.length === 1 ? (
               // Single context: show icon + name only, no popover
               <div className="flex items-center gap-2 px-3 py-2">
