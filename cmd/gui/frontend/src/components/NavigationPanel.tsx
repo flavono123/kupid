@@ -71,26 +71,27 @@ const TreeNodeItem = memo(({
   }, [node.fullPath, onToggleSelect]);
 
   return (
-    <div>
+    <div className="relative">
+      {/* Indent guide lines - with higher z-index to stay visible on hover */}
+      {node.level > 0 && (
+        <>
+          {Array.from({ length: node.level }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute top-0 bottom-0 border-l border-border/40 pointer-events-none z-10"
+              style={{ left: `${i * 12}px` }}
+            />
+          ))}
+        </>
+      )}
+
       <div
         ref={nodeRef}
-        className={`flex items-center py-0.5 px-2 rounded-sm relative ${
+        className={`flex items-center py-0.5 pr-2 rounded-sm relative ${
           isFocused ? 'bg-primary/20 border-l-2 border-primary' : 'hover:bg-accent'
         }`}
-        style={{ paddingLeft: `${node.level * 12}px` }}
+        style={{ paddingLeft: `${node.level * 12 + 2}px` }}
       >
-        {/* Indent guide lines */}
-        {node.level > 0 && (
-          <div className="absolute left-0 top-0 bottom-0 flex">
-            {Array.from({ length: node.level }).map((_, i) => (
-              <div
-                key={i}
-                className="border-l border-border/40"
-                style={{ marginLeft: `${i * 12}px` }}
-              />
-            ))}
-          </div>
-        )}
 
         {/* Expand/Collapse button OR Checkbox (mutually exclusive) */}
         {hasChildren ? (
