@@ -132,14 +132,10 @@ export function ResultTable({
           // Get highlight indices based on full text
           const indices = getHighlightIndices(fullText);
 
-          // Calculate max characters based on column width (approx 8px per char)
-          const maxChars = Math.floor(columnWidth / 8);
-
           // Render with CellContent component (handles truncation + highlighting)
           return (
             <CellContent
               value={value}
-              maxLength={maxChars}
               highlightIndices={indices}
             />
           );
@@ -247,8 +243,12 @@ export function ResultTable({
                     {row.getVisibleCells().map((cell) => (
                       <div
                         key={cell.id}
-                        className="px-4 py-2 text-sm overflow-hidden"
-                        style={{ width: `${cell.column.getSize()}px` }}
+                        className="px-4 py-2 text-sm flex-shrink-0"
+                        style={{
+                          width: `${cell.column.getSize()}px`,
+                          minWidth: `${cell.column.getSize()}px`,
+                          maxWidth: `${cell.column.getSize()}px`,
+                        }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </div>
