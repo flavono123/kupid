@@ -171,6 +171,15 @@ export function NavigationPanel({
   const [savedExpandedPaths, setSavedExpandedPaths] = useState<Set<string> | null>(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
+  // Reset state when GVK changes
+  useEffect(() => {
+    setExpandedPaths(new Set());
+    setSelectedPaths(new Set());
+    setSearchVisible(false);
+    setSavedExpandedPaths(null);
+    setCurrentMatchIndex(0);
+  }, [selectedGVK]);
+
   // Fetch node tree
   useEffect(() => {
     if (!selectedGVK || connectedContexts.length === 0) {
