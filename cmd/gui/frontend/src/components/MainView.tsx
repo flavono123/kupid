@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Card } from "./ui/card";
 import { CommandPalette } from "./CommandPalette";
 import { NavigationPanel } from "./NavigationPanel";
+import { ResultTable } from "./ResultTable";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./ui/button";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "./ui/resizable";
@@ -20,6 +20,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
   const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGVK, setSelectedGVK] = useState<main.MultiClusterGVK | null>(null);
+  const [selectedFields, setSelectedFields] = useState<string[][]>([]);
   const loadedRef = useRef(false);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -60,6 +61,11 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
   }, []);
+
+  // Reset selectedFields when GVK changes
+  useEffect(() => {
+    setSelectedFields([]);
+  }, [selectedGVK]);
 
   const toggleSidebar = () => {
     const panel = sidebarPanelRef.current;
@@ -199,7 +205,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                   connectedContexts={connectedContexts}
                   onFieldsSelected={(fields) => {
                     console.log("Selected fields:", fields);
-                    // TODO: Update table columns in right panel
+                    setSelectedFields(fields);
                   }}
                 />
               ) : (
@@ -217,7 +223,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
 
         {/* Right Panel - Main Content */}
         <ResizablePanel defaultSize={80}>
-          <div className="h-full overflow-auto p-8 relative">
+          <div className="h-full relative">
             {/* Floating Expand Button (only when collapsed) */}
             {isSidebarCollapsed && (
               <Button
@@ -230,16 +236,20 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
               </Button>
             )}
 
-            <Card className="h-full flex items-center justify-center bg-muted/20">
-              <div className="text-center">
-                <h3 className="text-lg text-foreground mb-2">
-                  Right Panel
-                </h3>
+            {/* Table or Empty State */}
+            {selectedGVK ? (
+              <ResultTable
+                selectedFields={selectedFields}
+                selectedGVK={selectedGVK}
+                connectedContexts={connectedContexts}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center">
                 <p className="text-sm text-muted-foreground">
-                  Resource details or editor will go here
+                  Press <kbd className="px-2 py-1 text-xs rounded border bg-muted">⌘K</kbd> to select a resource
                 </p>
               </div>
-            </Card>
+            )}
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

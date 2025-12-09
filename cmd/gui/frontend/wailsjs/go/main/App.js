@@ -18,6 +18,10 @@ export function GetNodeTree(arg1, arg2) {
   return window['go']['main']['App']['GetNodeTree'](arg1, arg2);
 }
 
+export function GetResources(arg1, arg2) {
+  return window['go']['main']['App']['GetResources'](arg1, arg2);
+}
+
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }

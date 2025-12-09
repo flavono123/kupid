@@ -281,6 +281,63 @@ func getResourcesForContexts(gvk schema.GroupVersionKind, contexts []string) ([]
 	return allObjs, nil
 }
 
+// GetResources fetches actual resource data for the given GVK and contexts
+// Returns raw resource data as map[string]interface{} for flexible frontend consumption
+// Adds _context field to each resource to indicate which context it came from
+func (a *App) GetResources(gvk MultiClusterGVK, contexts []string) ([]map[string]interface{}, error) {
+	// Convert MultiClusterGVK to schema.GroupVersionKind
+	schemaGVK := schema.GroupVersionKind{
+		Group:   gvk.Group,
+		Version: gvk.Version,
+		Kind:    gvk.Kind,
+	}
+
+	// Get resources from each context separately to track context origin
+	var allResources []map[string]interface{}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, contextName := range contexts {
+		wg.Add(1)
+		go func(ctx string) {
+			defer wg.Done()
+
+			// Get GVR from GVK
+			gvr, err := kube.GetGVRForContext(ctx, schemaGVK)
+			if err != nil {
+				log.Printf("Warning: failed to get GVR for %s in context %s: %v", schemaGVK.Kind, ctx, err)
+				return
+			}
+
+			// Create resource controller for this context
+			controller := kube.NewResourceControllerForContext(ctx, gvr)
+
+			// Start the informer
+			_, err = controller.Inform()
+			if err != nil {
+				log.Printf("Warning: failed to start informer for %s in context %s: %v", schemaGVK.Kind, ctx, err)
+				return
+			}
+
+			// Get objects from controller
+			objs := controller.Objects()
+
+			mu.Lock()
+			for _, obj := range objs {
+				resource := obj.Object
+				// Add _context field to indicate which context this resource came from
+				resource["_context"] = ctx
+				allResources = append(allResources, resource)
+			}
+			mu.Unlock()
+		}(contextName)
+	}
+
+	wg.Wait()
+
+	return allResources, nil
+}
+
 // convertNodeTree converts kube.Node map to frontend TreeNode array
 func convertNodeTree(nodes map[string]*kube.Node) []*TreeNode {
 	result := make([]*TreeNode, 0, len(nodes))
