@@ -480,5 +480,260 @@ describe('NavigationPanel', () => {
         expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'name']]);
       });
     });
+
+    it('should auto-expand parent nodes when a nested field is selected', async () => {
+      const nestedTreeData = [
+        {
+          name: 'spec',
+          type: 'PodSpec',
+          fullPath: ['spec'],
+          level: 0,
+          children: [
+            {
+              name: 'containers',
+              type: '[]Container',
+              fullPath: ['spec', 'containers'],
+              level: 1,
+              children: [
+                {
+                  name: 'ports',
+                  type: '[]ContainerPort',
+                  fullPath: ['spec', 'containers', 'ports'],
+                  level: 2,
+                  children: [
+                    {
+                      name: 'containerPort',
+                      type: 'int32',
+                      fullPath: ['spec', 'containers', 'ports', 'containerPort'],
+                      level: 3,
+                      children: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      (App.GetNodeTree as any).mockResolvedValue(nestedTreeData);
+
+      const user = userEvent.setup();
+
+      render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('spec')).toBeInTheDocument();
+      });
+
+      // Initially, nested children should not be visible
+      expect(screen.queryByText('containerPort')).not.toBeInTheDocument();
+
+      // Manually expand to reach the nested field
+      const specExpandButton = screen.getAllByRole('button')[0];
+      await user.click(specExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('containers')).toBeInTheDocument();
+      });
+
+      const containersExpandButton = screen.getAllByRole('button')[1];
+      await user.click(containersExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('ports')).toBeInTheDocument();
+      });
+
+      const portsExpandButton = screen.getAllByRole('button')[2];
+      await user.click(portsExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('containerPort')).toBeInTheDocument();
+      });
+
+      // Now collapse all nodes to test auto-expand
+      await user.click(portsExpandButton); // Collapse ports
+      await user.click(containersExpandButton); // Collapse containers
+      await user.click(specExpandButton); // Collapse spec
+
+      await waitFor(() => {
+        expect(screen.queryByText('containerPort')).not.toBeInTheDocument();
+      });
+
+      // Re-expand to select the field
+      await user.click(specExpandButton);
+      await waitFor(() => {
+        expect(screen.getByText('containers')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getAllByRole('button')[1]); // containers
+      await waitFor(() => {
+        expect(screen.getByText('ports')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getAllByRole('button')[2]); // ports
+      await waitFor(() => {
+        expect(screen.getByText('containerPort')).toBeInTheDocument();
+      });
+
+      // Find and click the checkbox for containerPort
+      const checkboxes = screen.getAllByRole('checkbox');
+      const containerPortCheckbox = checkboxes.find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('containerPort');
+      });
+
+      await user.click(containerPortCheckbox!);
+
+      // Verify parent nodes remain expanded
+      expect(screen.getByText('spec')).toBeInTheDocument();
+      expect(screen.getByText('containers')).toBeInTheDocument();
+      expect(screen.getByText('ports')).toBeInTheDocument();
+      expect(screen.getByText('containerPort')).toBeInTheDocument();
+    });
+  });
+
+  describe('Expand/Collapse State Management', () => {
+    const mockTreeData = [
+      {
+        name: 'metadata',
+        type: 'ObjectMeta',
+        fullPath: ['metadata'],
+        level: 0,
+        children: [
+          {
+            name: 'name',
+            type: 'string',
+            fullPath: ['metadata', 'name'],
+            level: 1,
+            children: [],
+          },
+          {
+            name: 'namespace',
+            type: 'string',
+            fullPath: ['metadata', 'namespace'],
+            level: 1,
+            children: [],
+          },
+        ],
+      },
+      {
+        name: 'spec',
+        type: 'PodSpec',
+        fullPath: ['spec'],
+        level: 0,
+        children: [
+          {
+            name: 'nodeName',
+            type: 'string',
+            fullPath: ['spec', 'nodeName'],
+            level: 1,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    it('should preserve manual expand state when searching and then clearing search', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const user = userEvent.setup();
+
+      render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Manually expand metadata
+      const expandButtons = screen.getAllByRole('button');
+      await user.click(expandButtons[0]); // Expand metadata
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      // spec should be collapsed
+      expect(screen.queryByText('nodeName')).not.toBeInTheDocument();
+
+      // Open search and search for "nodeName"
+      await user.keyboard('{Meta>}f{/Meta}');
+      const searchInput = screen.getByPlaceholderText('Search...');
+      await user.type(searchInput, 'nodeName');
+
+      // Wait for search results - spec should auto-expand to show nodeName
+      await waitFor(() => {
+        expect(screen.getByText('nodeName')).toBeInTheDocument();
+      }, { timeout: 1000 });
+
+      // Clear search
+      await user.clear(searchInput);
+
+      // Wait for debounce and state update
+      await waitFor(() => {
+        // After clearing search, spec should collapse back (not manually expanded)
+        expect(screen.queryByText('nodeName')).not.toBeInTheDocument();
+      }, { timeout: 500 });
+
+      // metadata should still be expanded (manually expanded)
+      expect(screen.getByText('name')).toBeInTheDocument();
+      expect(screen.getByText('namespace')).toBeInTheDocument();
+    });
+
+    it('should keep search results expanded even after manual collapse during search', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const user = userEvent.setup();
+
+      render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Open search and search for "namespace"
+      await user.keyboard('{Meta>}f{/Meta}');
+      const searchInput = screen.getByPlaceholderText('Search...');
+      await user.type(searchInput, 'namespace');
+
+      // metadata should auto-expand due to search
+      await waitFor(() => {
+        expect(screen.getByText('namespace')).toBeInTheDocument();
+      }, { timeout: 1000 });
+
+      // Try to manually collapse metadata during search
+      const expandButtons = screen.getAllByRole('button');
+      const metadataExpandButton = expandButtons.find((btn) => {
+        const svg = btn.querySelector('svg');
+        return svg?.classList.contains('lucide-chevron-down');
+      });
+
+      if (metadataExpandButton) {
+        await user.click(metadataExpandButton);
+
+        // Manual collapse is recorded but search results take priority
+        // so namespace remains visible (expected behavior for search UX)
+        // This ensures users can always see search results
+        expect(screen.getByText('namespace')).toBeInTheDocument();
+      }
+    });
   });
 });

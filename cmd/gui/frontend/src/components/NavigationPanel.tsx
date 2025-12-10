@@ -166,10 +166,9 @@ export function NavigationPanel({
 }: NavigationPanelProps) {
   const [nodeTree, setNodeTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [manualExpandedPaths, setManualExpandedPaths] = useState<Set<string>>(new Set());
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [searchVisible, setSearchVisible] = useState(false);
-  const [savedExpandedPaths, setSavedExpandedPaths] = useState<Set<string> | null>(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
@@ -177,10 +176,9 @@ export function NavigationPanel({
   useEffect(() => {
     setNodeTree([]);
     setLoading(true);
-    setExpandedPaths(new Set());
+    setManualExpandedPaths(new Set());
     setSelectedPaths(new Set());
     setSearchVisible(false);
-    setSavedExpandedPaths(null);
     setCurrentMatchIndex(0);
     setDebouncedQuery('');
   }, [selectedGVK]);
@@ -340,10 +338,24 @@ export function NavigationPanel({
     setCurrentMatchIndex(0);
   }, [matchedPaths.length]);
 
-  // Compute paths to expand based on matched paths
-  const pathsToExpand = useMemo(() => {
+  // Compute parent paths of selected fields (to auto-expand)
+  const selectedParentPaths = useMemo(() => {
+    const paths = new Set<string>();
+    selectedPaths.forEach((pathKey) => {
+      const pathParts = pathKey.split('/');
+      // Add all parent paths (not the selected path itself)
+      for (let i = 1; i < pathParts.length; i++) {
+        const parentPath = pathParts.slice(0, i).join('/');
+        paths.add(parentPath);
+      }
+    });
+    return paths;
+  }, [selectedPaths]);
+
+  // Compute paths to expand based on search results
+  const searchExpandedPaths = useMemo(() => {
     if (!debouncedQuery || matchedPaths.length === 0) {
-      return null;
+      return new Set<string>();
     }
 
     const paths = new Set<string>();
@@ -358,27 +370,21 @@ export function NavigationPanel({
     return paths;
   }, [debouncedQuery, matchedPaths]);
 
-  // Auto-expand parent nodes when search has results
-  useEffect(() => {
-    if (pathsToExpand) {
-      // Save current expanded state before first search
-      if (!savedExpandedPaths) {
-        setSavedExpandedPaths(new Set(expandedPaths));
-      }
+  // Final expanded paths = manual + search + selected parents
+  const expandedPaths = useMemo(() => {
+    const paths = new Set<string>(manualExpandedPaths);
 
-      // Check if paths actually changed to avoid unnecessary updates
-      const currentExpandedStr = Array.from(expandedPaths).sort().join(',');
-      const newExpandedStr = Array.from(pathsToExpand).sort().join(',');
-
-      if (currentExpandedStr !== newExpandedStr) {
-        setExpandedPaths(pathsToExpand);
-      }
-    } else if (!debouncedQuery && savedExpandedPaths) {
-      // Restore saved state when search is cleared
-      setExpandedPaths(savedExpandedPaths);
-      setSavedExpandedPaths(null);
+    // Add search-expanded paths when searching
+    if (debouncedQuery) {
+      searchExpandedPaths.forEach((path) => paths.add(path));
     }
-  }, [debouncedQuery, pathsToExpand, expandedPaths, savedExpandedPaths]);
+
+    // Always add selected parent paths
+    selectedParentPaths.forEach((path) => paths.add(path));
+
+    return paths;
+  }, [manualExpandedPaths, debouncedQuery, searchExpandedPaths, selectedParentPaths]);
+
 
   // Filter tree to only show matched nodes and their parents when searching
   const filteredNodeTree = useMemo(() => {
@@ -412,7 +418,7 @@ export function NavigationPanel({
   // Memoized toggle functions
   const toggleExpand = useCallback((path: string[]) => {
     const pathKey = path.join('/');
-    setExpandedPaths((prev) => {
+    setManualExpandedPaths((prev) => {
       const next = new Set(prev);
       if (next.has(pathKey)) {
         next.delete(pathKey);
@@ -431,6 +437,17 @@ export function NavigationPanel({
         next.delete(pathKey);
       } else {
         next.add(pathKey);
+
+        // Auto-expand parent paths when selecting a field
+        setManualExpandedPaths((prevExpanded) => {
+          const nextExpanded = new Set(prevExpanded);
+          // Add all parent paths
+          for (let i = 1; i < path.length; i++) {
+            const parentPath = path.slice(0, i).join('/');
+            nextExpanded.add(parentPath);
+          }
+          return nextExpanded;
+        });
       }
 
       // Notify parent
