@@ -173,6 +173,8 @@ export function NavigationPanel({
 
   // Reset state when GVK changes
   useEffect(() => {
+    setNodeTree([]);
+    setLoading(true);
     setExpandedPaths(new Set());
     setSelectedPaths(new Set());
     setSearchVisible(false);
