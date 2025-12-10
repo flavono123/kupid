@@ -126,10 +126,9 @@ func (n *Node) FullPath() []string {
 }
 
 func (n *Node) Level() int {
-	if n.field == nil {
-		return n.level
-	}
-	return n.field.Level
+	// Use ancestors length to calculate actual tree depth
+	// This correctly handles index nodes (*, 0, 1, ...) which add extra levels
+	return len(n.ancestors)
 }
 
 func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructured, nodePrefix []string) map[string]*Node {

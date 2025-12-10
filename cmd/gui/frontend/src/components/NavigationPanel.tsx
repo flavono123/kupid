@@ -90,7 +90,7 @@ const TreeNodeItem = memo(({
       <div
         ref={nodeRef}
         className={`flex items-center py-0.5 pr-2 rounded-sm relative ${
-          isFocused ? 'bg-primary/20 border-l-2 border-primary' : 'hover:bg-accent'
+          isFocused ? 'bg-primary/20' : 'hover:bg-accent'
         }`}
         style={{ paddingLeft: `${node.level * 12 + 2}px` }}
       >
