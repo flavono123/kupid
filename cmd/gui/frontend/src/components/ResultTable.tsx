@@ -94,6 +94,29 @@ export function ResultTable({
     return Math.min(Math.max(headerWidth, maxValueWidth), 300);
   };
 
+  // Memoize column widths separately (only recalculate when fields or data change)
+  const columnWidths = useMemo(() => {
+    // Always add default columns at the beginning
+    let fieldsToUse: string[][];
+
+    if (connectedContexts.length === 1) {
+      // Single context: name + selectedFields
+      fieldsToUse = [['metadata', 'name'], ...selectedFields];
+    } else {
+      // Multiple contexts: context, name + selectedFields
+      fieldsToUse = [['_context'], ['metadata', 'name'], ...selectedFields];
+    }
+
+    const widths: Record<string, number> = {};
+    fieldsToUse.forEach((fieldPath) => {
+      const fieldName = fieldPath[fieldPath.length - 1];
+      const columnValues = data.map((row) => getNestedValue(row, fieldPath));
+      widths[fieldPath.join('.')] = calculateColumnWidth(fieldName, columnValues);
+    });
+
+    return widths;
+  }, [selectedFields, connectedContexts, data]);
+
   // Create dynamic columns from selectedFields with default columns prepended
   const columns = useMemo<ColumnDef<any>[]>(() => {
     // Always add default columns at the beginning
@@ -109,16 +132,13 @@ export function ResultTable({
 
     return fieldsToUse.map((fieldPath) => {
       const fieldName = fieldPath[fieldPath.length - 1];
-
-      // Get all values for this column to calculate width
-      const columnValues = data.map((row) => getNestedValue(row, fieldPath));
-      const columnWidth = calculateColumnWidth(fieldName, columnValues);
+      const columnId = fieldPath.join('.');
 
       return {
-        id: fieldPath.join('.'),
+        id: columnId,
         header: fieldName === '_context' ? 'context' : fieldName,  // Rename _context to context
         accessorFn: (row) => getNestedValue(row, fieldPath),
-        size: columnWidth,  // Set calculated width
+        size: columnWidths[columnId] || 100,  // Use pre-calculated width
         minSize: 80,  // Minimum column width
         maxSize: 300,  // Maximum column width
         cell: (info) => {
@@ -142,7 +162,7 @@ export function ResultTable({
         },
       };
     });
-  }, [selectedFields, connectedContexts, data]);
+  }, [selectedFields, connectedContexts, columnWidths, getHighlightIndices]);
 
   // Create table instance
   const table = useReactTable({

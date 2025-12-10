@@ -460,8 +460,39 @@ export function NavigationPanel({
     });
   }, [onFieldsSelected]);
 
+  const clearAllSelections = useCallback(() => {
+    setSelectedPaths(new Set());
+    if (onFieldsSelected) {
+      onFieldsSelected([]);
+    }
+  }, [onFieldsSelected]);
+
   return (
     <div className="flex flex-col h-full relative">
+      {/* Selected Fields Info (conditional) - Float on top-left */}
+      {selectedPaths.size > 0 && (
+        <div className="
+          p-2 flex items-center gap-2
+          border-b border-border
+          md:absolute md:top-2 md:left-2 md:z-10
+          md:w-auto md:border md:rounded-md md:shadow-lg
+          md:bg-background/95 md:backdrop-blur-sm
+          md:p-1.5
+        ">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            {selectedPaths.size} selected
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={clearAllSelections}
+            className="h-7 text-xs"
+          >
+            Clear all
+          </Button>
+        </div>
+      )}
+
       {/* Search Bar (conditional) - Float on wide screens, full width on narrow */}
       {searchVisible && (
         <div className="
