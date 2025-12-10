@@ -49,7 +49,8 @@ const TreeNodeItem = memo(({
   const pathKey = node.fullPath.join('/');
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
-  const matchIndices = searchResultsMap.get(pathKey) || null;
+  const matchIndices = searchResultsMap.get(pathKey);
+  const hasHighlight = matchIndices !== undefined && matchIndices !== null && matchIndices.length > 0;
   const isFocused = focusedPath === pathKey;
   const nodeRef = useRef<HTMLDivElement>(null);
 
@@ -120,8 +121,8 @@ const TreeNodeItem = memo(({
 
         {/* Field name */}
         <span className="text-sm text-foreground font-mono">
-          {matchIndices ? (
-            <HighlightedText text={node.name} indices={matchIndices} />
+          {hasHighlight ? (
+            <HighlightedText text={node.name} indices={matchIndices!} />
           ) : (
             node.name
           )}
@@ -170,6 +171,7 @@ export function NavigationPanel({
   const [searchVisible, setSearchVisible] = useState(false);
   const [savedExpandedPaths, setSavedExpandedPaths] = useState<Set<string> | null>(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   // Reset state when GVK changes
   useEffect(() => {
@@ -180,6 +182,7 @@ export function NavigationPanel({
     setSearchVisible(false);
     setSavedExpandedPaths(null);
     setCurrentMatchIndex(0);
+    setDebouncedQuery('');
   }, [selectedGVK]);
 
   // Fetch node tree
@@ -219,37 +222,72 @@ export function NavigationPanel({
     return map;
   }, [nodeTree]);
 
-  // Prepare searchable texts - use same order as Map
-  const { searchableTexts, pathKeys } = useMemo(() => {
-    const texts: string[] = [];
-    const keys: string[] = [];
+  // Prepare searchable items with index tracking
+  const searchableItems = useMemo(() => {
+    const items: Array<{ text: string; pathKey: string; node: TreeNode; index: number }> = [];
+    let index = 0;
     flatNodesMap.forEach((node, pathKey) => {
-      texts.push(`${node.name} ${node.type}`);
-      keys.push(pathKey);
+      items.push({
+        text: `${node.name} ${node.type}`,
+        pathKey,
+        node,
+        index: index++,
+      });
     });
-    return { searchableTexts: texts, pathKeys: keys };
+    return items;
   }, [flatNodesMap]);
 
-  // Use stricter threshold for navigation panel (0.3 instead of default 0)
-  const { query, setQuery, results } = useFuzzySearch(searchableTexts, 0.3);
+  // Use fuzzy search hook with generic type (using debounced query)
+  const { query, setQuery, results: allSearchResults } = useFuzzySearch(
+    searchableItems,
+    (item) => item.text,
+    0.3
+  );
 
-  // Create a Map of search results for O(1) lookup
+  // Debounce query to avoid searching on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 150); // 150ms debounce
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Limit search results to prevent performance issues
+  const MAX_RESULTS = 200;
+  const searchResults = useMemo(() => {
+    // Only apply debounce and limiting when there's a query
+    if (!debouncedQuery) {
+      return allSearchResults;
+    }
+    return allSearchResults.slice(0, MAX_RESULTS);
+  }, [allSearchResults, debouncedQuery]);
+
+  const hasMoreResults = debouncedQuery && allSearchResults.length > MAX_RESULTS;
+
+  // Get all matched paths sorted by tree order (for auto-expand and Enter navigation)
+  const matchedPaths = useMemo(() => {
+    return [...searchResults]
+      .sort((a, b) => a.item.index - b.item.index) // Tree order: top to bottom
+      .map((result) => result.item.pathKey);
+  }, [searchResults]);
+
+  // Create a Map of search results for O(1) lookup (for highlighting only)
   const searchResultsMap = useMemo(() => {
     const map = new Map<string, readonly [number, number][] | null>();
-    results.forEach((result) => {
-      const index = searchableTexts.indexOf(result.item);
-      if (index !== -1) {
-        const pathKey = pathKeys[index];
-        map.set(pathKey, result.indices);
-      }
+    searchResults.forEach((result) => {
+      // Filter indices to only include those within node.name
+      // This handles cases where the match is in node.type
+      const nameLength = result.item.node.name.length;
+      const filteredIndices = result.indices
+        .filter(([start, end]) => start < nameLength)
+        .map(([start, end]): [number, number] => [start, Math.min(end, nameLength - 1)]);
+
+      // Add to map with filtered indices (null if no match in name)
+      map.set(result.item.pathKey, filteredIndices.length > 0 ? filteredIndices : null);
     });
     return map;
-  }, [results, searchableTexts, pathKeys]);
-
-  // Get list of matched paths for navigation
-  const matchedPaths = useMemo(() => {
-    return Array.from(searchResultsMap.keys());
-  }, [searchResultsMap]);
+  }, [searchResults]);
 
   // Navigate to next/previous match
   const navigateMatches = useCallback((direction: 'next' | 'prev') => {
@@ -302,34 +340,74 @@ export function NavigationPanel({
     setCurrentMatchIndex(0);
   }, [matchedPaths.length]);
 
+  // Compute paths to expand based on matched paths
+  const pathsToExpand = useMemo(() => {
+    if (!debouncedQuery || matchedPaths.length === 0) {
+      return null;
+    }
+
+    const paths = new Set<string>();
+    matchedPaths.forEach((pathKey) => {
+      const pathParts = pathKey.split('/');
+      // Add all parent paths
+      for (let i = 1; i < pathParts.length; i++) {
+        const parentPath = pathParts.slice(0, i).join('/');
+        paths.add(parentPath);
+      }
+    });
+    return paths;
+  }, [debouncedQuery, matchedPaths]);
+
   // Auto-expand parent nodes when search has results
   useEffect(() => {
-    if (query && searchResultsMap.size > 0) {
+    if (pathsToExpand) {
       // Save current expanded state before first search
       if (!savedExpandedPaths) {
         setSavedExpandedPaths(new Set(expandedPaths));
       }
 
-      // Collect all parent paths of matched nodes
-      // Start with empty set - only expand parents of matched nodes
-      const pathsToExpand = new Set<string>();
+      // Check if paths actually changed to avoid unnecessary updates
+      const currentExpandedStr = Array.from(expandedPaths).sort().join(',');
+      const newExpandedStr = Array.from(pathsToExpand).sort().join(',');
 
-      searchResultsMap.forEach((_, pathKey) => {
-        const pathParts = pathKey.split('/');
-        // Add all parent paths
-        for (let i = 1; i < pathParts.length; i++) {
-          const parentPath = pathParts.slice(0, i).join('/');
-          pathsToExpand.add(parentPath);
-        }
-      });
-
-      setExpandedPaths(pathsToExpand);
-    } else if (!query && savedExpandedPaths) {
+      if (currentExpandedStr !== newExpandedStr) {
+        setExpandedPaths(pathsToExpand);
+      }
+    } else if (!debouncedQuery && savedExpandedPaths) {
       // Restore saved state when search is cleared
       setExpandedPaths(savedExpandedPaths);
       setSavedExpandedPaths(null);
     }
-  }, [query, searchResultsMap]);
+  }, [debouncedQuery, pathsToExpand, expandedPaths, savedExpandedPaths]);
+
+  // Filter tree to only show matched nodes and their parents when searching
+  const filteredNodeTree = useMemo(() => {
+    if (!debouncedQuery || matchedPaths.length === 0) {
+      return nodeTree;
+    }
+
+    // Create a Set of all paths to show (matched nodes + their ancestors)
+    const pathsToShow = new Set<string>();
+    matchedPaths.forEach((pathKey) => {
+      const pathParts = pathKey.split('/');
+      // Add the node itself and all its ancestors
+      for (let i = 1; i <= pathParts.length; i++) {
+        pathsToShow.add(pathParts.slice(0, i).join('/'));
+      }
+    });
+
+    // Recursively filter the tree
+    const filterNodes = (nodes: TreeNode[]): TreeNode[] => {
+      return nodes
+        .filter((node) => pathsToShow.has(node.fullPath.join('/')))
+        .map((node) => ({
+          ...node,
+          children: node.children ? filterNodes(node.children) : [],
+        }));
+    };
+
+    return filterNodes(nodeTree);
+  }, [debouncedQuery, matchedPaths, nodeTree]);
 
   // Memoized toggle functions
   const toggleExpand = useCallback((path: string[]) => {
@@ -384,9 +462,10 @@ export function NavigationPanel({
             className="flex-1 h-8 text-sm"
             autoFocus
           />
-          {query && matchedPaths.length > 0 && (
+          {debouncedQuery && matchedPaths.length > 0 && (
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {currentMatchIndex + 1}/{matchedPaths.length}
+              {hasMoreResults && '+'}
             </span>
           )}
           <Button
@@ -409,13 +488,15 @@ export function NavigationPanel({
             <Spinner className="w-8 h-8" />
             <p className="text-sm text-muted-foreground">Loading schema...</p>
           </div>
-        ) : nodeTree.length === 0 ? (
+        ) : filteredNodeTree.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground">No schema available</p>
+            <p className="text-sm text-muted-foreground">
+              {debouncedQuery ? 'No matching fields found' : 'No schema available'}
+            </p>
           </div>
         ) : (
           <div className="p-2" style={{ minWidth: 'max-content' }}>
-            {nodeTree.map((node, idx) => (
+            {filteredNodeTree.map((node, idx) => (
               <TreeNodeItem
                 key={`${node.fullPath.join('/')}-${idx}`}
                 node={node}
@@ -424,7 +505,7 @@ export function NavigationPanel({
                 onToggleExpand={toggleExpand}
                 onToggleSelect={toggleSelect}
                 searchResultsMap={searchResultsMap}
-                focusedPath={query && matchedPaths.length > 0 ? matchedPaths[currentMatchIndex] : undefined}
+                focusedPath={debouncedQuery && matchedPaths.length > 0 ? matchedPaths[currentMatchIndex] : undefined}
               />
             ))}
           </div>

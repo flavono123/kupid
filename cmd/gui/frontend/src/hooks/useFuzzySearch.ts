@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import fuzzysort from 'fuzzysort';
 
-export interface FuzzySearchResult {
-  item: string;
+export interface FuzzySearchResult<T = string> {
+  item: T;
   indices: readonly [number, number][]; // Range format for highlighting
   score: number;
 }
@@ -39,15 +39,48 @@ export function indexesToRanges(indexes: readonly number[]): [number, number][] 
   return ranges;
 }
 
-export function useFuzzySearch(items: string[], threshold: number = 0) {
+// Overload 1: For string arrays (backward compatibility)
+export function useFuzzySearch(
+  items: string[],
+  threshold?: number
+): { query: string; setQuery: (query: string) => void; results: FuzzySearchResult<string>[] };
+
+// Overload 2: For object arrays with getSearchText
+export function useFuzzySearch<T>(
+  items: T[],
+  getSearchText: (item: T) => string,
+  threshold?: number
+): { query: string; setQuery: (query: string) => void; results: FuzzySearchResult<T>[] };
+
+// Implementation
+export function useFuzzySearch<T = string>(
+  items: T[],
+  getSearchTextOrThreshold?: ((item: T) => string) | number,
+  thresholdParam?: number
+) {
   const [query, setQuery] = useState('');
 
-  const results = useMemo<FuzzySearchResult[]>(() => {
+  // Parse parameters
+  const getSearchText: (item: T) => string =
+    typeof getSearchTextOrThreshold === 'function'
+      ? getSearchTextOrThreshold
+      : (item) => item as unknown as string;
+
+  const threshold =
+    typeof getSearchTextOrThreshold === 'number'
+      ? getSearchTextOrThreshold
+      : thresholdParam ?? 0;
+
+  const results = useMemo<FuzzySearchResult<T>[]>(() => {
     if (!query) {
       // No search query: return all items sorted alphabetically
-      const sorted = [...items].sort((a, b) => a.localeCompare(b));
+      const sorted = [...items].sort((a, b) => {
+        const textA = getSearchText(a);
+        const textB = getSearchText(b);
+        return textA.localeCompare(textB);
+      });
       const emptyIndices: [number, number][] = [];
-      return sorted.map((item): FuzzySearchResult => ({
+      return sorted.map((item): FuzzySearchResult<T> => ({
         item,
         indices: emptyIndices,
         score: 0,
@@ -59,15 +92,16 @@ export function useFuzzySearch(items: string[], threshold: number = 0) {
     // Higher threshold = stricter matching (fewer results)
     // Default 0 accepts all matches, 0.3-0.4 is moderately strict
     const searchResults = fuzzysort.go(query, items, {
+      key: getSearchText as any,
       threshold: threshold,
     });
 
-    return searchResults.map((result): FuzzySearchResult => ({
-      item: result.target,
+    return searchResults.map((result): FuzzySearchResult<T> => ({
+      item: result.obj,
       indices: indexesToRanges(result.indexes),
       score: result.score,
     }));
-  }, [query, items, threshold]);
+  }, [query, items, threshold, getSearchText]);
 
   return { query, setQuery, results };
 }
