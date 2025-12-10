@@ -121,8 +121,8 @@ const TreeNodeItem = memo(({
 
         {/* Field name */}
         <span className="text-sm text-foreground font-mono">
-          {hasHighlight ? (
-            <HighlightedText text={node.name} indices={matchIndices!} />
+          {hasHighlight && matchIndices ? (
+            <HighlightedText text={node.name} indices={matchIndices} />
           ) : (
             node.name
           )}

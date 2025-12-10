@@ -64,7 +64,7 @@ export function useFuzzySearch<T = string>(
   const getSearchText: (item: T) => string =
     typeof getSearchTextOrThreshold === 'function'
       ? getSearchTextOrThreshold
-      : (item) => item as unknown as string;
+      : (item) => String(item);
 
   const threshold =
     typeof getSearchTextOrThreshold === 'number'
@@ -91,16 +91,42 @@ export function useFuzzySearch<T = string>(
     // Threshold range: 0 (accept all) to 1 (perfect match only)
     // Higher threshold = stricter matching (fewer results)
     // Default 0 accepts all matches, 0.3-0.4 is moderately strict
-    const searchResults = fuzzysort.go(query, items, {
-      key: getSearchText as any,
-      threshold: threshold,
-    });
 
-    return searchResults.map((result): FuzzySearchResult<T> => ({
-      item: result.obj,
-      indices: indexesToRanges(result.indexes),
-      score: result.score,
-    }));
+    // Handle string arrays vs object arrays differently
+    if (typeof getSearchTextOrThreshold === 'function') {
+      // Object array with custom getSearchText
+      const searchResults = fuzzysort.go(query, items, {
+        key: getSearchText,
+        threshold: threshold,
+      });
+
+      return searchResults.map((result): FuzzySearchResult<T> => ({
+        item: result.obj,
+        indices: indexesToRanges(result.indexes),
+        score: result.score,
+      }));
+    } else {
+      // String array (T is string)
+      // Create a map from string representation to original item
+      const stringToItem = new Map<string, T>();
+      items.forEach((item) => {
+        stringToItem.set(String(item), item);
+      });
+
+      const searchResults = fuzzysort.go(query, items.map(String), {
+        threshold: threshold,
+      });
+
+      return searchResults.map((result): FuzzySearchResult<T> => {
+        const item = stringToItem.get(result.target);
+        // item will always exist because result.target comes from items.map(String)
+        return {
+          item: item ?? items[0], // Fallback should never be needed
+          indices: indexesToRanges(result.indexes),
+          score: result.score,
+        };
+      }).filter((r): r is FuzzySearchResult<T> => r.item !== undefined);
+    }
   }, [query, items, threshold, getSearchText]);
 
   return { query, setQuery, results };
