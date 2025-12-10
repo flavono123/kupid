@@ -17,3 +17,5 @@ export function Greet(arg1:string):Promise<string>;
 export function ListContexts():Promise<Array<string>>;
 
 export function RefreshContexts():Promise<Array<string>>;
+
+export function SaveFile(arg1:string,arg2:string):Promise<string>;

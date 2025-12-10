@@ -9,9 +9,9 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { rankItem } from '@tanstack/match-sorter-utils';
-import { Input } from './ui/input';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
+import { ResultTableToolbar } from './ResultTableToolbar';
 import { useCellHighlight } from '../hooks/useCellHighlight';
 import { GetResources } from '../../wailsjs/go/main/App';
 import type { main } from '../../wailsjs/go/models';
@@ -172,22 +172,41 @@ export function ResultTable({
     overscan: 10,  // Render 10 extra rows above/below viewport
   });
 
+  // Prepare export data (headers and rows for CSV)
+  const exportData = useMemo(() => {
+    const headers = table.getHeaderGroups()[0]?.headers.map((header) => {
+      return typeof header.column.columnDef.header === 'string'
+        ? header.column.columnDef.header
+        : String(header.column.columnDef.header);
+    }) || [];
+
+    const exportRows = rows.map((row) => {
+      return row.getVisibleCells().map((cell) => {
+        const value = cell.getValue();
+        // Handle objects/arrays - convert to JSON string for CSV
+        if (typeof value === 'object' && value !== null) {
+          return JSON.stringify(value);
+        }
+        return value;
+      });
+    });
+
+    console.log('Export data prepared:', { headers, rowCount: exportRows.length, sampleRow: exportRows[0] });
+    return { headers, rows: exportRows };
+  }, [table, rows]);
+
   return (
     <div className="flex flex-col h-full">
-      {/* Search Bar */}
-      <div className="p-4 border-b border-border">
-        <Input
-          placeholder="Search all fields..."
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="max-w-sm"
-        />
-        {globalFilter && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Found {table.getFilteredRowModel().rows.length} / {data.length} rows
-          </p>
-        )}
-      </div>
+      {/* Toolbar with Search and Export */}
+      <ResultTableToolbar
+        globalFilter={globalFilter}
+        onGlobalFilterChange={setGlobalFilter}
+        filteredRowCount={rows.length}
+        totalRowCount={data.length}
+        headers={exportData.headers}
+        rows={exportData.rows}
+        resourceKind={selectedGVK?.kind || 'resources'}
+      />
 
       {/* Table Content with Virtual Scrolling */}
       <div ref={tableContainerRef} className="flex-1 overflow-auto">

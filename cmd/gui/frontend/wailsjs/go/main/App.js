@@ -33,3 +33,7 @@ export function ListContexts() {
 export function RefreshContexts() {
   return window['go']['main']['App']['RefreshContexts']();
 }
+
+export function SaveFile(arg1, arg2) {
+  return window['go']['main']['App']['SaveFile'](arg1, arg2);
+}

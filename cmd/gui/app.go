@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -390,4 +393,53 @@ func convertNodeTree(nodes map[string]*kube.Node) []*TreeNode {
 	})
 
 	return result
+}
+
+// SaveFile opens a save file dialog and saves the content to the selected file
+// Returns the path where the file was saved, or empty string if cancelled
+func (a *App) SaveFile(defaultFilename string, content string) (string, error) {
+	// Get user's Downloads directory as default location
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+	defaultDir := filepath.Join(homeDir, "Downloads")
+
+	// Open save file dialog
+	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultDirectory: defaultDir,
+		DefaultFilename:  defaultFilename,
+		Title:            "Save CSV File",
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "CSV Files (*.csv)",
+				Pattern:     "*.csv",
+			},
+			{
+				DisplayName: "All Files (*.*)",
+				Pattern:     "*.*",
+			},
+		},
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to open save dialog: %w", err)
+	}
+
+	// User cancelled the dialog
+	if filePath == "" {
+		return "", nil
+	}
+
+	// Ensure .csv extension
+	if !strings.HasSuffix(filePath, ".csv") {
+		filePath += ".csv"
+	}
+
+	// Write content to file
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return filePath, nil
 }
