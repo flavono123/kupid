@@ -59,7 +59,7 @@ export function ResultTable({
     setLoading(true);
     GetResources(selectedGVK, connectedContexts)
       .then((resources) => {
-        setData(resources);
+        setData(resources || []);
         setLoading(false);
       })
       .catch((error) => {
@@ -211,18 +211,25 @@ export function ResultTable({
             <div className="sticky top-0 bg-muted z-10 border-b border-border">
               {table.getHeaderGroups().map((headerGroup) => (
                 <div key={headerGroup.id} className="flex">
-                  {headerGroup.headers.map((header) => (
-                    <div
-                      key={header.id}
-                      className="px-4 py-2 text-left text-sm font-medium"
-                      style={{ width: `${header.getSize()}px` }}
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                    </div>
-                  ))}
+                  {headerGroup.headers.map((header) => {
+                    const headerText = typeof header.column.columnDef.header === 'string'
+                      ? header.column.columnDef.header
+                      : String(header.column.columnDef.header);
+
+                    return (
+                      <div
+                        key={header.id}
+                        className="px-4 py-2 text-left text-sm font-medium flex-shrink-0"
+                        style={{
+                          width: `${header.getSize()}px`,
+                          minWidth: `${header.getSize()}px`,
+                          maxWidth: `${header.getSize()}px`,
+                        }}
+                      >
+                        <CellContent value={headerText} />
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
