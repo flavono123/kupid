@@ -214,8 +214,15 @@ func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, 
 		Kind:    gvk.Kind,
 	}
 
-	// 1. Get field tree from schema
-	fields, err := kube.CreateFieldTree(schemaGVK)
+	// 1. Get field tree from schema (use first available context from GVK)
+	var fields map[string]*kube.Field
+	var err error
+	if len(gvk.Contexts) > 0 {
+		// Use the first context where this GVK is available
+		fields, err = kube.CreateFieldTreeForContext(gvk.Contexts[0], schemaGVK)
+	} else {
+		fields, err = kube.CreateFieldTree(schemaGVK)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field tree: %w", err)
 	}

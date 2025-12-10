@@ -87,12 +87,12 @@ func matchXKubeGVK(extension spec.Extensions, gvk schema.GroupVersionKind) bool 
 
 // CreateFieldTree creates a field tree for a GVK from the current context (legacy, kept for TUI compatibility)
 func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
-	return createFieldTreeForContext("", gvk)
+	return CreateFieldTreeForContext("", gvk)
 }
 
-// createFieldTreeForContext creates a field tree for a GVK from the specified context
+// CreateFieldTreeForContext creates a field tree for a GVK from the specified context
 // If contextName is empty, uses the current context
-func createFieldTreeForContext(contextName string, gvk schema.GroupVersionKind) (map[string]*Field, error) {
+func CreateFieldTreeForContext(contextName string, gvk schema.GroupVersionKind) (map[string]*Field, error) {
 	gvr, err := GetGVRForContext(contextName, gvk)
 	if err != nil {
 		return nil, err
