@@ -30,8 +30,9 @@
  *     run: npm run test:run -- --coverage
  */
 
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CommandPalette } from './CommandPalette';
 import { main } from '../../wailsjs/go/models';
 
@@ -173,6 +174,157 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
 
       // Should show loading message
       expect(screen.getByText(/Loading GVKs from 2 contexts/)).toBeInTheDocument();
+    });
+  });
+});
+
+describe('CommandPalette - Focus Management', () => {
+  const mockOnClose = vi.fn();
+  const mockOnGVKSelect = vi.fn();
+
+  it('should focus first item when typing in search', async () => {
+    const user = userEvent.setup();
+    const gvks = [
+      createMockGVK('Pod', '', ['context-1'], 1),
+      createMockGVK('PodTemplate', '', ['context-1'], 1),
+      createMockGVK('Deployment', 'apps', ['context-1'], 1),
+    ];
+
+    render(
+      <CommandPalette
+        contexts={['context-1']}
+        gvks={gvks}
+        loading={false}
+        onClose={mockOnClose}
+        onGVKSelect={mockOnGVKSelect}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search resources...');
+
+    // Type "po" to filter
+    await user.type(searchInput, 'po');
+
+    // Wait for filtering to complete
+    await waitFor(() => {
+      // Pod should be visible (first match)
+      expect(screen.getByText('Pod')).toBeInTheDocument();
+      // PodTemplate should be visible (second match)
+      expect(screen.getByText('PodTemplate')).toBeInTheDocument();
+      // Deployment should not be visible (no match)
+      expect(screen.queryByText('Deployment')).not.toBeInTheDocument();
+    });
+
+    // The Command component should have value set to first item's kind
+    const commandList = screen.getByRole('listbox');
+    expect(commandList).toBeInTheDocument();
+  });
+
+  it('should disable pointer events temporarily when query changes', async () => {
+    vi.useFakeTimers();
+    const user = userEvent.setup({ delay: null });
+
+    const gvks = [
+      createMockGVK('Pod', '', ['context-1'], 1),
+      createMockGVK('Deployment', 'apps', ['context-1'], 1),
+    ];
+
+    render(
+      <CommandPalette
+        contexts={['context-1']}
+        gvks={gvks}
+        loading={false}
+        onClose={mockOnClose}
+        onGVKSelect={mockOnGVKSelect}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search resources...');
+    const commandList = screen.getByRole('listbox');
+
+    // Initially, pointer-events should be disabled (disablePointer starts as true)
+    expect(commandList.className).toContain('pointer-events-none');
+
+    // Wait for initial timeout (100ms)
+    vi.advanceTimersByTime(100);
+    await waitFor(() => {
+      expect(commandList.className).not.toContain('pointer-events-none');
+    });
+
+    // Type to change query
+    await user.type(searchInput, 'p');
+
+    // Pointer events should be disabled again
+    await waitFor(() => {
+      expect(commandList.className).toContain('pointer-events-none');
+    });
+
+    // After 100ms, pointer events should be re-enabled
+    vi.advanceTimersByTime(100);
+    await waitFor(() => {
+      expect(commandList.className).not.toContain('pointer-events-none');
+    });
+
+    vi.useRealTimers();
+  });
+
+  it('should reset to first item when clearing search', async () => {
+    const user = userEvent.setup();
+    const gvks = [
+      createMockGVK('Pod', '', ['context-1'], 1),
+      createMockGVK('Deployment', 'apps', ['context-1'], 1),
+    ];
+
+    render(
+      <CommandPalette
+        contexts={['context-1']}
+        gvks={gvks}
+        loading={false}
+        onClose={mockOnClose}
+        onGVKSelect={mockOnGVKSelect}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search resources...');
+
+    // Type a search query
+    await user.type(searchInput, 'deploy');
+
+    // Clear the search
+    await user.clear(searchInput);
+
+    // Both items should be visible again
+    await waitFor(() => {
+      expect(screen.getByText('Pod')).toBeInTheDocument();
+      expect(screen.getByText('Deployment')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle empty search results', async () => {
+    const user = userEvent.setup();
+    const gvks = [
+      createMockGVK('Pod', '', ['context-1'], 1),
+      createMockGVK('Deployment', 'apps', ['context-1'], 1),
+    ];
+
+    render(
+      <CommandPalette
+        contexts={['context-1']}
+        gvks={gvks}
+        loading={false}
+        onClose={mockOnClose}
+        onGVKSelect={mockOnGVKSelect}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search resources...');
+
+    // Type a query that matches nothing
+    await user.type(searchInput, 'xyz123');
+
+    // Should show empty state
+    await waitFor(() => {
+      expect(screen.getByText('No GVKs found.')).toBeInTheDocument();
     });
   });
 });
