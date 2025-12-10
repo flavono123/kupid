@@ -94,7 +94,21 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 				go func() { i.emitCh <- emitMsg{Obj: n} }()
 			},
 			DeleteFunc: func(obj interface{}) {
-				d := obj.(*unstructured.Unstructured)
+				var d *unstructured.Unstructured
+
+				// Handle DeletedFinalStateUnknown wrapper
+				if deleted, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					d, ok = deleted.Obj.(*unstructured.Unstructured)
+					if !ok {
+						return
+					}
+				} else {
+					var ok bool
+					d, ok = obj.(*unstructured.Unstructured)
+					if !ok {
+						return
+					}
+				}
 
 				go func() { i.emitCh <- emitMsg{Obj: d} }()
 			},
