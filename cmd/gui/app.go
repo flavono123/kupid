@@ -369,8 +369,16 @@ func convertNodeTree(nodes map[string]*kube.Node) []*TreeNode {
 		result = append(result, treeNode)
 	}
 
-	// Sort result: numeric indices first (sorted numerically), then alphabetically
+	// Sort result: * always comes first, then numeric indices (sorted numerically), then alphabetically
 	sort.Slice(result, func(i, j int) bool {
+		// * always comes first
+		if result[i].Name == "*" {
+			return true
+		}
+		if result[j].Name == "*" {
+			return false
+		}
+
 		// Try to parse as numbers
 		numI, errI := strconv.Atoi(result[i].Name)
 		numJ, errJ := strconv.Atoi(result[j].Name)
@@ -380,7 +388,7 @@ func convertNodeTree(nodes map[string]*kube.Node) []*TreeNode {
 			return numI < numJ
 		}
 
-		// One is a number, one is not: numbers come first
+		// One is a number, one is not: numbers come first (after *)
 		if errI == nil {
 			return true
 		}

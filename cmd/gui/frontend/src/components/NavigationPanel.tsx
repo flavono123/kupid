@@ -431,34 +431,113 @@ export function NavigationPanel({
 
   const toggleSelect = useCallback((path: string[]) => {
     const pathKey = path.join('/');
-    setSelectedPaths((prev) => {
-      const next = new Set(prev);
-      if (next.has(pathKey)) {
-        next.delete(pathKey);
-      } else {
-        next.add(pathKey);
 
-        // Auto-expand parent paths when selecting a field
-        setManualExpandedPaths((prevExpanded) => {
-          const nextExpanded = new Set(prevExpanded);
-          // Add all parent paths
-          for (let i = 1; i < path.length; i++) {
-            const parentPath = path.slice(0, i).join('/');
-            nextExpanded.add(parentPath);
-          }
-          return nextExpanded;
+    // Check if path contains wildcard '*'
+    const wildcardIndex = path.findIndex(p => p === '*');
+
+    if (wildcardIndex === -1) {
+      // No wildcard, handle normally
+      setSelectedPaths((prev) => {
+        const next = new Set(prev);
+        if (next.has(pathKey)) {
+          next.delete(pathKey);
+        } else {
+          next.add(pathKey);
+
+          // Auto-expand parent paths when selecting a field
+          setManualExpandedPaths((prevExpanded) => {
+            const nextExpanded = new Set(prevExpanded);
+            for (let i = 1; i < path.length; i++) {
+              const parentPath = path.slice(0, i).join('/');
+              nextExpanded.add(parentPath);
+            }
+            return nextExpanded;
+          });
+        }
+
+        if (onFieldsSelected) {
+          const selectedFields = Array.from(next)
+            .filter((p) => !p.includes('*')) // Filter out wildcard paths (UI only)
+            .map((p) => p.split('/'));
+          onFieldsSelected(selectedFields);
+        }
+
+        return next;
+      });
+    } else {
+      // Wildcard found - toggle all index nodes
+      const arrayPath = path.slice(0, wildcardIndex);
+      const pathAfterWildcard = path.slice(wildcardIndex + 1);
+
+      // Find array node
+      const arrayPathKey = arrayPath.join('/');
+      const arrayNode = flatNodesMap.get(arrayPathKey);
+
+      if (!arrayNode || !arrayNode.children) {
+        return;
+      }
+
+      setSelectedPaths((prev) => {
+        const next = new Set(prev);
+
+        // Find all index nodes (numeric children)
+        const indexNodes = arrayNode.children.filter((child) => {
+          return child.name !== '*' && !isNaN(Number(child.name));
         });
-      }
 
-      // Notify parent
-      if (onFieldsSelected) {
-        const selectedFields = Array.from(next).map((p) => p.split('/'));
-        onFieldsSelected(selectedFields);
-      }
+        // Check if all index nodes with the same path are selected
+        const allSelected = indexNodes.every((indexNode) => {
+          const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
+          return next.has(targetPath.join('/'));
+        });
 
-      return next;
-    });
-  }, [onFieldsSelected]);
+        // Toggle all
+        const toSelect = !allSelected;
+        indexNodes.forEach((indexNode) => {
+          const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
+          const targetPathKey = targetPath.join('/');
+
+          if (toSelect) {
+            next.add(targetPathKey);
+          } else {
+            next.delete(targetPathKey);
+          }
+        });
+
+        // Also toggle the wildcard path for UI display
+        if (toSelect) {
+          next.add(pathKey);
+        } else {
+          next.delete(pathKey);
+        }
+
+        // Auto-expand parent paths if selecting
+        if (toSelect) {
+          setManualExpandedPaths((prevExpanded) => {
+            const nextExpanded = new Set(prevExpanded);
+            // Expand parents of all selected paths
+            indexNodes.forEach((indexNode) => {
+              const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
+              for (let i = 1; i < targetPath.length; i++) {
+                const parentPath = targetPath.slice(0, i).join('/');
+                nextExpanded.add(parentPath);
+              }
+            });
+            return nextExpanded;
+          });
+        }
+
+        if (onFieldsSelected) {
+          const selectedFields = Array.from(next)
+            .filter((p) => !p.includes('*')) // Filter out wildcard paths (UI only)
+            .map((p) => p.split('/'));
+          onFieldsSelected(selectedFields);
+        }
+
+        return next;
+      });
+    }
+  }, [onFieldsSelected, flatNodesMap]);
 
   const clearAllSelections = useCallback(() => {
     setSelectedPaths(new Set());

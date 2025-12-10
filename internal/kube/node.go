@@ -148,6 +148,19 @@ func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructur
 			maxLength := getMaxLength(childPrefix, objs)
 			children = make(map[string]*Node)
 
+			// Add wildcard node for non-empty arrays (before creating index nodes)
+			if maxLength > 0 && field.Children != nil {
+				// Create independent children tree for wildcard node
+				wildcardChildren := CreateNodeTree(field.Children, objs, append(childPrefix, "*"))
+				children["*"] = &Node{
+					field:     nil,
+					name:      "*",
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  wildcardChildren,
+				}
+			}
+
 			for i := 0; i < maxLength; i++ {
 				idx := strconv.Itoa(i)
 				grandChildren := map[string]*Node(nil)
@@ -200,8 +213,18 @@ func getNestedValue(obj map[string]interface{}, paths ...string) (interface{}, b
 	var current interface{} = obj
 
 	for i, path := range paths {
-		// for array nodes
-		if index, err := strconv.Atoi(path); err == nil {
+		// Handle wildcard: use first index (0) for querying actual data
+		if path == "*" {
+			if slice, ok := current.([]interface{}); ok {
+				if len(slice) == 0 {
+					return nil, false, nil
+				}
+				current = slice[0]
+			} else {
+				return nil, false, fmt.Errorf("expected array for wildcard, got %T", current)
+			}
+		} else if index, err := strconv.Atoi(path); err == nil {
+			// for array nodes
 			if slice, ok := current.([]interface{}); ok {
 				if index >= len(slice) {
 					return nil, false, fmt.Errorf("index %d out of bounds", index)
@@ -317,13 +340,31 @@ func UpdateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 			maxLength := getMaxLength(childPrefix, objs)
 			children = make(map[string]*Node)
 
+			// Add wildcard node for non-empty arrays (before creating index nodes)
+			if maxLength > 0 && field.Children != nil {
+				existingWildcardChildren := map[string]*Node{}
+				if exists && existingNode.children != nil && existingNode.children["*"] != nil {
+					existingWildcardChildren = existingNode.children["*"].children
+				}
+				wildcardChildren := UpdateNodeTree(existingWildcardChildren, field.Children, objs, append(childPrefix, "*"))
+				children["*"] = &Node{
+					field:     nil,
+					name:      "*",
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  wildcardChildren,
+					Expanded:  exists && existingNode.children != nil && existingNode.children["*"] != nil && existingNode.children["*"].Expanded,
+					Selected:  exists && existingNode.children != nil && existingNode.children["*"] != nil && existingNode.children["*"].Selected,
+				}
+			}
+
 			for i := 0; i < maxLength; i++ {
 				idx := strconv.Itoa(i)
 				var grandChildren map[string]*Node
 
 				if field.Children != nil {
 					existingChildren := map[string]*Node{}
-					if exists && existingNode.children != nil {
+					if exists && existingNode.children != nil && existingNode.children[idx] != nil {
 						existingChildren = existingNode.children[idx].children
 					}
 					grandChildren = UpdateNodeTree(existingChildren, field.Children, objs, append(childPrefix, idx))
