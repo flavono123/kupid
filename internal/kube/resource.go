@@ -84,12 +84,18 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 		ObjectType:    &unstructured.Unstructured{},
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				u := obj.(*unstructured.Unstructured)
+				u, ok := obj.(*unstructured.Unstructured)
+				if !ok {
+					return
+				}
 
 				go func() { i.emitCh <- emitMsg{Obj: u} }()
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				n := newObj.(*unstructured.Unstructured)
+				n, ok := newObj.(*unstructured.Unstructured)
+				if !ok {
+					return
+				}
 
 				go func() { i.emitCh <- emitMsg{Obj: n} }()
 			},

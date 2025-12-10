@@ -2,10 +2,15 @@ import { useCallback } from 'react';
 import fuzzysort from 'fuzzysort';
 
 /**
+ * Function that takes text and returns highlight indices for matching characters
+ */
+type HighlightFunction = (text: string) => [number, number][] | null;
+
+/**
  * Hook for highlighting search matches in table cells
  * Returns a function that takes text and returns highlight indices
  */
-export function useCellHighlight(query: string) {
+export function useCellHighlight(query: string): HighlightFunction {
   return useCallback(
     (text: string): [number, number][] | null => {
       if (!query || !text) return null;
