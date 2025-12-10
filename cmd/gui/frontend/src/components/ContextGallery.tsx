@@ -221,7 +221,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
       // Enter: Connect to selected contexts
       if (e.key === 'Enter' && selectedContexts.size > 0) {
         e.preventDefault();
-        handleConnect();
+        handleConnect(selectedContexts);
         return;
       }
     };
@@ -371,7 +371,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
         <div className="flex-1 flex flex-col justify-between pt-8">
           <div className="flex-shrink-0 flex justify-center border-t pt-6">
             <Button
-              onClick={handleConnect}
+              onClick={() => handleConnect(selectedContexts)}
               disabled={selectedContexts.size === 0 || isConnecting}
               size="lg"
             >
