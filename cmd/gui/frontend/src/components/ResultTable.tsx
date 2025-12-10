@@ -142,7 +142,7 @@ export function ResultTable({
         },
       };
     });
-  }, [selectedFields, connectedContexts, data, getHighlightIndices]);
+  }, [selectedFields, connectedContexts, data]);
 
   // Create table instance
   const table = useReactTable({
@@ -163,6 +163,13 @@ export function ResultTable({
 
   // Get filtered rows for virtualization
   const { rows } = table.getRowModel();
+
+  // Calculate total width of all columns for horizontal scrolling
+  const totalColumnsWidth = useMemo(() => {
+    return columns.reduce((sum, col) => {
+      return sum + (col.size || 100);
+    }, 0);
+  }, [columns]);
 
   // Setup row virtualizer
   const rowVirtualizer = useVirtualizer({
@@ -225,7 +232,7 @@ export function ResultTable({
             </p>
           </div>
         ) : (
-          <div>
+          <div style={{ minWidth: `${totalColumnsWidth}px` }}>
             {/* Header (sticky) */}
             <div className="sticky top-0 bg-background z-10 border-b border-border">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -254,16 +261,22 @@ export function ResultTable({
             </div>
 
             {/* Body (virtualized) */}
-            <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                position: 'relative',
+              }}
+            >
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const row = rows[virtualRow.index];
                 return (
                   <div
                     key={row.id}
-                    className="flex border-b border-border hover:bg-accent transition-colors absolute top-0 left-0 w-full"
+                    className="flex border-b border-border hover:bg-accent transition-colors absolute top-0 left-0"
                     style={{
                       height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,
+                      width: '100%',
                     }}
                   >
                     {row.getVisibleCells().map((cell) => (
