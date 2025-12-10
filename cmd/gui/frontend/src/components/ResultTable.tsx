@@ -168,7 +168,7 @@ export function ResultTable({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 35,  // Estimated row height in pixels
+    estimateSize: () => 28,  // Estimated row height in pixels (reduced from 35)
     overscan: 10,  // Render 10 extra rows above/below viewport
   });
 
@@ -227,7 +227,7 @@ export function ResultTable({
         ) : (
           <div>
             {/* Header (sticky) */}
-            <div className="sticky top-0 bg-muted z-10 border-b border-border">
+            <div className="sticky top-0 bg-background z-10 border-b border-border">
               {table.getHeaderGroups().map((headerGroup) => (
                 <div key={headerGroup.id} className="flex">
                   {headerGroup.headers.map((header) => {
@@ -238,7 +238,7 @@ export function ResultTable({
                     return (
                       <div
                         key={header.id}
-                        className="px-4 py-2 text-left text-sm font-medium flex-shrink-0"
+                        className="px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0"
                         style={{
                           width: `${header.getSize()}px`,
                           minWidth: `${header.getSize()}px`,
@@ -269,7 +269,7 @@ export function ResultTable({
                     {row.getVisibleCells().map((cell) => (
                       <div
                         key={cell.id}
-                        className="px-4 py-2 text-sm flex-shrink-0"
+                        className="px-4 py-1 text-sm flex-shrink-0"
                         style={{
                           width: `${cell.column.getSize()}px`,
                           minWidth: `${cell.column.getSize()}px`,
