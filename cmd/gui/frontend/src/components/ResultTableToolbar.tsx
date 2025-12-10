@@ -54,7 +54,11 @@ export function ResultTableToolbar({
     try {
       setExporting(true);
       const csvContent = convertToCSV(headers, rows);
-      const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const now = new Date();
+      const timestamp = now.toISOString()
+        .replace(/T/, '_')
+        .replace(/:/g, '-')
+        .replace(/\.\d+Z$/, ''); // YYYY-MM-DD_HH-MM-SS
       const filename = `${resourceKind}-${timestamp}.csv`;
 
       const savedPath = await downloadCSV(csvContent, filename, SaveFile);
