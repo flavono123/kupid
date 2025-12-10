@@ -27,6 +27,7 @@ interface CommandPaletteProps {
 export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }: CommandPaletteProps) {
   console.log("CommandPalette rendered with contexts:", contexts);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
+  const [selectedValue, setSelectedValue] = useState<string>("");
   const contextsRef = useRef(contexts);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -130,6 +131,18 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
       .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [gvks, results, query, searchableTexts]);
 
+  // Reset selected value to first item when query changes
+  // This ensures keyboard input always focuses the top result, ignoring mouse position
+  useEffect(() => {
+    if (filteredGVKs.length > 0) {
+      // Set to first item's kind
+      setSelectedValue(filteredGVKs[0].gvk.kind);
+    } else {
+      setSelectedValue("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
   const handleSelect = (gvk: main.MultiClusterGVK) => {
     console.log("Selected GVK:", gvk);
     onGVKSelect(gvk);
@@ -150,7 +163,12 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
           When enabled, causes unexpected upward scrolling (set 0 jumps incorrectly).
           TODO: Re-enable once cmdk fixes the loop + scroll interaction bug.
         */}
-        <Command className="rounded-lg border shadow-lg" shouldFilter={false}>
+        <Command
+          className="rounded-lg border shadow-lg"
+          shouldFilter={false}
+          value={selectedValue}
+          onValueChange={setSelectedValue}
+        >
           <CommandInput
             ref={searchInputRef}
             placeholder="Search resources..."
