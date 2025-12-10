@@ -28,6 +28,7 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
   console.log("CommandPalette rendered with contexts:", contexts);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const [selectedValue, setSelectedValue] = useState<string>("");
+  const [disablePointer, setDisablePointer] = useState(true);
   const contextsRef = useRef(contexts);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -140,6 +141,14 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
     } else {
       setSelectedValue("");
     }
+
+    // Disable pointer events briefly to prevent mouse hover from affecting focus
+    setDisablePointer(true);
+    const timeoutId = setTimeout(() => {
+      setDisablePointer(false);
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
@@ -175,7 +184,10 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
             value={query}
             onValueChange={setQuery}
           />
-          <CommandList ref={listRef} className="max-h-96">
+          <CommandList
+            ref={listRef}
+            className={`max-h-96 ${disablePointer ? "pointer-events-none" : ""}`}
+          >
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <Spinner className="w-8 h-8 text-primary" />
