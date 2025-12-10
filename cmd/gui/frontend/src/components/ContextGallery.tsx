@@ -35,28 +35,16 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
   // Results are already processed by useFuzzySearch
   const filteredContexts = results;
 
-  const handleCardClick = useCallback((context: string, index: number) => {
-    setSelectedContexts((prev) => {
-      const newSelected = new Set(prev);
-      if (newSelected.has(context)) {
-        newSelected.delete(context);
-      } else {
-        newSelected.add(context);
-      }
-      return newSelected;
-    });
-    setFocusedIndex(index);
-  }, []);
-
-  const handleConnect = useCallback(async () => {
-    console.log("handleConnect called, selectedContexts:", selectedContexts);
-    if (selectedContexts.size === 0) {
+  const handleConnect = useCallback(async (contextsToConnect?: Set<string>) => {
+    const contexts = contextsToConnect || selectedContexts;
+    console.log("handleConnect called, contexts:", contexts);
+    if (contexts.size === 0) {
       console.log("No contexts selected");
       return;
     }
 
     setIsConnecting(true);
-    const contextsArray = Array.from(selectedContexts);
+    const contextsArray = Array.from(contexts);
 
     try {
       const results = await ConnectToContexts(contextsArray);
@@ -85,7 +73,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
 
       // If at least one context connected successfully, navigate to main view
       if (successful.length > 0) {
-        onContextsConnected(Array.from(selectedContexts), successful);
+        onContextsConnected(Array.from(contexts), successful);
       }
     } catch (error) {
       console.error("Connection error:", error);
@@ -96,6 +84,32 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
       setIsConnecting(false);
     }
   }, [selectedContexts, onContextsConnected]);
+
+  const handleCardClick = useCallback((context: string, index: number) => {
+    // Update focus and selection immediately for responsive UX
+    setFocusedIndex(index);
+    setSelectedContexts((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(context)) {
+        newSelected.delete(context);
+      } else {
+        newSelected.add(context);
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const handleCardDoubleClick = useCallback((context: string, index: number) => {
+    // Calculate which contexts to connect
+    const contextsToConnect = new Set(selectedContexts);
+    contextsToConnect.add(context); // Ensure the double-clicked card is included
+
+    // Update selection state
+    setSelectedContexts(contextsToConnect);
+
+    // Connect with the calculated contexts immediately
+    handleConnect(contextsToConnect);
+  }, [selectedContexts, handleConnect]);
 
   const handleClearAll = useCallback(() => {
     setSelectedContexts(new Set());
@@ -328,6 +342,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
                 >
                   <Card
                     onClick={() => handleCardClick(item, index)}
+                    onDoubleClick={() => handleCardDoubleClick(item, index)}
                     className={`
                       px-3 py-1 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5
                       ${isSelected ? "bg-accent" : ""}
