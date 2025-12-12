@@ -69,4 +69,8 @@
   body {
     @apply bg-background text-foreground;
     }
+  /* Lucide icons stroke width */
+  svg[class*="lucide"] {
+    stroke-width: 1;
+    }
 }
