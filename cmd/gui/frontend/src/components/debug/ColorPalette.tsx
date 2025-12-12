@@ -140,25 +140,6 @@ export function ColorPalette({ onBack }: ColorPaletteProps) {
             </p>
           </Card>
         </div>
-
-        {/* Note about missing colors */}
-        <Card className="mt-12 p-6 border-yellow-500 border-2">
-          <h3 className="font-bold text-foreground mb-2">⚠️ 참고사항</h3>
-          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-            <li>
-              <strong>success</strong> 색상은 기본 제공되지 않음
-            </li>
-            <li>
-              <strong>warning</strong> 색상도 없음 (필요시 추가 가능)
-            </li>
-            <li>
-              <strong>info</strong> 색상도 없음
-            </li>
-            <li>
-              성공/실패 표시가 필요하면 Tailwind의 <code className="bg-muted px-1 py-0.5 rounded text-xs">green-500</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs">red-500</code> 등을 직접 사용하거나 CSS 변수로 추가 필요
-            </li>
-          </ul>
-        </Card>
       </div>
     </div>
   );

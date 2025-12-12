@@ -75,7 +75,7 @@ export function CellContent({
             fullText
           )}
           {copied && (
-            <span className="ml-2 text-xs text-green-600 font-medium">
+            <span className="ml-2 text-xs text-primary font-medium">
               Copied
             </span>
           )}

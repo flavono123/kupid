@@ -109,15 +109,15 @@ export function ResultTableToolbar({
               className="gap-2"
             >
               {exportStatus === 'idle' && <Download className="h-4 w-4" />}
-              {exportStatus === 'copied' && <Clipboard className="h-4 w-4 text-green-600" />}
-              {exportStatus === 'downloaded' && <FileDown className="h-4 w-4 text-green-600" />}
-              {exportStatus === 'error' && <AlertCircle className="h-4 w-4 text-red-600" />}
+              {exportStatus === 'copied' && <Clipboard className="h-4 w-4 text-primary" />}
+              {exportStatus === 'downloaded' && <FileDown className="h-4 w-4 text-primary" />}
+              {exportStatus === 'error' && <AlertCircle className="h-4 w-4 text-destructive" />}
 
               <span className={
                 exportStatus === 'copied' || exportStatus === 'downloaded'
-                  ? 'text-green-600'
+                  ? 'text-primary'
                   : exportStatus === 'error'
-                  ? 'text-red-600'
+                  ? 'text-destructive'
                   : ''
               }>
                 {exportStatus === 'copied' && 'Copied'}

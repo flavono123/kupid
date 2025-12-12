@@ -295,12 +295,12 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
                         >
                           <PopoverTrigger asChild>
                             <div
-                              className="flex items-center gap-1 px-1 py-0.5 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                              className="flex items-center gap-1 px-1 py-0.5 rounded-md bg-accent/10 border border-accent/30 hover:bg-accent/20 transition-colors"
                               onMouseEnter={() => setOpenPopoverIndex(index)}
                               onMouseLeave={() => setOpenPopoverIndex(null)}
                             >
                               <K8sIcon className="w-9 h-9" />
-                              <span className="text-xs text-blue-700">
+                              <span className="text-xs text-accent-foreground">
                                 {availableCount}
                               </span>
                             </div>
@@ -334,7 +334,7 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
                                         }`}
                                     >
                                       {isAvailable ? (
-                                        <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                        <Check className="w-4 h-4 text-primary flex-shrink-0" />
                                       ) : (
                                         <X className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                       )}
