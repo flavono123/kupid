@@ -9,6 +9,10 @@ import { main } from "../../wailsjs/go/models";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 
+// Use null character as path delimiter to avoid conflicts with field names containing '/'
+// (e.g., Kubernetes annotations like "karpenter.sh/node-hash-version")
+const PATH_DELIMITER = '\x00';
+
 interface NavigationPanelProps {
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
@@ -46,7 +50,7 @@ const TreeNodeItem = memo(({
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
   const isLeaf = !hasChildren && !isArrayOrMap;
-  const pathKey = node.fullPath.join('/');
+  const pathKey = node.fullPath.join(PATH_DELIMITER);
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
   const matchIndices = searchResultsMap.get(pathKey);
@@ -141,7 +145,7 @@ const TreeNodeItem = memo(({
         <div>
           {node.children.map((child, idx) => (
             <TreeNodeItem
-              key={`${child.fullPath.join('/')}-${idx}`}
+              key={`${child.fullPath.join(PATH_DELIMITER)}-${idx}`}
               node={child}
               expandedPaths={expandedPaths}
               selectedPaths={selectedPaths}
@@ -209,7 +213,7 @@ export function NavigationPanel({
     const map = new Map<string, TreeNode>();
     const flatten = (nodes: TreeNode[]) => {
       for (const node of nodes) {
-        const pathKey = node.fullPath.join('/');
+        const pathKey = node.fullPath.join(PATH_DELIMITER);
         map.set(pathKey, node);
         if (node.children && node.children.length > 0) {
           flatten(node.children);
@@ -342,10 +346,10 @@ export function NavigationPanel({
   const selectedParentPaths = useMemo(() => {
     const paths = new Set<string>();
     selectedPaths.forEach((pathKey) => {
-      const pathParts = pathKey.split('/');
+      const pathParts = pathKey.split(PATH_DELIMITER);
       // Add all parent paths (not the selected path itself)
       for (let i = 1; i < pathParts.length; i++) {
-        const parentPath = pathParts.slice(0, i).join('/');
+        const parentPath = pathParts.slice(0, i).join(PATH_DELIMITER);
         paths.add(parentPath);
       }
     });
@@ -360,10 +364,10 @@ export function NavigationPanel({
 
     const paths = new Set<string>();
     matchedPaths.forEach((pathKey) => {
-      const pathParts = pathKey.split('/');
+      const pathParts = pathKey.split(PATH_DELIMITER);
       // Add all parent paths
       for (let i = 1; i < pathParts.length; i++) {
-        const parentPath = pathParts.slice(0, i).join('/');
+        const parentPath = pathParts.slice(0, i).join(PATH_DELIMITER);
         paths.add(parentPath);
       }
     });
@@ -395,17 +399,17 @@ export function NavigationPanel({
     // Create a Set of all paths to show (matched nodes + their ancestors)
     const pathsToShow = new Set<string>();
     matchedPaths.forEach((pathKey) => {
-      const pathParts = pathKey.split('/');
+      const pathParts = pathKey.split(PATH_DELIMITER);
       // Add the node itself and all its ancestors
       for (let i = 1; i <= pathParts.length; i++) {
-        pathsToShow.add(pathParts.slice(0, i).join('/'));
+        pathsToShow.add(pathParts.slice(0, i).join(PATH_DELIMITER));
       }
     });
 
     // Recursively filter the tree
     const filterNodes = (nodes: TreeNode[]): TreeNode[] => {
       return nodes
-        .filter((node) => pathsToShow.has(node.fullPath.join('/')))
+        .filter((node) => pathsToShow.has(node.fullPath.join(PATH_DELIMITER)))
         .map((node) => ({
           ...node,
           children: node.children ? filterNodes(node.children) : [],
@@ -417,7 +421,7 @@ export function NavigationPanel({
 
   // Memoized toggle functions
   const toggleExpand = useCallback((path: string[]) => {
-    const pathKey = path.join('/');
+    const pathKey = path.join(PATH_DELIMITER);
     setManualExpandedPaths((prev) => {
       const next = new Set(prev);
       if (next.has(pathKey)) {
@@ -430,7 +434,7 @@ export function NavigationPanel({
   }, []);
 
   const toggleSelect = useCallback((path: string[]) => {
-    const pathKey = path.join('/');
+    const pathKey = path.join(PATH_DELIMITER);
 
     // Check if path contains wildcard '*'
     const wildcardIndex = path.findIndex(p => p === '*');
@@ -448,7 +452,7 @@ export function NavigationPanel({
           setManualExpandedPaths((prevExpanded) => {
             const nextExpanded = new Set(prevExpanded);
             for (let i = 1; i < path.length; i++) {
-              const parentPath = path.slice(0, i).join('/');
+              const parentPath = path.slice(0, i).join(PATH_DELIMITER);
               nextExpanded.add(parentPath);
             }
             return nextExpanded;
@@ -458,7 +462,7 @@ export function NavigationPanel({
         if (onFieldsSelected) {
           const selectedFields = Array.from(next)
             .filter((p) => !p.includes('*')) // Filter out wildcard paths (UI only)
-            .map((p) => p.split('/'));
+            .map((p) => p.split(PATH_DELIMITER));
           onFieldsSelected(selectedFields);
         }
 
@@ -470,7 +474,7 @@ export function NavigationPanel({
       const pathAfterWildcard = path.slice(wildcardIndex + 1);
 
       // Find array node
-      const arrayPathKey = arrayPath.join('/');
+      const arrayPathKey = arrayPath.join(PATH_DELIMITER);
       const arrayNode = flatNodesMap.get(arrayPathKey);
 
       if (!arrayNode || !arrayNode.children) {
@@ -488,14 +492,14 @@ export function NavigationPanel({
         // Check if all index nodes with the same path are selected
         const allSelected = indexNodes.every((indexNode) => {
           const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
-          return next.has(targetPath.join('/'));
+          return next.has(targetPath.join(PATH_DELIMITER));
         });
 
         // Toggle all
         const toSelect = !allSelected;
         indexNodes.forEach((indexNode) => {
           const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
-          const targetPathKey = targetPath.join('/');
+          const targetPathKey = targetPath.join(PATH_DELIMITER);
 
           if (toSelect) {
             next.add(targetPathKey);
@@ -519,7 +523,7 @@ export function NavigationPanel({
             indexNodes.forEach((indexNode) => {
               const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
               for (let i = 1; i < targetPath.length; i++) {
-                const parentPath = targetPath.slice(0, i).join('/');
+                const parentPath = targetPath.slice(0, i).join(PATH_DELIMITER);
                 nextExpanded.add(parentPath);
               }
             });
@@ -530,7 +534,7 @@ export function NavigationPanel({
         if (onFieldsSelected) {
           const selectedFields = Array.from(next)
             .filter((p) => !p.includes('*')) // Filter out wildcard paths (UI only)
-            .map((p) => p.split('/'));
+            .map((p) => p.split(PATH_DELIMITER));
           onFieldsSelected(selectedFields);
         }
 
@@ -625,7 +629,7 @@ export function NavigationPanel({
           <div className="p-2" style={{ minWidth: 'max-content' }}>
             {filteredNodeTree.map((node, idx) => (
               <TreeNodeItem
-                key={`${node.fullPath.join('/')}-${idx}`}
+                key={`${node.fullPath.join(PATH_DELIMITER)}-${idx}`}
                 node={node}
                 expandedPaths={expandedPaths}
                 selectedPaths={selectedPaths}

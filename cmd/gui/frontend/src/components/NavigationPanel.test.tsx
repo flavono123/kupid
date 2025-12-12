@@ -597,6 +597,107 @@ describe('NavigationPanel', () => {
       expect(screen.getByText('ports')).toBeInTheDocument();
       expect(screen.getByText('containerPort')).toBeInTheDocument();
     });
+
+    it('should handle field names with slashes (e.g., Kubernetes annotations)', async () => {
+      const treeWithSlashes = [
+        {
+          name: 'metadata',
+          type: 'ObjectMeta',
+          fullPath: ['metadata'],
+          level: 0,
+          children: [
+            {
+              name: 'annotations',
+              type: 'map[string]string',
+              fullPath: ['metadata', 'annotations'],
+              level: 1,
+              children: [
+                {
+                  name: 'karpenter.sh/node-hash-version',
+                  type: 'string',
+                  fullPath: ['metadata', 'annotations', 'karpenter.sh/node-hash-version'],
+                  level: 2,
+                  children: [],
+                },
+                {
+                  name: 'eks.amazonaws.com/nodegroup',
+                  type: 'string',
+                  fullPath: ['metadata', 'annotations', 'eks.amazonaws.com/nodegroup'],
+                  level: 2,
+                  children: [],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      (App.GetNodeTree as any).mockResolvedValue(treeWithSlashes);
+
+      const user = userEvent.setup();
+
+      render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Expand metadata
+      const metadataExpandButton = screen.getAllByRole('button')[0];
+      await user.click(metadataExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('annotations')).toBeInTheDocument();
+      });
+
+      // Expand annotations
+      const annotationsExpandButton = screen.getAllByRole('button')[1];
+      await user.click(annotationsExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('karpenter.sh/node-hash-version')).toBeInTheDocument();
+        expect(screen.getByText('eks.amazonaws.com/nodegroup')).toBeInTheDocument();
+      });
+
+      // Find and click the checkbox for the Karpenter annotation (with slash in name)
+      const checkboxes = screen.getAllByRole('checkbox');
+      const karpenterCheckbox = checkboxes.find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('karpenter.sh/node-hash-version');
+      });
+
+      expect(karpenterCheckbox).toBeDefined();
+      await user.click(karpenterCheckbox!);
+
+      // Should call onFieldsSelected with the correct path (preserving slashes)
+      await waitFor(() => {
+        expect(mockOnFieldsSelected).toHaveBeenCalledWith([
+          ['metadata', 'annotations', 'karpenter.sh/node-hash-version'],
+        ]);
+      });
+
+      // Select the EKS annotation as well
+      const eksCheckbox = checkboxes.find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('eks.amazonaws.com/nodegroup');
+      });
+
+      await user.click(eksCheckbox!);
+
+      // Should call onFieldsSelected with both paths
+      await waitFor(() => {
+        expect(mockOnFieldsSelected).toHaveBeenLastCalledWith([
+          ['metadata', 'annotations', 'karpenter.sh/node-hash-version'],
+          ['metadata', 'annotations', 'eks.amazonaws.com/nodegroup'],
+        ]);
+      });
+    });
   });
 
   describe('Expand/Collapse State Management', () => {
