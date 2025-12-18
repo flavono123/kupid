@@ -127,7 +127,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                         )}
                       </div>
                     ) : (
-                      <div className="text-xs text-muted-foreground italic">
+                      <div className="text-xs text-muted-foreground italic truncate">
                         Select a resource
                       </div>
                     )}
@@ -196,7 +196,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                         )}
                       </div>
                     ) : (
-                      <div className="text-xs text-muted-foreground italic px-3">
+                      <div className="text-xs text-muted-foreground italic px-3 truncate">
                         Select a resource
                       </div>
                     )}
@@ -217,8 +217,8 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                   }}
                 />
               ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground">
+                <div className="h-full flex items-center justify-center px-4">
+                  <p className="text-sm text-muted-foreground truncate">
                     Press <kbd className="px-2 py-1 text-xs rounded border bg-muted">⌘K</kbd> to select a resource
                   </p>
                 </div>
@@ -252,8 +252,8 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                 connectedContexts={connectedContexts}
               />
             ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">
+              <div className="h-full flex items-center justify-center px-4">
+                <p className="text-sm text-muted-foreground truncate">
                   Press <kbd className="px-2 py-1 text-xs rounded border bg-muted">⌘K</kbd> to select a resource
                 </p>
               </div>
