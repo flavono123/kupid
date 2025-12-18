@@ -99,7 +99,7 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
     });
   }, []);
 
-  const handleCardDoubleClick = useCallback((context: string, index: number) => {
+  const handleCardDoubleClick = useCallback((context: string, _index: number) => {
     // Calculate which contexts to connect
     const contextsToConnect = new Set(selectedContexts);
     contextsToConnect.add(context); // Ensure the double-clicked card is included

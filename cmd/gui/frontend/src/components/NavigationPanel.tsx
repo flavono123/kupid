@@ -283,7 +283,7 @@ export function NavigationPanel({
       // This handles cases where the match is in node.type
       const nameLength = result.item.node.name.length;
       const filteredIndices = result.indices
-        .filter(([start, end]) => start < nameLength)
+        .filter(([start]) => start < nameLength)
         .map(([start, end]): [number, number] => [start, Math.min(end, nameLength - 1)]);
 
       // Add to map with filtered indices (null if no match in name)
