@@ -125,6 +125,7 @@ function App() {
                 <MainView
                     selectedContexts={selectedContexts}
                     connectedContexts={connectedContexts}
+                    onBackToContexts={handleBackToGallery}
                 />
             ) : (
                 <ContextGallery onContextsConnected={handleContextsConnected} />

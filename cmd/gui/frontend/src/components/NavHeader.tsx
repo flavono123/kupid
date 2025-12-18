@@ -9,6 +9,7 @@ interface NavHeaderProps {
   connectedContexts: string[];
   selectedGVK: main.MultiClusterGVK | null;
   onCollapse: () => void;
+  onBackToContexts: () => void;
 }
 
 export function NavHeader({
@@ -16,6 +17,7 @@ export function NavHeader({
   connectedContexts,
   selectedGVK,
   onCollapse,
+  onBackToContexts,
 }: NavHeaderProps) {
   return (
     <div className="p-4 border-b border-border relative">
@@ -34,6 +36,7 @@ export function NavHeader({
           <ContextDisplay
             selectedContexts={selectedContexts}
             connectedContexts={connectedContexts}
+            onBackToContexts={onBackToContexts}
           />
           <ResourceDisplay
             selectedGVK={selectedGVK}

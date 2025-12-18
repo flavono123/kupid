@@ -1,32 +1,55 @@
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { PlugZap, Unplug } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
+import { Button } from "./ui/button";
+import { ChevronLeft, PlugZap, Unplug } from "lucide-react";
 
 interface ContextDisplayProps {
   selectedContexts: string[];
   connectedContexts: string[];
+  onBackToContexts: () => void;
 }
 
-export function ContextDisplay({ selectedContexts, connectedContexts }: ContextDisplayProps) {
-  if (selectedContexts.length === 1) {
-    // Single context: show icon + name only
+export function ContextDisplay({
+  selectedContexts,
+  connectedContexts,
+  onBackToContexts,
+}: ContextDisplayProps) {
+  const isSingleContext = selectedContexts.length === 1;
+
+  // Single context: just show hover-to-transform button (no portal needed)
+  if (isSingleContext) {
     return (
-      <div className="flex items-center gap-2 min-w-0 px-3 py-2">
-        <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
-        <h2 className="text-sm text-foreground overflow-hidden whitespace-nowrap">
-          {connectedContexts[0]}
-        </h2>
+      <div className="group relative">
+        {/* Default state: context name */}
+        <div className="flex items-center gap-2 px-3 py-2 min-w-0 group-hover:invisible overflow-hidden">
+          <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
+          <h2 className="text-sm text-foreground truncate">
+            {connectedContexts[0]}
+          </h2>
+        </div>
+
+        {/* Hover state: back button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBackToContexts}
+          className="absolute inset-0 w-full justify-start gap-2 invisible group-hover:visible overflow-hidden font-normal"
+        >
+          <ChevronLeft className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">Back to contexts</span>
+        </Button>
       </div>
     );
   }
 
-  // Multiple contexts: show popover with count
+  // Multiple contexts: hover-to-transform button + portal with context list
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 px-3 py-2 rounded-md transition-colors min-w-0">
-          <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
-          <div className="overflow-hidden">
-            <h2 className="text-sm text-foreground whitespace-nowrap">
+    <HoverCard openDelay={100} closeDelay={200}>
+      <HoverCardTrigger asChild>
+        <div className="group relative">
+          {/* Default state: context count */}
+          <div className="flex items-center gap-2 px-3 py-2 min-w-0 group-hover:invisible overflow-hidden">
+            <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
+            <h2 className="text-sm text-foreground truncate">
               Contexts ({
                 connectedContexts.length === selectedContexts.length
                   ? selectedContexts.length
@@ -34,10 +57,21 @@ export function ContextDisplay({ selectedContexts, connectedContexts }: ContextD
               })
             </h2>
           </div>
+
+          {/* Hover state: back button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBackToContexts}
+            className="absolute inset-0 w-full justify-start gap-2 invisible group-hover:visible overflow-hidden font-normal"
+          >
+            <ChevronLeft className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Back to contexts</span>
+          </Button>
         </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto max-w-md p-3" align="start">
-        <div className="space-y-1 text-xs">
+      </HoverCardTrigger>
+      <HoverCardContent className="w-auto min-w-48 max-w-md p-2" align="start">
+        <div className="space-y-0.5 text-xs">
           {selectedContexts
             .slice()
             .sort((a, b) => {
@@ -53,21 +87,21 @@ export function ContextDisplay({ selectedContexts, connectedContexts }: ContextD
               return (
                 <div
                   key={ctx}
-                  className={`flex items-center gap-2 ${
+                  className={`flex items-center gap-2 px-2 py-1 rounded ${
                     isConnected ? "" : "text-muted-foreground"
                   }`}
                 >
                   {isConnected ? (
-                    <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
+                    <PlugZap className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                   ) : (
-                    <Unplug className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <Unplug className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                   )}
                   <span className="break-all">{ctx}</span>
                 </div>
               );
             })}
         </div>
-      </PopoverContent>
-    </Popover>
+      </HoverCardContent>
+    </HoverCard>
   );
 }

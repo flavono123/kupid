@@ -14,9 +14,10 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 interface MainViewProps {
   selectedContexts: string[];
   connectedContexts: string[];
+  onBackToContexts: () => void;
 }
 
-export function MainView({ selectedContexts, connectedContexts }: MainViewProps) {
+export function MainView({ selectedContexts, connectedContexts, onBackToContexts }: MainViewProps) {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +101,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
               connectedContexts={connectedContexts}
               selectedGVK={selectedGVK}
               onCollapse={toggleSidebar}
+              onBackToContexts={onBackToContexts}
             />
 
             {/* Navigation Content */}
