@@ -44,7 +44,7 @@ export function NavHeader({
       </div>
 
       {/* Row 2: ResourceDisplay / SelectionBadge */}
-      <div className="flex items-center justify-between gap-2 px-3">
+      <div className="flex items-center justify-between gap-2 px-3 h-6">
         <ResourceDisplay
           selectedGVK={selectedGVK}
           className="min-w-0"
