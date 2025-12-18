@@ -5,7 +5,7 @@ import { ResultTable } from "./ResultTable";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./ui/button";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "./ui/resizable";
-import { Plug, Unplug, PanelLeftClose, PanelLeft } from "lucide-react";
+import { PlugZap, Unplug, PanelLeftClose, PanelLeft } from "lucide-react";
 import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import { ImperativePanelHandle } from "react-resizable-panels";
@@ -110,7 +110,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                   // Single context: show icon + name only, no popover
                   <div className="flex flex-col gap-2 px-3 py-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <Plug className="w-4 h-4 text-primary flex-shrink-0" />
+                      <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
                       <h2 className="text-sm text-foreground overflow-hidden whitespace-nowrap">
                         {connectedContexts[0]}
                       </h2>
@@ -138,7 +138,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                     <Popover>
                       <PopoverTrigger asChild>
                         <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 px-3 py-2 rounded-md transition-colors min-w-0">
-                          <Plug className="w-4 h-4 text-primary flex-shrink-0" />
+                          <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
                           <div className="overflow-hidden">
                             <h2 className="text-sm text-foreground whitespace-nowrap">
                               Contexts ({
@@ -173,7 +173,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                                   }`}
                                 >
                                   {isConnected ? (
-                                    <Plug className="w-4 h-4 text-primary flex-shrink-0" />
+                                    <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
                                   ) : (
                                     <Unplug className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                   )}
