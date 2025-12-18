@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { HighlightedText } from './HighlightedText';
-import { CLIPBOARD_CURSOR } from '../lib/clipboard-cursor';
 
 interface CellContentProps {
   value: any;
@@ -54,8 +53,7 @@ export function CellContent({
     <Popover open={isHovered} onOpenChange={setIsHovered}>
       <PopoverTrigger asChild>
         <div
-          className="text-sm truncate hover:underline hover:bg-accent/50 -mx-4 px-4 -my-2 py-2 rounded"
-          style={{ cursor: CLIPBOARD_CURSOR }}
+          className="text-sm truncate hover:underline hover:bg-accent/50 -mx-4 px-4 -my-2 py-2 rounded cursor-pointer"
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           onClick={handleClick}
