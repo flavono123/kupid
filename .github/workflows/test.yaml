@@ -20,3 +20,14 @@ jobs:
         run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
       - name: Run tests
         run: ginkgo -r -v
+      # TODO: Add frontend type checking to catch missing imports and type errors
+      # - name: Set up Node.js
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: '20'
+      #     cache: 'npm'
+      #     cache-dependency-path: cmd/gui/frontend/package-lock.json
+      # - name: Install frontend dependencies
+      #   run: npm ci --prefix cmd/gui/frontend
+      # - name: Run frontend type check
+      #   run: npm run type-check --prefix cmd/gui/frontend
