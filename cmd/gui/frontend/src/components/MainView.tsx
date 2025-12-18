@@ -85,6 +85,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     navigationPanelRef.current?.clearSelections();
   }, []);
 
+  const handleSearch = useCallback(() => {
+    navigationPanelRef.current?.toggleSearch();
+  }, []);
+
   return (
     <div className="h-screen bg-background">
       <ResizablePanelGroup direction="horizontal">
@@ -109,6 +113,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               onCollapse={toggleSidebar}
               onBackToContexts={onBackToContexts}
               onClearAllFields={handleClearAllFields}
+              onSearch={handleSearch}
             />
 
             {/* Navigation Content */}

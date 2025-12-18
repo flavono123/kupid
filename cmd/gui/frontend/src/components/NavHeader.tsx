@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { PanelLeftClose } from "lucide-react";
+import { PanelLeftClose, Search } from "lucide-react";
 import { ContextDisplay } from "./ContextDisplay";
 import { ResourceDisplay } from "./ResourceDisplay";
 import { SelectionBadge } from "./SelectionBadge";
@@ -13,6 +13,7 @@ interface NavHeaderProps {
   onCollapse: () => void;
   onBackToContexts: () => void;
   onClearAllFields: () => void;
+  onSearch: () => void;
 }
 
 export function NavHeader({
@@ -23,6 +24,7 @@ export function NavHeader({
   onCollapse,
   onBackToContexts,
   onClearAllFields,
+  onSearch,
 }: NavHeaderProps) {
   return (
     <div className="p-4 border-b border-border flex flex-col gap-2">
@@ -43,16 +45,29 @@ export function NavHeader({
         </Button>
       </div>
 
-      {/* Row 2: ResourceDisplay / SelectionBadge */}
+      {/* Row 2: ResourceDisplay / SelectionBadge + Search */}
       <div className="flex items-center justify-between gap-2 px-3 h-6">
         <ResourceDisplay
           selectedGVK={selectedGVK}
           className="min-w-0"
         />
-        <SelectionBadge
-          count={selectedFieldCount}
-          onClearAll={onClearAllFields}
-        />
+        <div className="flex items-center gap-1">
+          <SelectionBadge
+            count={selectedFieldCount}
+            onClearAll={onClearAllFields}
+          />
+          {selectedGVK && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onSearch}
+              className="h-6 w-6"
+              title="Search fields (⌘F)"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

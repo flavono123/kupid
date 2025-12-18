@@ -22,6 +22,7 @@ interface NavigationPanelProps {
 export interface NavigationPanelHandle {
   clearSelections: () => void;
   getSelectedCount: () => number;
+  toggleSearch: () => void;
 }
 
 interface TreeNode {
@@ -181,6 +182,10 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
+  // Use ref for stable callback access to avoid stale closures
+  const searchVisibleRef = useRef(searchVisible);
+  searchVisibleRef.current = searchVisible;
+
   // Reset state when GVK changes
   useEffect(() => {
     setNodeTree([]);
@@ -311,13 +316,29 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     });
   }, [matchedPaths.length]);
 
+  // Toggle search
+  const toggleSearch = useCallback(() => {
+    if (searchVisibleRef.current) {
+      setSearchVisible(false);
+      setQuery('');
+    } else {
+      setSearchVisible(true);
+    }
+  }, []);
+
+  // Close search
+  const closeSearch = useCallback(() => {
+    setSearchVisible(false);
+    setQuery('');
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd+F / Ctrl+F: Toggle search
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
-        setSearchVisible((prev) => !prev);
+        toggleSearch();
         return;
       }
 
@@ -325,8 +346,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
 
       // Esc: Close search
       if (e.key === 'Escape') {
-        setSearchVisible(false);
-        setQuery('');
+        closeSearch();
         return;
       }
 
@@ -340,7 +360,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchVisible, query, navigateMatches]);
+  }, [searchVisible, query, navigateMatches, toggleSearch, closeSearch]);
 
   // Reset match index when search results change
   useEffect(() => {
@@ -558,11 +578,13 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
   useImperativeHandle(ref, () => ({
     clearSelections: clearAllSelections,
     getSelectedCount: () => selectedPaths.size,
-  }), [clearAllSelections, selectedPaths.size]);
+    toggleSearch,
+  }), [clearAllSelections, selectedPaths.size, toggleSearch]);
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Search Bar (conditional) - Float on wide screens, full width on narrow */}
+      {/* Search Bar (conditional) */}
+      {/* TODO: Add slide-down/slide-up animation when showing/hiding */}
       {searchVisible && (
         <FieldSearchBar
           query={query}
@@ -570,10 +592,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
           currentMatchIndex={currentMatchIndex}
           totalMatches={matchedPaths.length}
           hasMoreResults={hasMoreResults}
-          onClose={() => {
-            setSearchVisible(false);
-            setQuery('');
-          }}
+          onClose={closeSearch}
         />
       )}
 
