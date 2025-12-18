@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { CommandPalette } from "./CommandPalette";
 import { NavigationPanel } from "./NavigationPanel";
 import { ResultTable } from "./ResultTable";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { NavHeader } from "./NavHeader";
 import { Button } from "./ui/button";
+import { Kbd } from "./ui/kbd";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "./ui/resizable";
-import { PlugZap, Unplug, PanelLeftClose, PanelLeft } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import { ImperativePanelHandle } from "react-resizable-panels";
@@ -93,117 +94,13 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
           onExpand={() => setIsSidebarCollapsed(false)}
         >
           <div className="flex flex-col h-full">
-            {/* Context Header */}
-            <div className="p-4 border-b border-border relative">
-              {/* Collapse Button - positioned absolutely at top-right */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className="absolute top-4 right-4"
-              >
-                <PanelLeftClose className="w-4 h-4" />
-              </Button>
-
-              <div className="pr-10 overflow-hidden">
-                {selectedContexts.length === 1 ? (
-                  // Single context: show icon + name only, no popover
-                  <div className="flex flex-col gap-2 px-3 py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
-                      <h2 className="text-sm text-foreground overflow-hidden whitespace-nowrap">
-                        {connectedContexts[0]}
-                      </h2>
-                    </div>
-                    {selectedGVK ? (
-                      <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-                        <h3 className="text-sm font-medium text-foreground whitespace-nowrap">
-                          {selectedGVK.kind}
-                        </h3>
-                        {selectedGVK.group && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {selectedGVK.group}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground italic truncate">
-                        Select a resource
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // Multiple contexts: show popover with count
-                  <div className="flex flex-col gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 px-3 py-2 rounded-md transition-colors min-w-0">
-                          <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
-                          <div className="overflow-hidden">
-                            <h2 className="text-sm text-foreground whitespace-nowrap">
-                              Contexts ({
-                                connectedContexts.length === selectedContexts.length
-                                  ? selectedContexts.length  // All succeeded: "3"
-                                  : `${connectedContexts.length}/${selectedContexts.length}`  // Some failed: "2/3"
-                              })
-                            </h2>
-                          </div>
-                        </div>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto max-w-md p-3" align="start">
-                        <div className="space-y-1 text-xs">
-                          {selectedContexts
-                            .slice()
-                            .sort((a, b) => {
-                              const aConnected = connectedContexts.includes(a) ? 1 : 0;
-                              const bConnected = connectedContexts.includes(b) ? 1 : 0;
-                              // Sort by connection status (connected first), then alphabetically
-                              if (aConnected !== bConnected) {
-                                return bConnected - aConnected;
-                              }
-                              return a.localeCompare(b);
-                            })
-                            .map((ctx) => {
-                              const isConnected = connectedContexts.includes(ctx);
-                              return (
-                                <div
-                                  key={ctx}
-                                  className={`flex items-center gap-2 ${
-                                    isConnected ? "" : "text-muted-foreground"
-                                  }`}
-                                >
-                                  {isConnected ? (
-                                    <PlugZap className="w-4 h-4 text-primary flex-shrink-0" />
-                                  ) : (
-                                    <Unplug className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                  )}
-                                  <span className="break-all">{ctx}</span>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    {selectedGVK ? (
-                      <div className="flex items-center gap-2 px-3 min-w-0 overflow-hidden">
-                        <h3 className="text-sm font-medium text-foreground whitespace-nowrap">
-                          {selectedGVK.kind}
-                        </h3>
-                        {selectedGVK.group && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {selectedGVK.group}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground italic px-3 truncate">
-                        Select a resource
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Nav Header */}
+            <NavHeader
+              selectedContexts={selectedContexts}
+              connectedContexts={connectedContexts}
+              selectedGVK={selectedGVK}
+              onCollapse={toggleSidebar}
+            />
 
             {/* Navigation Content */}
             <div className="flex-1 overflow-auto">
@@ -219,7 +116,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
                   <p className="text-sm text-muted-foreground truncate">
-                    Press <kbd className="px-2 py-1 text-xs rounded border bg-muted">⌘K</kbd> to select a resource
+                    Press <Kbd>⌘K</Kbd> to select a resource
                   </p>
                 </div>
               )}
@@ -254,7 +151,7 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
             ) : (
               <div className="h-full flex items-center justify-center px-4">
                 <p className="text-sm text-muted-foreground truncate">
-                  Press <kbd className="px-2 py-1 text-xs rounded border bg-muted">⌘K</kbd> to select a resource
+                  Press <Kbd>⌘K</Kbd> to select a resource
                 </p>
               </div>
             )}
