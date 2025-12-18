@@ -267,22 +267,25 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
                           )}
                         </span>
 
-                        {/* Group badge (only for non-core) - positioned next to kind name */}
-                        {!isCore && (
-                          <Badge
-                            variant="secondary"
-                            className="text-muted-foreground"
-                          >
-                            {groupIndices.length > 0 ? (
+                        {/* Group/Version badge - positioned next to kind name */}
+                        <Badge
+                          variant="secondary"
+                          className="text-muted-foreground"
+                        >
+                          {isCore ? (
+                            gvk.version
+                          ) : groupIndices.length > 0 ? (
+                            <>
                               <HighlightedText
                                 text={gvk.group}
                                 indices={groupIndices}
                               />
-                            ) : (
-                              gvk.group
-                            )}
-                          </Badge>
-                        )}
+                              /{gvk.version}
+                            </>
+                          ) : (
+                            `${gvk.group}/${gvk.version}`
+                          )}
+                        </Badge>
                       </div>
 
                       {/* Right side: Context availability badge */}

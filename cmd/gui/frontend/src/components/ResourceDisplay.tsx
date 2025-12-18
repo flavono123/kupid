@@ -22,11 +22,9 @@ export function ResourceDisplay({
       <h3 className="text-sm font-medium text-foreground truncate">
         {selectedGVK.kind}
       </h3>
-      {selectedGVK.group && (
-        <span className="text-xs text-muted-foreground truncate">
-          {selectedGVK.group}
-        </span>
-      )}
+      <span className="text-xs text-muted-foreground truncate">
+        {selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version}
+      </span>
     </div>
   );
 }
