@@ -115,8 +115,8 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
                 />
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
-                  <p className="text-sm text-muted-foreground truncate">
-                    Press <Kbd>⌘K</Kbd> to select a resource
+                  <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                    Press <Kbd>⌘</Kbd><Kbd>K</Kbd> to select a resource
                   </p>
                 </div>
               )}
@@ -150,8 +150,8 @@ export function MainView({ selectedContexts, connectedContexts }: MainViewProps)
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">
-                <p className="text-sm text-muted-foreground truncate">
-                  Press <Kbd>⌘K</Kbd> to select a resource
+                <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                  Press <Kbd>⌘</Kbd><Kbd>K</Kbd> to select a resource
                 </p>
               </div>
             )}

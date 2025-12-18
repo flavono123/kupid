@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
-import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import { X, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
 import { Spinner } from "./ui/spinner";
+import { SelectionBadge } from "./SelectionBadge";
+import { FieldSearchBar } from "./FieldSearchBar";
 import { GetNodeTree } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
@@ -265,7 +266,7 @@ export function NavigationPanel({
     return allSearchResults.slice(0, MAX_RESULTS);
   }, [allSearchResults, debouncedQuery]);
 
-  const hasMoreResults = debouncedQuery && allSearchResults.length > MAX_RESULTS;
+  const hasMoreResults = Boolean(debouncedQuery) && allSearchResults.length > MAX_RESULTS;
 
   // Get all matched paths sorted by tree order (for auto-expand and Enter navigation)
   const matchedPaths = useMemo(() => {
@@ -553,63 +554,24 @@ export function NavigationPanel({
   return (
     <div className="flex flex-col h-full relative">
       {/* Selected Fields Info (conditional) - Float on top-left */}
-      {selectedPaths.size > 0 && (
-        <div className="
-          p-2 flex items-center gap-2
-          border-b border-border
-          md:absolute md:top-2 md:left-2 md:z-10
-          md:w-auto md:border md:rounded-md md:shadow-lg
-          md:bg-background/95 md:backdrop-blur-sm
-          md:p-1.5
-        ">
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            {selectedPaths.size} selected
-          </span>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={clearAllSelections}
-            className="h-7 text-xs"
-          >
-            Clear all
-          </Button>
-        </div>
-      )}
+      <SelectionBadge
+        count={selectedPaths.size}
+        onClearAll={clearAllSelections}
+      />
 
       {/* Search Bar (conditional) - Float on wide screens, full width on narrow */}
       {searchVisible && (
-        <div className="
-          p-2 flex items-center gap-1.5
-          border-b border-border
-          md:absolute md:top-2 md:right-2 md:z-10
-          md:w-64 md:border md:rounded-md md:shadow-lg
-          md:bg-background/95 md:backdrop-blur-sm
-          md:p-1.5
-        ">
-          <Input
-            placeholder="Search..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 h-8 text-sm"
-            autoFocus
-          />
-          {debouncedQuery && matchedPaths.length > 0 && (
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {currentMatchIndex + 1}/{matchedPaths.length}
-              {hasMoreResults && '+'}
-            </span>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setSearchVisible(false);
-              setQuery('');
-            }}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+        <FieldSearchBar
+          query={query}
+          onQueryChange={setQuery}
+          currentMatchIndex={currentMatchIndex}
+          totalMatches={matchedPaths.length}
+          hasMoreResults={hasMoreResults}
+          onClose={() => {
+            setSearchVisible(false);
+            setQuery('');
+          }}
+        />
       )}
 
       {/* Tree View */}
