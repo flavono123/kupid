@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { CommandPalette } from "./CommandPalette";
-import { NavigationPanel } from "./NavigationPanel";
+import { NavigationPanel, NavigationPanelHandle } from "./NavigationPanel";
 import { ResultTable } from "./ResultTable";
 import { NavHeader } from "./NavHeader";
 import { Button } from "./ui/button";
@@ -25,6 +25,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const [selectedFields, setSelectedFields] = useState<string[][]>([]);
   const loadedRef = useRef(false);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  const navigationPanelRef = useRef<NavigationPanelHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Load GVKs once when MainView mounts
@@ -80,6 +81,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     }
   };
 
+  const handleClearAllFields = useCallback(() => {
+    navigationPanelRef.current?.clearSelections();
+  }, []);
+
   return (
     <div className="h-screen bg-background">
       <ResizablePanelGroup direction="horizontal">
@@ -100,14 +105,17 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               selectedContexts={selectedContexts}
               connectedContexts={connectedContexts}
               selectedGVK={selectedGVK}
+              selectedFieldCount={selectedFields.length}
               onCollapse={toggleSidebar}
               onBackToContexts={onBackToContexts}
+              onClearAllFields={handleClearAllFields}
             />
 
             {/* Navigation Content */}
             <div className="flex-1 overflow-auto">
               {selectedGVK ? (
                 <NavigationPanel
+                  ref={navigationPanelRef}
                   selectedGVK={selectedGVK}
                   connectedContexts={connectedContexts}
                   onFieldsSelected={(fields) => {

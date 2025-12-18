@@ -5,7 +5,10 @@ interface ResourceDisplayProps {
   className?: string;
 }
 
-export function ResourceDisplay({ selectedGVK, className = "" }: ResourceDisplayProps) {
+export function ResourceDisplay({
+  selectedGVK,
+  className = "",
+}: ResourceDisplayProps) {
   if (!selectedGVK) {
     return (
       <div className={`text-xs text-muted-foreground italic truncate ${className}`}>
@@ -16,11 +19,11 @@ export function ResourceDisplay({ selectedGVK, className = "" }: ResourceDisplay
 
   return (
     <div className={`flex items-center gap-2 min-w-0 overflow-hidden ${className}`}>
-      <h3 className="text-sm font-medium text-foreground whitespace-nowrap">
+      <h3 className="text-sm font-medium text-foreground truncate">
         {selectedGVK.kind}
       </h3>
       {selectedGVK.group && (
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
+        <span className="text-xs text-muted-foreground truncate">
           {selectedGVK.group}
         </span>
       )}

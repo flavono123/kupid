@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, memo, useRef, forwardRef, useImperativeHandle } from "react";
 import { Button } from "./ui/button";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
 import { Spinner } from "./ui/spinner";
-import { SelectionBadge } from "./SelectionBadge";
 import { FieldSearchBar } from "./FieldSearchBar";
 import { GetNodeTree } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
@@ -18,6 +17,11 @@ interface NavigationPanelProps {
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
   onFieldsSelected?: (fields: string[][]) => void;
+}
+
+export interface NavigationPanelHandle {
+  clearSelections: () => void;
+  getSelectedCount: () => number;
 }
 
 interface TreeNode {
@@ -164,11 +168,11 @@ const TreeNodeItem = memo(({
 
 TreeNodeItem.displayName = 'TreeNodeItem';
 
-export function NavigationPanel({
+export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanelProps>(({
   selectedGVK,
   connectedContexts,
   onFieldsSelected,
-}: NavigationPanelProps) {
+}, ref) => {
   const [nodeTree, setNodeTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [manualExpandedPaths, setManualExpandedPaths] = useState<Set<string>>(new Set());
@@ -551,14 +555,13 @@ export function NavigationPanel({
     }
   }, [onFieldsSelected]);
 
+  useImperativeHandle(ref, () => ({
+    clearSelections: clearAllSelections,
+    getSelectedCount: () => selectedPaths.size,
+  }), [clearAllSelections, selectedPaths.size]);
+
   return (
     <div className="flex flex-col h-full relative">
-      {/* Selected Fields Info (conditional) - Float on top-left */}
-      <SelectionBadge
-        count={selectedPaths.size}
-        onClearAll={clearAllSelections}
-      />
-
       {/* Search Bar (conditional) - Float on wide screens, full width on narrow */}
       {searchVisible && (
         <FieldSearchBar
@@ -606,4 +609,6 @@ export function NavigationPanel({
       </div>
     </div>
   );
-}
+});
+
+NavigationPanel.displayName = 'NavigationPanel';

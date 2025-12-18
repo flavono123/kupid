@@ -1,4 +1,4 @@
-import { Button } from "./ui/button";
+import { useState } from "react";
 
 interface SelectionBadgeProps {
   count: number;
@@ -6,30 +6,26 @@ interface SelectionBadgeProps {
 }
 
 export function SelectionBadge({ count, onClearAll }: SelectionBadgeProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   if (count === 0) {
     return null;
   }
 
   return (
-    <div className="
-      p-2 flex items-center gap-2
-      border-b border-border
-      md:absolute md:top-2 md:left-2 md:z-10
-      md:w-auto md:border md:rounded-md md:shadow-lg
-      md:bg-background/95 md:backdrop-blur-sm
-      md:p-1.5
-    ">
-      <span className="text-sm text-muted-foreground whitespace-nowrap">
-        {count} selected
-      </span>
-      <Button
-        variant="destructive"
-        size="sm"
-        onClick={onClearAll}
-        className="h-7 text-xs"
-      >
-        Clear all
-      </Button>
-    </div>
+    <button
+      className={`
+        px-2 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap
+        ${isHovered
+          ? "bg-destructive text-destructive-foreground cursor-pointer"
+          : "bg-primary/10 text-primary"
+        }
+      `}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={isHovered ? onClearAll : undefined}
+    >
+      {isHovered ? "Clear all" : `${count} selected`}
+    </button>
   );
 }
