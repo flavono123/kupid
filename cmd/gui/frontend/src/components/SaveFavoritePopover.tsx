@@ -82,7 +82,7 @@ export function SaveFavoritePopover({
           title={isSaved ? "Saved as favorite" : "Save as favorite"}
         >
           <Star
-            className={`h-3.5 w-3.5 ${isSaved ? "fill-current text-yellow-500" : ""}`}
+            className={`h-3.5 w-3.5 ${isSaved ? "fill-current text-accent" : ""}`}
           />
         </Button>
       </PopoverTrigger>

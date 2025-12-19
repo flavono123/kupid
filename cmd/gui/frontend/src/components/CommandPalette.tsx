@@ -222,7 +222,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
                 {filteredFavorites.length > 0 && (
                   <CommandGroup heading={
                     <span className="flex items-center gap-1.5">
-                      <Star className="h-3 w-3" />
+                      <Star className="h-3 w-3 text-accent" />
                       FAVORITES
                     </span>
                   }>
@@ -251,7 +251,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
                           className="flex items-center justify-between py-2"
                         >
                           <div className="flex items-center gap-2">
-                            <Star className="h-3.5 w-3.5 text-yellow-500 fill-current ml-2" />
+                            <Star className="h-3.5 w-3.5 text-accent fill-current ml-2" />
                             <span>
                               {nameIndices.length > 0 ? (
                                 <HighlightedText text={favorite.name} indices={nameIndices} />

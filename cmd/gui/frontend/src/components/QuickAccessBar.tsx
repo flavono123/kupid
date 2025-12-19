@@ -20,7 +20,7 @@ export function QuickAccessBar({
   return (
     <div className="px-4 py-2 border-b border-border">
       <div className="flex items-center gap-1.5 flex-wrap">
-        <Star className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+        <Star className="h-3.5 w-3.5 text-accent shrink-0" />
         {favorites.map((fav) => (
           <Badge
             key={fav.id}
