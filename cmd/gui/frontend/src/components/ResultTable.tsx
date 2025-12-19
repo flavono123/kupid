@@ -292,7 +292,7 @@ export function ResultTable({
                 return (
                   <div
                     key={row.id}
-                    className="flex border-b border-border hover:bg-accent transition-colors absolute top-0 left-0"
+                    className="flex border-b border-border hover:bg-focus transition-colors absolute top-0 left-0"
                     style={{
                       height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,

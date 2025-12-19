@@ -9,7 +9,7 @@ interface HighlightedTextProps {
 export function HighlightedText({
   text,
   indices = [],
-  highlightClassName = "bg-accent/50 dark:bg-accent/50 text-foreground font-medium"
+  highlightClassName = "bg-focus-highlight text-foreground font-medium"
 }: HighlightedTextProps) {
   if (indices.length === 0) return <>{text}</>;
 

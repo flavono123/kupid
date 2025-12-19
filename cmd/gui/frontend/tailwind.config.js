@@ -15,10 +15,11 @@ export default {
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
-  			// Semantic highlight colors for hover/active states
-  			highlight: {
+  			// Semantic focus colors for hover/active/highlight states
+  			focus: {
   				DEFAULT: 'hsl(var(--accent) / 0.15)',
   				active: 'hsl(var(--accent) / 0.30)',
+  				highlight: 'hsl(var(--accent) / 0.50)',
   			},
   			card: {
   				DEFAULT: 'hsl(var(--card))',

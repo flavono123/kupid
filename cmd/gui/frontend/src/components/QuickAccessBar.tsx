@@ -116,7 +116,7 @@ export function QuickAccessBar({
     <>
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border-b border-border">
         <CollapsibleTrigger asChild>
-          <button className="w-full px-4 py-2 flex items-center justify-between hover:bg-highlight transition-colors">
+          <button className="w-full px-4 py-2 flex items-center justify-between hover:bg-focus transition-colors">
             <div className="flex items-center gap-2">
               <Star className="h-3.5 w-3.5 text-accent shrink-0" />
               <span className="text-xs font-medium text-foreground">Favorites</span>
@@ -179,8 +179,8 @@ export function QuickAccessBar({
                   className={cn(
                     "group px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors",
                     isActive
-                      ? "bg-highlight-active hover:bg-highlight-active"
-                      : "hover:bg-highlight"
+                      ? "bg-focus-active hover:bg-focus-active"
+                      : "hover:bg-focus"
                   )}
                   onClick={() => {
                     if (isActive) {
