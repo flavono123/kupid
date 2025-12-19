@@ -359,11 +359,17 @@ export function QuickAccessBar({
                 );
               }
 
+              // Check if current GVK matches this favorite's GVK
+              const isSameGVK = selectedGVK &&
+                selectedGVK.group === fav.gvk.group &&
+                selectedGVK.version === fav.gvk.version &&
+                selectedGVK.kind === fav.gvk.kind;
+
               return (
                 <div
                   key={fav.id}
                   className={cn(
-                    "group px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors",
+                    "group px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors min-w-0",
                     isActive
                       ? "bg-focus-active hover:bg-focus-active"
                       : "hover:bg-focus"
@@ -382,20 +388,36 @@ export function QuickAccessBar({
                       isActive ? "text-accent fill-accent" : "text-accent/60"
                     )}
                   />
-                  <span
-                    className={cn(
-                      "text-sm flex-1 truncate",
-                      isActive ? "text-foreground font-medium" : "text-muted-foreground"
+
+                  {/* Name with minimum width guarantee */}
+                  <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                    <span
+                      className={cn(
+                        "text-sm truncate min-w-[80px]",
+                        isActive ? "text-foreground font-medium" : "text-muted-foreground"
+                      )}
+                    >
+                      {fav.name}
+                    </span>
+
+                    {/* GVK info - only show when different GVK, can truncate */}
+                    {!isSameGVK && (
+                      <span className="text-xs hidden sm:flex items-center gap-1 truncate min-w-0 text-muted-foreground/60">
+                        <span className="truncate">
+                          {fav.gvk.kind} ({fav.gvk.group ? `${fav.gvk.group}/${fav.gvk.version}` : fav.gvk.version})
+                        </span>
+                      </span>
                     )}
-                  >
-                    {fav.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {fav.fields.length}
+                  </div>
+
+                  {/* Field count - always visible */}
+                  <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
+                    {!isSameGVK && <span className="hidden sm:inline">&middot;</span>}
+                    <span>{fav.fields.length} {fav.fields.length === 1 ? 'field' : 'fields'}</span>
                   </span>
 
                   {/* Action buttons - visible on hover */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <Button
                       variant="ghost"
                       size="icon"
