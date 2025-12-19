@@ -47,6 +47,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     saveFavorite,
     applyFavorite,
     clearFavorite,
+    deleteFavorite,
+    renameFavorite,
   } = useFavoriteViews({
     currentGVK: selectedGVK,
     selectedPaths,
@@ -208,6 +210,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               activeFavoriteId={activeFavorite?.id ?? null}
               onApply={handleApplyFavorite}
               onClear={handleClearFavorite}
+              onRename={renameFavorite}
+              onDelete={deleteFavorite}
             />
 
             {/* Navigation Content */}
