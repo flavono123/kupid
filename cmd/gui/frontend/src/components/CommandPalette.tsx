@@ -220,12 +220,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
 
                 {/* FAVORITES Group */}
                 {filteredFavorites.length > 0 && (
-                  <CommandGroup heading={
-                    <span className="flex items-center gap-1.5">
-                      <Star className="h-3 w-3 text-accent" />
-                      FAVORITES
-                    </span>
-                  }>
+                  <CommandGroup heading="FAVORITES">
                     {filteredFavorites.map(({ favorite, indices }) => {
                       // Calculate highlight indices for name (indices are for "name group kind" format)
                       const nameLength = favorite.name.length;
