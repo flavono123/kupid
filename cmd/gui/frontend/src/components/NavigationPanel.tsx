@@ -17,11 +17,15 @@ interface NavigationPanelProps {
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
   onFieldsSelected?: (fields: string[][]) => void;
+  /** Called when schema loading completes and component is ready */
+  onReady?: () => void;
 }
 
 export interface NavigationPanelHandle {
   clearSelections: () => void;
   getSelectedCount: () => number;
+  getSelectedPaths: () => Set<string>;
+  setSelectedPaths: (paths: Set<string>) => void;
   toggleSearch: () => void;
 }
 
@@ -173,6 +177,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
   selectedGVK,
   connectedContexts,
   onFieldsSelected,
+  onReady,
 }, ref) => {
   const [nodeTree, setNodeTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -217,6 +222,13 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
         setLoading(false);
       });
   }, [selectedGVK, connectedContexts]);
+
+  // Notify parent when loading completes
+  useEffect(() => {
+    if (!loading && nodeTree.length > 0 && onReady) {
+      onReady();
+    }
+  }, [loading, nodeTree.length, onReady]);
 
   // Flatten tree for search - create a Map for O(1) lookup
   const flatNodesMap = useMemo(() => {
@@ -575,11 +587,40 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     }
   }, [onFieldsSelected]);
 
+  // Set selections from external source (e.g., applying a favorite)
+  const setSelectionsFromPaths = useCallback((paths: Set<string>) => {
+    setSelectedPaths(paths);
+
+    // Auto-expand parent paths for all selections
+    const expandPaths = new Set<string>();
+    paths.forEach((pathKey) => {
+      const pathParts = pathKey.split(PATH_DELIMITER);
+      for (let i = 1; i < pathParts.length; i++) {
+        expandPaths.add(pathParts.slice(0, i).join(PATH_DELIMITER));
+      }
+    });
+    setManualExpandedPaths((prev) => {
+      const next = new Set(prev);
+      expandPaths.forEach((p) => next.add(p));
+      return next;
+    });
+
+    // Notify parent
+    if (onFieldsSelected) {
+      const selectedFields = Array.from(paths)
+        .filter((p) => !p.includes('*'))
+        .map((p) => p.split(PATH_DELIMITER));
+      onFieldsSelected(selectedFields);
+    }
+  }, [onFieldsSelected]);
+
   useImperativeHandle(ref, () => ({
     clearSelections: clearAllSelections,
     getSelectedCount: () => selectedPaths.size,
+    getSelectedPaths: () => new Set(selectedPaths),
+    setSelectedPaths: setSelectionsFromPaths,
     toggleSearch,
-  }), [clearAllSelections, selectedPaths.size, toggleSearch]);
+  }), [clearAllSelections, selectedPaths, setSelectionsFromPaths, toggleSearch]);
 
   return (
     <div className="flex flex-col h-full relative">

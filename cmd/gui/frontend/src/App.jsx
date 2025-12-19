@@ -113,19 +113,30 @@ function App() {
         }, '', '');
     };
 
-    const handleBackToGallery = () => {
+    const handleBack = () => {
+        // For history navigation (cmd+[ etc)
         window.history.back();
+    };
+
+    const handleBackToContextsGallery = () => {
+        // Direct navigation to contexts gallery (not using history)
+        setShowColors(false);
+        setShowMainView(false);
+        setSelectedContexts([]);
+        setConnectedContexts([]);
+        // Replace current state with gallery state
+        window.history.replaceState({ view: 'gallery' }, '', '');
     };
 
     return (
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             {showColors ? (
-                <ColorPalette onBack={handleBackToGallery} />
+                <ColorPalette onBack={handleBack} />
             ) : showMainView ? (
                 <MainView
                     selectedContexts={selectedContexts}
                     connectedContexts={connectedContexts}
-                    onBackToContexts={handleBackToGallery}
+                    onBackToContexts={handleBackToContextsGallery}
                 />
             ) : (
                 <ContextGallery onContextsConnected={handleContextsConnected} />

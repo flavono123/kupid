@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { CommandPalette } from "./CommandPalette";
 import { NavigationPanel, NavigationPanelHandle } from "./NavigationPanel";
 import { ResultTable } from "./ResultTable";
 import { NavHeader } from "./NavHeader";
+import { QuickAccessBar } from "./QuickAccessBar";
 import { Button } from "./ui/button";
 import { Kbd } from "./ui/kbd";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "./ui/resizable";
@@ -10,6 +11,7 @@ import { PanelLeft } from "lucide-react";
 import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import { useFavoriteViews } from "@/hooks/useFavoriteViews";
 
 interface MainViewProps {
   selectedContexts: string[];
@@ -17,16 +19,38 @@ interface MainViewProps {
   onBackToContexts: () => void;
 }
 
+// Path delimiter must match NavigationPanel's delimiter
+const PATH_DELIMITER = '\x00';
+
 export function MainView({ selectedContexts, connectedContexts, onBackToContexts }: MainViewProps) {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [gvks, setGVKs] = useState<main.MultiClusterGVK[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGVK, setSelectedGVK] = useState<main.MultiClusterGVK | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[][]>([]);
+  // Pending favorite ID to apply after GVK switch (use ref to avoid stale closure)
+  const pendingFavoriteIdRef = useRef<string | null>(null);
   const loadedRef = useRef(false);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const navigationPanelRef = useRef<NavigationPanelHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Convert selectedFields to Set<string> for favorite comparison
+  const selectedPaths = useMemo(() => {
+    return new Set(selectedFields.map((f) => JSON.stringify(f)));
+  }, [selectedFields]);
+
+  // Favorite views hook
+  const {
+    allFavorites,
+    activeFavorite,
+    saveFavorite,
+    applyFavorite,
+    clearFavorite,
+  } = useFavoriteViews({
+    currentGVK: selectedGVK,
+    selectedPaths,
+  });
 
   // Load GVKs once when MainView mounts
   useEffect(() => {
@@ -89,6 +113,66 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     navigationPanelRef.current?.toggleSearch();
   }, []);
 
+  const handleSaveFavorite = useCallback(async (name: string) => {
+    await saveFavorite(name);
+  }, [saveFavorite]);
+
+  // Convert favorite fields to path set for NavigationPanel
+  const fieldsToPathSet = useCallback((fields: string[][]) => {
+    return new Set(fields.map((f) => f.join(PATH_DELIMITER)));
+  }, []);
+
+  // Apply favorite by ID (sets paths in NavigationPanel and activates)
+  const applyFavoriteById = useCallback((id: string) => {
+    const fields = applyFavorite(id);
+    if (!fields || !navigationPanelRef.current) {
+      return;
+    }
+
+    const pathSet = fieldsToPathSet(fields);
+    navigationPanelRef.current.setSelectedPaths(pathSet);
+  }, [applyFavorite, fieldsToPathSet]);
+
+  // Called when NavigationPanel finishes loading - apply pending favorite if any
+  const handleNavigationReady = useCallback(() => {
+    if (pendingFavoriteIdRef.current) {
+      applyFavoriteById(pendingFavoriteIdRef.current);
+      pendingFavoriteIdRef.current = null;
+    }
+  }, [applyFavoriteById]);
+
+  // Apply favorite (same logic as CommandPalette)
+  const handleApplyFavorite = useCallback((favorite: main.FavoriteViewResponse) => {
+    const matchingGVK = gvks.find(
+      (g) =>
+        g.group === favorite.gvk.group &&
+        g.version === favorite.gvk.version &&
+        g.kind === favorite.gvk.kind
+    );
+    if (!matchingGVK) return;
+
+    // Check if same GVK is already selected
+    const isSameGVK = selectedGVK &&
+      selectedGVK.group === matchingGVK.group &&
+      selectedGVK.version === matchingGVK.version &&
+      selectedGVK.kind === matchingGVK.kind;
+
+    if (isSameGVK) {
+      // Same GVK - apply directly without waiting for onReady
+      applyFavoriteById(favorite.id);
+    } else {
+      // Different GVK - need to wait for NavigationPanel to load
+      pendingFavoriteIdRef.current = favorite.id;
+      setSelectedGVK(matchingGVK);
+    }
+  }, [gvks, selectedGVK, applyFavoriteById]);
+
+  const handleClearFavorite = useCallback(() => {
+    clearFavorite();
+    // Also clear nav panel selections
+    navigationPanelRef.current?.clearSelections();
+  }, [clearFavorite]);
+
   return (
     <div className="h-screen bg-background">
       <ResizablePanelGroup direction="horizontal">
@@ -110,10 +194,20 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               connectedContexts={connectedContexts}
               selectedGVK={selectedGVK}
               selectedFieldCount={selectedFields.length}
+              isFavoriteSaved={activeFavorite !== null}
               onCollapse={toggleSidebar}
               onBackToContexts={onBackToContexts}
               onClearAllFields={handleClearAllFields}
               onSearch={handleSearch}
+              onSaveFavorite={handleSaveFavorite}
+            />
+
+            {/* Quick Access Bar for Favorites - always visible */}
+            <QuickAccessBar
+              favorites={allFavorites}
+              activeFavoriteId={activeFavorite?.id ?? null}
+              onApply={handleApplyFavorite}
+              onClear={handleClearFavorite}
             />
 
             {/* Navigation Content */}
@@ -123,10 +217,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                   ref={navigationPanelRef}
                   selectedGVK={selectedGVK}
                   connectedContexts={connectedContexts}
-                  onFieldsSelected={(fields) => {
-                    console.log("Selected fields:", fields);
-                    setSelectedFields(fields);
-                  }}
+                  onReady={handleNavigationReady}
+                  onFieldsSelected={setSelectedFields}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
@@ -179,10 +271,15 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         <CommandPalette
           contexts={connectedContexts}
           gvks={gvks}
+          favorites={allFavorites}
           loading={loading}
           onClose={() => setShowCommandPalette(false)}
           onGVKSelect={(gvk) => {
             setSelectedGVK(gvk);
+            setShowCommandPalette(false);
+          }}
+          onFavoriteSelect={(favorite) => {
+            handleApplyFavorite(favorite);
             setShowCommandPalette(false);
           }}
         />
