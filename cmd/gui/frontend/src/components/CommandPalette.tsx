@@ -6,12 +6,13 @@ import {
   CommandList,
   CommandEmpty,
   CommandItem,
+  CommandGroup,
 } from "./ui/command";
 import { Badge } from "./ui/badge";
 import { Kbd } from "./ui/kbd";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Spinner } from "./ui/spinner";
-import { Check, X } from "lucide-react";
+import { Check, X, Star } from "lucide-react";
 import { useFuzzySearch } from "@/hooks/useFuzzySearch";
 import { HighlightedText } from "./HighlightedText";
 import { K8sIcon } from "./K8sIcon";
@@ -19,13 +20,14 @@ import { K8sIcon } from "./K8sIcon";
 interface CommandPaletteProps {
   contexts: string[];
   gvks: main.MultiClusterGVK[];
+  favorites: main.FavoriteViewResponse[];
   loading: boolean;
   onClose: () => void;
   onGVKSelect: (gvk: main.MultiClusterGVK) => void;
+  onFavoriteSelect: (favorite: main.FavoriteViewResponse) => void;
 }
 
-export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }: CommandPaletteProps) {
-  console.log("CommandPalette rendered with contexts:", contexts);
+export function CommandPalette({ contexts, gvks, favorites, loading, onClose, onGVKSelect, onFavoriteSelect }: CommandPaletteProps) {
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const [selectedValue, setSelectedValue] = useState<string>("");
   const [disablePointer, setDisablePointer] = useState(true);
@@ -72,15 +74,31 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // Extract searchable text (group + kind) for fuzzy search
-  const searchableTexts = useMemo(() => {
-    return gvks.map((gvk) => {
-      // Combine group and kind for searching (e.g., "apps Deployment" or "Deployment" for core)
-      return gvk.group ? `${gvk.group} ${gvk.kind}` : gvk.kind;
-    });
-  }, [gvks]);
+  // Combined search items: favorites first, then GVKs
+  type SearchItem =
+    | { type: 'favorite'; favorite: main.FavoriteViewResponse; searchText: string }
+    | { type: 'gvk'; gvk: main.MultiClusterGVK; searchText: string };
 
-  const { query, setQuery, results } = useFuzzySearch(searchableTexts);
+  const searchItems = useMemo((): SearchItem[] => {
+    const favItems: SearchItem[] = favorites.map((fav) => {
+      const gvkText = fav.gvk.group ? `${fav.gvk.group} ${fav.gvk.kind}` : fav.gvk.kind;
+      return {
+        type: 'favorite' as const,
+        favorite: fav,
+        searchText: `${fav.name} ${gvkText}`,
+      };
+    });
+
+    const gvkItems: SearchItem[] = gvks.map((gvk) => ({
+      type: 'gvk' as const,
+      gvk,
+      searchText: gvk.group ? `${gvk.group} ${gvk.kind}` : gvk.kind,
+    }));
+
+    return [...favItems, ...gvkItems];
+  }, [favorites, gvks]);
+
+  const { query, setQuery, results } = useFuzzySearch(searchItems, (item) => item.searchText);
 
   // Reset scroll to top when query changes (including when cleared)
   useEffect(() => {
@@ -96,47 +114,44 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
     }
   }, [query]);
 
-  // Map fuzzy search results back to full GVK info
-  const filteredGVKs = useMemo(() => {
-    if (query === "") {
-      // No search query: sort by group -> kind
-      return gvks
-        .slice()
-        .sort((a, b) => {
-          // Sort by group first (empty group comes first)
-          const groupCompare = a.group.localeCompare(b.group);
-          if (groupCompare !== 0) return groupCompare;
-          // Then by kind
-          return a.kind.localeCompare(b.kind);
-        })
-        .map((gvk, index) => ({
-          gvk: gvk,
-          indices: null,
-          originalIndex: index,
-        }));
-    }
+  // Separate results into favorites and GVKs
+  const { filteredFavorites, filteredGVKs } = useMemo(() => {
+    const favoriteResults: Array<{
+      favorite: main.FavoriteViewResponse;
+      indices: readonly [number, number][] | null;
+    }> = [];
 
-    // With search query: use fuzzy search results
-    return results
-      .map((result) => {
-        const gvkIndex = searchableTexts.indexOf(result.item);
-        if (gvkIndex === -1) {
-          return null;
-        }
-        return {
-          gvk: gvks[gvkIndex],
-          indices: result.indices,
-          originalIndex: gvkIndex,
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [gvks, results, query, searchableTexts]);
+    const gvkResults: Array<{
+      gvk: main.MultiClusterGVK;
+      indices: readonly [number, number][] | null;
+      originalIndex: number;
+    }> = [];
+
+    results.forEach((result, idx) => {
+      if (result.item.type === 'favorite') {
+        favoriteResults.push({
+          favorite: result.item.favorite,
+          indices: result.indices.length > 0 ? result.indices : null,
+        });
+      } else {
+        gvkResults.push({
+          gvk: result.item.gvk,
+          indices: result.indices.length > 0 ? result.indices : null,
+          originalIndex: idx,
+        });
+      }
+    });
+
+    return { filteredFavorites: favoriteResults, filteredGVKs: gvkResults };
+  }, [results]);
 
   // Reset selected value to first item when query changes
   // This ensures keyboard input always focuses the top result, ignoring mouse position
   useEffect(() => {
-    if (filteredGVKs.length > 0) {
-      // Set to first item's kind
+    // Set to first available item (favorites first, then GVKs)
+    if (filteredFavorites.length > 0) {
+      setSelectedValue(`fav-${filteredFavorites[0].favorite.id}`);
+    } else if (filteredGVKs.length > 0) {
       setSelectedValue(filteredGVKs[0].gvk.kind);
     } else {
       setSelectedValue("");
@@ -153,8 +168,11 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
   }, [query]);
 
   const handleSelect = (gvk: main.MultiClusterGVK) => {
-    console.log("Selected GVK:", gvk);
     onGVKSelect(gvk);
+  };
+
+  const handleFavoriteSelect = (favorite: main.FavoriteViewResponse) => {
+    onFavoriteSelect(favorite);
   };
 
   return (
@@ -198,7 +216,62 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
               </div>
             ) : (
               <>
-                <CommandEmpty>No GVKs found.</CommandEmpty>
+                <CommandEmpty>No results found.</CommandEmpty>
+
+                {/* FAVORITES Group */}
+                {filteredFavorites.length > 0 && (
+                  <CommandGroup heading={
+                    <span className="flex items-center gap-1.5">
+                      <Star className="h-3 w-3" />
+                      FAVORITES
+                    </span>
+                  }>
+                    {filteredFavorites.map(({ favorite, indices }) => {
+                      // Calculate highlight indices for name (indices are for "name group kind" format)
+                      const nameLength = favorite.name.length;
+                      const nameIndices: [number, number][] = [];
+
+                      if (indices) {
+                        indices.forEach(([start, end]) => {
+                          if (start < nameLength) {
+                            nameIndices.push([start, Math.min(end, nameLength - 1)]);
+                          }
+                        });
+                      }
+
+                      const gvkLabel = favorite.gvk.group
+                        ? `${favorite.gvk.kind} (${favorite.gvk.group}/${favorite.gvk.version})`
+                        : `${favorite.gvk.kind} (${favorite.gvk.version})`;
+
+                      return (
+                        <CommandItem
+                          key={`fav-${favorite.id}`}
+                          value={`fav-${favorite.id}`}
+                          onSelect={() => handleFavoriteSelect(favorite)}
+                          className="flex items-center justify-between py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Star className="h-3.5 w-3.5 text-yellow-500 fill-current ml-2" />
+                            <span>
+                              {nameIndices.length > 0 ? (
+                                <HighlightedText text={favorite.name} indices={nameIndices} />
+                              ) : (
+                                favorite.name
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {gvkLabel} &middot; {favorite.fields.length} fields
+                          </span>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                )}
+
+                {/* RESOURCES Group */}
+                {filteredGVKs.length > 0 && (
+                  <CommandGroup heading="RESOURCES">
                 {filteredGVKs.map(({ gvk, indices }, index) => {
                   const isCore = gvk.group === "";
                   const availableCount = gvk.contexts?.length || 0;
@@ -352,6 +425,8 @@ export function CommandPalette({ contexts, gvks, loading, onClose, onGVKSelect }
                     </CommandItem>
                   );
                 })}
+                  </CommandGroup>
+                )}
               </>
             )}
           </CommandList>

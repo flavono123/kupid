@@ -3,6 +3,7 @@ import { PanelLeftClose, Search } from "lucide-react";
 import { ContextDisplay } from "./ContextDisplay";
 import { ResourceDisplay } from "./ResourceDisplay";
 import { SelectionBadge } from "./SelectionBadge";
+import { SaveFavoritePopover } from "./SaveFavoritePopover";
 import { main } from "../../wailsjs/go/models";
 
 interface NavHeaderProps {
@@ -10,10 +11,12 @@ interface NavHeaderProps {
   connectedContexts: string[];
   selectedGVK: main.MultiClusterGVK | null;
   selectedFieldCount: number;
+  isFavoriteSaved: boolean;
   onCollapse: () => void;
   onBackToContexts: () => void;
   onClearAllFields: () => void;
   onSearch: () => void;
+  onSaveFavorite: (name: string) => Promise<void>;
 }
 
 export function NavHeader({
@@ -21,11 +24,16 @@ export function NavHeader({
   connectedContexts,
   selectedGVK,
   selectedFieldCount,
+  isFavoriteSaved,
   onCollapse,
   onBackToContexts,
   onClearAllFields,
   onSearch,
+  onSaveFavorite,
 }: NavHeaderProps) {
+  const gvkLabel = selectedGVK
+    ? `${selectedGVK.kind.toLowerCase()} (${selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version})`
+    : "";
   return (
     <div className="p-4 border-b border-border flex flex-col gap-2">
       {/* Row 1: ContextDisplay / Collapse Button */}
@@ -57,15 +65,23 @@ export function NavHeader({
             onClearAll={onClearAllFields}
           />
           {selectedGVK && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onSearch}
-              className="h-6 w-6"
-              title="Search fields (⌘F)"
-            >
-              <Search className="h-3.5 w-3.5" />
-            </Button>
+            <>
+              <SaveFavoritePopover
+                gvkLabel={gvkLabel}
+                fieldCount={selectedFieldCount}
+                isSaved={isFavoriteSaved}
+                onSave={onSaveFavorite}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onSearch}
+                className="h-6 w-6"
+                title="Search fields (⌘F)"
+              >
+                <Search className="h-3.5 w-3.5" />
+              </Button>
+            </>
           )}
         </div>
       </div>

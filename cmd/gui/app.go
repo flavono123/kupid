@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/store"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,7 +20,8 @@ import (
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx           context.Context
+	favoriteStore *store.Store
 }
 
 // NewApp creates a new App application struct
@@ -31,6 +33,21 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Detect dev mode from wails environment
+	env := runtime.Environment(ctx)
+	devMode := env.BuildType == "dev"
+
+	s, err := store.NewStore(store.StoreOptions{DevMode: devMode})
+	if err != nil {
+		log.Printf("failed to create favorite store: %v", err)
+	} else {
+		a.favoriteStore = s
+		if err := a.favoriteStore.Load(); err != nil {
+			log.Printf("failed to load favorite views: %v", err)
+		}
+		log.Printf("favorite store initialized (dev=%v)", devMode)
+	}
 }
 
 // Greet returns a greeting for the given name
@@ -450,4 +467,117 @@ func (a *App) SaveFile(defaultFilename string, content string) (string, error) {
 	}
 
 	return filePath, nil
+}
+
+
+// FavoriteView types for frontend binding
+type FavoriteViewGVK struct {
+	Group   string `json:"group"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+}
+
+type FavoriteViewResponse struct {
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	GVK       FavoriteViewGVK `json:"gvk"`
+	Fields    [][]string      `json:"fields"`
+	CreatedAt string          `json:"createdAt"`
+	UpdatedAt string          `json:"updatedAt"`
+}
+
+func favoriteViewToResponse(v *store.FavoriteView) FavoriteViewResponse {
+	return FavoriteViewResponse{
+		ID:   v.ID,
+		Name: v.Name,
+		GVK: FavoriteViewGVK{
+			Group:   v.GVK.Group,
+			Version: v.GVK.Version,
+			Kind:    v.GVK.Kind,
+		},
+		Fields:    v.Fields,
+		CreatedAt: v.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: v.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
+// ListFavoriteViews returns all favorite views.
+func (a *App) ListFavoriteViews() ([]FavoriteViewResponse, error) {
+	if a.favoriteStore == nil {
+		return nil, fmt.Errorf("favorite store not initialized")
+	}
+
+	views := a.favoriteStore.ListAll()
+	result := make([]FavoriteViewResponse, len(views))
+	for i, v := range views {
+		result[i] = favoriteViewToResponse(&v)
+	}
+	return result, nil
+}
+
+// GetFavoriteViewsForGVK returns favorite views for a specific GVK.
+func (a *App) GetFavoriteViewsForGVK(group, version, kind string) ([]FavoriteViewResponse, error) {
+	if a.favoriteStore == nil {
+		return nil, fmt.Errorf("favorite store not initialized")
+	}
+
+	gvk := store.GVKRef{Group: group, Version: version, Kind: kind}
+	views := a.favoriteStore.ListByGVK(gvk)
+	result := make([]FavoriteViewResponse, len(views))
+	for i, v := range views {
+		result[i] = favoriteViewToResponse(&v)
+	}
+	return result, nil
+}
+
+// SaveFavoriteView saves current selection as a favorite.
+func (a *App) SaveFavoriteView(name, group, version, kind string, fields [][]string) (*FavoriteViewResponse, error) {
+	if a.favoriteStore == nil {
+		return nil, fmt.Errorf("favorite store not initialized")
+	}
+
+	gvk := store.GVKRef{Group: group, Version: version, Kind: kind}
+	view, err := a.favoriteStore.Create(name, gvk, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.favoriteStore.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save: %w", err)
+	}
+
+	result := favoriteViewToResponse(view)
+	return &result, nil
+}
+
+// DeleteFavoriteView removes a favorite view by ID.
+func (a *App) DeleteFavoriteView(id string) error {
+	if a.favoriteStore == nil {
+		return fmt.Errorf("favorite store not initialized")
+	}
+
+	if err := a.favoriteStore.Delete(id); err != nil {
+		return err
+	}
+
+	return a.favoriteStore.Save()
+}
+
+// RenameFavoriteView updates the name of a favorite view.
+func (a *App) RenameFavoriteView(id, newName string) (*FavoriteViewResponse, error) {
+	if a.favoriteStore == nil {
+		return nil, fmt.Errorf("favorite store not initialized")
+	}
+
+	view, err := a.favoriteStore.Rename(id, newName)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.favoriteStore.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save: %w", err)
+	}
+
+	result := favoriteViewToResponse(view)
+	return &result, nil
 }

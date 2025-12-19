@@ -4,7 +4,11 @@ import {main} from '../models';
 
 export function ConnectToContexts(arg1:Array<string>):Promise<Array<main.ContextConnectionResult>>;
 
+export function DeleteFavoriteView(arg1:string):Promise<void>;
+
 export function GetCurrentContext():Promise<string>;
+
+export function GetFavoriteViewsForGVK(arg1:string,arg2:string,arg3:string):Promise<Array<main.FavoriteViewResponse>>;
 
 export function GetGVKs(arg1:Array<string>):Promise<Array<main.MultiClusterGVK>>;
 
@@ -16,6 +20,12 @@ export function Greet(arg1:string):Promise<string>;
 
 export function ListContexts():Promise<Array<string>>;
 
+export function ListFavoriteViews():Promise<Array<main.FavoriteViewResponse>>;
+
 export function RefreshContexts():Promise<Array<string>>;
+
+export function RenameFavoriteView(arg1:string,arg2:string):Promise<main.FavoriteViewResponse>;
+
+export function SaveFavoriteView(arg1:string,arg2:string,arg3:string,arg4:string,arg5:Array<any>):Promise<main.FavoriteViewResponse>;
 
 export function SaveFile(arg1:string,arg2:string):Promise<string>;

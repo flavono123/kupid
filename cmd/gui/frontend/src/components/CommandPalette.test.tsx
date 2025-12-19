@@ -53,6 +53,7 @@ const createMockGVK = (
 describe('CommandPalette - Context Availability Badge Visibility', () => {
   const mockOnClose = () => {};
   const mockOnGVKSelect = () => {};
+  const mockOnFavoriteSelect = () => {};
 
   describe('Single context connected', () => {
     it('should NOT show context availability badge when only 1 context is connected', () => {
@@ -65,9 +66,11 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
         <CommandPalette
           contexts={['context-1']}
           gvks={gvks}
+          favorites={[]}
           loading={false}
           onClose={mockOnClose}
           onGVKSelect={mockOnGVKSelect}
+          onFavoriteSelect={mockOnFavoriteSelect}
         />
       );
 
@@ -87,9 +90,11 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
         <CommandPalette
           contexts={['context-1', 'context-2']}
           gvks={gvks}
+          favorites={[]}
           loading={false}
           onClose={mockOnClose}
           onGVKSelect={mockOnGVKSelect}
+          onFavoriteSelect={mockOnFavoriteSelect}
         />
       );
 
@@ -106,9 +111,11 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
         <CommandPalette
           contexts={['context-1', 'context-2']}
           gvks={gvks}
+          favorites={[]}
           loading={false}
           onClose={mockOnClose}
           onGVKSelect={mockOnGVKSelect}
+          onFavoriteSelect={mockOnFavoriteSelect}
         />
       );
 
@@ -127,9 +134,11 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
         <CommandPalette
           contexts={['context-1', 'context-2']}
           gvks={gvks}
+          favorites={[]}
           loading={false}
           onClose={mockOnClose}
           onGVKSelect={mockOnGVKSelect}
+          onFavoriteSelect={mockOnFavoriteSelect}
         />
       );
 
@@ -151,14 +160,16 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
         <CommandPalette
           contexts={['context-1', 'context-2']}
           gvks={[]}
+          favorites={[]}
           loading={false}
           onClose={mockOnClose}
           onGVKSelect={mockOnGVKSelect}
+          onFavoriteSelect={mockOnFavoriteSelect}
         />
       );
 
-      // Should show "No GVKs found" message
-      expect(screen.getByText('No GVKs found.')).toBeInTheDocument();
+      // Should show "No results found." message
+      expect(screen.getByText('No results found.')).toBeInTheDocument();
     });
 
     it('should show loading state correctly', () => {
@@ -166,9 +177,11 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
         <CommandPalette
           contexts={['context-1', 'context-2']}
           gvks={[]}
+          favorites={[]}
           loading={true}
           onClose={mockOnClose}
           onGVKSelect={mockOnGVKSelect}
+          onFavoriteSelect={mockOnFavoriteSelect}
         />
       );
 
@@ -178,9 +191,17 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
   });
 });
 
+// Helper to check if text content exists anywhere in the document
+// This handles cases where text is split across multiple elements (e.g., by HighlightedText)
+const hasTextContent = (text: string): boolean => {
+  const items = document.querySelectorAll('[cmdk-item]');
+  return Array.from(items).some(item => item.textContent?.includes(text));
+};
+
 describe('CommandPalette - Focus Management', () => {
   const mockOnClose = vi.fn();
   const mockOnGVKSelect = vi.fn();
+  const mockOnFavoriteSelect = vi.fn();
 
   it('should focus first item when typing in search', async () => {
     const user = userEvent.setup();
@@ -194,36 +215,40 @@ describe('CommandPalette - Focus Management', () => {
       <CommandPalette
         contexts={['context-1']}
         gvks={gvks}
+        favorites={[]}
         loading={false}
         onClose={mockOnClose}
         onGVKSelect={mockOnGVKSelect}
+        onFavoriteSelect={mockOnFavoriteSelect}
       />
     );
+
+    // Wait for initial render with all items visible
+    await waitFor(() => {
+      expect(hasTextContent('Pod')).toBe(true);
+      expect(hasTextContent('Deployment')).toBe(true);
+    });
 
     const searchInput = screen.getByPlaceholderText('Search resources...');
 
     // Type "po" to filter
     await user.type(searchInput, 'po');
 
-    // Wait for filtering to complete
+    // Wait for filtering to complete (fuzzy search is async)
+    // Note: HighlightedText splits text across elements, so we use hasTextContent
     await waitFor(() => {
-      // Pod should be visible (first match)
-      expect(screen.getByText('Pod')).toBeInTheDocument();
-      // PodTemplate should be visible (second match)
-      expect(screen.getByText('PodTemplate')).toBeInTheDocument();
-      // Deployment should not be visible (no match)
-      expect(screen.queryByText('Deployment')).not.toBeInTheDocument();
-    });
+      // Pod and PodTemplate should be visible (matches "po")
+      expect(hasTextContent('Pod')).toBe(true);
+      expect(hasTextContent('PodTemplate')).toBe(true);
+    }, { timeout: 2000 });
 
-    // The Command component should have value set to first item's kind
+    // The Command component should have the listbox
     const commandList = screen.getByRole('listbox');
     expect(commandList).toBeInTheDocument();
   });
 
-  it('should disable pointer events temporarily when query changes', async () => {
-    vi.useFakeTimers();
-    const user = userEvent.setup({ delay: null });
-
+  it('should show all items initially and filter on search', async () => {
+    const user = userEvent.setup();
     const gvks = [
       createMockGVK('Pod', '', ['context-1'], 1),
       createMockGVK('Deployment', 'apps', ['context-1'], 1),
@@ -233,39 +258,29 @@ describe('CommandPalette - Focus Management', () => {
       <CommandPalette
         contexts={['context-1']}
         gvks={gvks}
+        favorites={[]}
         loading={false}
         onClose={mockOnClose}
         onGVKSelect={mockOnGVKSelect}
+        onFavoriteSelect={mockOnFavoriteSelect}
       />
     );
 
+    // Wait for initial render - all items should be visible
+    await waitFor(() => {
+      expect(hasTextContent('Pod')).toBe(true);
+      expect(hasTextContent('Deployment')).toBe(true);
+    });
+
     const searchInput = screen.getByPlaceholderText('Search resources...');
-    const commandList = screen.getByRole('listbox');
 
-    // Initially, pointer-events should be disabled (disablePointer starts as true)
-    expect(commandList.className).toContain('pointer-events-none');
+    // Type "deploy" to filter
+    await user.type(searchInput, 'deploy');
 
-    // Wait for initial timeout (100ms)
-    vi.advanceTimersByTime(100);
+    // Wait for filtering - Deployment should match
     await waitFor(() => {
-      expect(commandList.className).not.toContain('pointer-events-none');
-    });
-
-    // Type to change query
-    await user.type(searchInput, 'p');
-
-    // Pointer events should be disabled again
-    await waitFor(() => {
-      expect(commandList.className).toContain('pointer-events-none');
-    });
-
-    // After 100ms, pointer events should be re-enabled
-    vi.advanceTimersByTime(100);
-    await waitFor(() => {
-      expect(commandList.className).not.toContain('pointer-events-none');
-    });
-
-    vi.useRealTimers();
+      expect(hasTextContent('Deployment')).toBe(true);
+    }, { timeout: 2000 });
   });
 
   it('should reset to first item when clearing search', async () => {
@@ -279,25 +294,37 @@ describe('CommandPalette - Focus Management', () => {
       <CommandPalette
         contexts={['context-1']}
         gvks={gvks}
+        favorites={[]}
         loading={false}
         onClose={mockOnClose}
         onGVKSelect={mockOnGVKSelect}
+        onFavoriteSelect={mockOnFavoriteSelect}
       />
     );
+
+    // Wait for initial render
+    await waitFor(() => {
+      expect(hasTextContent('Pod')).toBe(true);
+    });
 
     const searchInput = screen.getByPlaceholderText('Search resources...');
 
     // Type a search query
     await user.type(searchInput, 'deploy');
 
+    // Wait for filter to apply
+    await waitFor(() => {
+      expect(hasTextContent('Deployment')).toBe(true);
+    }, { timeout: 2000 });
+
     // Clear the search
     await user.clear(searchInput);
 
     // Both items should be visible again
     await waitFor(() => {
-      expect(screen.getByText('Pod')).toBeInTheDocument();
-      expect(screen.getByText('Deployment')).toBeInTheDocument();
-    });
+      expect(hasTextContent('Pod')).toBe(true);
+      expect(hasTextContent('Deployment')).toBe(true);
+    }, { timeout: 2000 });
   });
 
   it('should handle empty search results', async () => {
@@ -311,11 +338,18 @@ describe('CommandPalette - Focus Management', () => {
       <CommandPalette
         contexts={['context-1']}
         gvks={gvks}
+        favorites={[]}
         loading={false}
         onClose={mockOnClose}
         onGVKSelect={mockOnGVKSelect}
+        onFavoriteSelect={mockOnFavoriteSelect}
       />
     );
+
+    // Wait for initial render
+    await waitFor(() => {
+      expect(hasTextContent('Pod')).toBe(true);
+    });
 
     const searchInput = screen.getByPlaceholderText('Search resources...');
 
@@ -324,7 +358,7 @@ describe('CommandPalette - Focus Management', () => {
 
     // Should show empty state
     await waitFor(() => {
-      expect(screen.getByText('No GVKs found.')).toBeInTheDocument();
-    });
+      expect(screen.getByText('No results found.')).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 });

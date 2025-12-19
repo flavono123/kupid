@@ -6,8 +6,16 @@ export function ConnectToContexts(arg1) {
   return window['go']['main']['App']['ConnectToContexts'](arg1);
 }
 
+export function DeleteFavoriteView(arg1) {
+  return window['go']['main']['App']['DeleteFavoriteView'](arg1);
+}
+
 export function GetCurrentContext() {
   return window['go']['main']['App']['GetCurrentContext']();
+}
+
+export function GetFavoriteViewsForGVK(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetFavoriteViewsForGVK'](arg1, arg2, arg3);
 }
 
 export function GetGVKs(arg1) {
@@ -30,8 +38,20 @@ export function ListContexts() {
   return window['go']['main']['App']['ListContexts']();
 }
 
+export function ListFavoriteViews() {
+  return window['go']['main']['App']['ListFavoriteViews']();
+}
+
 export function RefreshContexts() {
   return window['go']['main']['App']['RefreshContexts']();
+}
+
+export function RenameFavoriteView(arg1, arg2) {
+  return window['go']['main']['App']['RenameFavoriteView'](arg1, arg2);
+}
+
+export function SaveFavoriteView(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SaveFavoriteView'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SaveFile(arg1, arg2) {
