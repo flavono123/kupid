@@ -362,3 +362,111 @@ describe('CommandPalette - Focus Management', () => {
     }, { timeout: 2000 });
   });
 });
+
+describe('CommandPalette - Resource Sorting', () => {
+  const mockOnClose = vi.fn();
+  const mockOnGVKSelect = vi.fn();
+  const mockOnFavoriteSelect = vi.fn();
+
+  it('should sort core resources before non-core resources', () => {
+    const gvks = [
+      { kind: 'Deployment', group: 'apps', version: 'v1', contexts: ['ctx'], allCount: 1 },
+      { kind: 'Pod', group: '', version: 'v1', contexts: ['ctx'], allCount: 1 },
+    ];
+
+    render(
+      <CommandPalette
+        contexts={['ctx']}
+        gvks={gvks}
+        favorites={[]}
+        loading={false}
+        onClose={mockOnClose}
+        onGVKSelect={mockOnGVKSelect}
+        onFavoriteSelect={mockOnFavoriteSelect}
+      />
+    );
+
+    // Get all items
+    const items = document.querySelectorAll('[cmdk-item]');
+    const itemTexts = Array.from(items).map(item => item.textContent || '');
+
+    // Pod (core) should come before Deployment (apps)
+    const podIndex = itemTexts.findIndex(text => text.includes('Pod'));
+    const deploymentIndex = itemTexts.findIndex(text => text.includes('Deployment'));
+
+    expect(podIndex).toBeLessThan(deploymentIndex);
+  });
+
+  it('should sort versions in semver order (stable > beta > alpha)', async () => {
+    const gvks = [
+      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1alpha1', contexts: ['ctx'], allCount: 1 },
+      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1', contexts: ['ctx'], allCount: 1 },
+      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1beta1', contexts: ['ctx'], allCount: 1 },
+    ];
+
+    render(
+      <CommandPalette
+        contexts={['ctx']}
+        gvks={gvks}
+        favorites={[]}
+        loading={false}
+        onClose={mockOnClose}
+        onGVKSelect={mockOnGVKSelect}
+        onFavoriteSelect={mockOnFavoriteSelect}
+      />
+    );
+
+    // Wait for render
+    await waitFor(() => {
+      expect(hasTextContent('NetworkPolicy')).toBe(true);
+    });
+
+    // Get all items
+    const items = document.querySelectorAll('[cmdk-item]');
+    const itemTexts = Array.from(items).map(item => item.textContent || '');
+
+    // Find indices of each version
+    const v1Index = itemTexts.findIndex(text => text.includes('networking.k8s.io/v1') && !text.includes('alpha') && !text.includes('beta'));
+    const v1beta1Index = itemTexts.findIndex(text => text.includes('v1beta1'));
+    const v1alpha1Index = itemTexts.findIndex(text => text.includes('v1alpha1'));
+
+    console.log('Item texts:', itemTexts);
+    console.log('v1 index:', v1Index, 'v1beta1 index:', v1beta1Index, 'v1alpha1 index:', v1alpha1Index);
+
+    // v1 should come before v1beta1, and v1beta1 should come before v1alpha1
+    expect(v1Index).toBeLessThan(v1beta1Index);
+    expect(v1beta1Index).toBeLessThan(v1alpha1Index);
+  });
+
+  it('should sort higher major versions first', async () => {
+    const gvks = [
+      { kind: 'CustomResource', group: 'example.com', version: 'v1', contexts: ['ctx'], allCount: 1 },
+      { kind: 'CustomResource', group: 'example.com', version: 'v2', contexts: ['ctx'], allCount: 1 },
+    ];
+
+    render(
+      <CommandPalette
+        contexts={['ctx']}
+        gvks={gvks}
+        favorites={[]}
+        loading={false}
+        onClose={mockOnClose}
+        onGVKSelect={mockOnGVKSelect}
+        onFavoriteSelect={mockOnFavoriteSelect}
+      />
+    );
+
+    await waitFor(() => {
+      expect(hasTextContent('CustomResource')).toBe(true);
+    });
+
+    const items = document.querySelectorAll('[cmdk-item]');
+    const itemTexts = Array.from(items).map(item => item.textContent || '');
+
+    const v2Index = itemTexts.findIndex(text => text.includes('example.com/v2'));
+    const v1Index = itemTexts.findIndex(text => text.includes('example.com/v1'));
+
+    // v2 should come before v1
+    expect(v2Index).toBeLessThan(v1Index);
+  });
+});

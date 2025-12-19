@@ -114,6 +114,49 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
     }
   }, [query]);
 
+  // Parse version string into comparable parts
+  const parseVersion = (version: string): { major: number; stability: number; stabilityOrder: number } => {
+    // Extract version number (e.g., "v2", "v1beta1" -> 2, 1)
+    const match = version.match(/^v(\d+)/);
+    const major = match ? parseInt(match[1], 10) : 0;
+
+    // Determine stability: stable (3) > beta (2) > alpha (1)
+    let stability = 3; // default to stable
+    let stabilityOrder = 0; // for beta1, beta2, etc.
+
+    if (version.includes('alpha')) {
+      stability = 1;
+      const alphaMatch = version.match(/alpha(\d+)?/);
+      stabilityOrder = alphaMatch?.[1] ? parseInt(alphaMatch[1], 10) : 0;
+    } else if (version.includes('beta')) {
+      stability = 2;
+      const betaMatch = version.match(/beta(\d+)?/);
+      stabilityOrder = betaMatch?.[1] ? parseInt(betaMatch[1], 10) : 0;
+    }
+
+    return { major, stability, stabilityOrder };
+  };
+
+  // Compare versions: returns negative if a < b, positive if a > b, 0 if equal
+  // Higher versions come first (descending order)
+  const compareVersions = (a: string, b: string): number => {
+    const vA = parseVersion(a);
+    const vB = parseVersion(b);
+
+    // Compare major version first (higher first)
+    if (vA.major !== vB.major) {
+      return vB.major - vA.major;
+    }
+
+    // Same major version: compare stability (stable > beta > alpha)
+    if (vA.stability !== vB.stability) {
+      return vB.stability - vA.stability;
+    }
+
+    // Same stability: compare stability order (higher first)
+    return vB.stabilityOrder - vA.stabilityOrder;
+  };
+
   // Separate results into favorites and GVKs
   const { filteredFavorites, filteredGVKs } = useMemo(() => {
     const favoriteResults: Array<{
@@ -140,6 +183,29 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
           originalIndex: idx,
         });
       }
+    });
+
+    // Sort GVKs: group (core first) -> kind -> version (semver desc)
+    gvkResults.sort((a, b) => {
+      // 1. Core group (empty string) comes first
+      const aIsCore = a.gvk.group === "";
+      const bIsCore = b.gvk.group === "";
+
+      if (aIsCore && !bIsCore) return -1;
+      if (!aIsCore && bIsCore) return 1;
+
+      // 2. Compare groups alphabetically
+      if (a.gvk.group !== b.gvk.group) {
+        return a.gvk.group.localeCompare(b.gvk.group);
+      }
+
+      // 3. Compare kinds alphabetically
+      if (a.gvk.kind !== b.gvk.kind) {
+        return a.gvk.kind.localeCompare(b.gvk.kind);
+      }
+
+      // 4. Compare versions (semver descending)
+      return compareVersions(a.gvk.version, b.gvk.version);
     });
 
     return { filteredFavorites: favoriteResults, filteredGVKs: gvkResults };
