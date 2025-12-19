@@ -175,6 +175,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     navigationPanelRef.current?.clearSelections();
   }, [clearFavorite]);
 
+  const gvkLabel = selectedGVK
+    ? `${selectedGVK.kind.toLowerCase()} (${selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version})`
+    : "";
+
   return (
     <div className="h-screen bg-background">
       <ResizablePanelGroup direction="horizontal">
@@ -196,22 +200,25 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               connectedContexts={connectedContexts}
               selectedGVK={selectedGVK}
               selectedFieldCount={selectedFields.length}
-              isFavoriteSaved={activeFavorite !== null}
               onCollapse={toggleSidebar}
               onBackToContexts={onBackToContexts}
               onClearAllFields={handleClearAllFields}
               onSearch={handleSearch}
-              onSaveFavorite={handleSaveFavorite}
             />
 
             {/* Quick Access Bar for Favorites - always visible */}
             <QuickAccessBar
               favorites={allFavorites}
               activeFavoriteId={activeFavorite?.id ?? null}
+              selectedGVK={selectedGVK}
+              gvkLabel={gvkLabel}
+              fieldCount={selectedFields.length}
+              isFavoriteSaved={activeFavorite !== null}
               onApply={handleApplyFavorite}
               onClear={handleClearFavorite}
               onRename={renameFavorite}
               onDelete={deleteFavorite}
+              onSaveFavorite={handleSaveFavorite}
             />
 
             {/* Navigation Content */}
@@ -226,9 +233,13 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 />
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
-                  <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground"
+                    onClick={() => setShowCommandPalette(true)}
+                  >
                     Press <Kbd>⌘</Kbd><Kbd>K</Kbd> to select a resource
-                  </p>
+                  </Button>
                 </div>
               )}
             </div>
@@ -261,9 +272,13 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">
-                <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground"
+                  onClick={() => setShowCommandPalette(true)}
+                >
                   Press <Kbd>⌘</Kbd><Kbd>K</Kbd> to select a resource
-                </p>
+                </Button>
               </div>
             )}
           </div>

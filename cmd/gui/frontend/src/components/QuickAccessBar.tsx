@@ -16,25 +16,40 @@ import {
   AlertDialogDescription,
   AlertDialogCancel,
 } from "./ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "./ui/popover";
 import { main } from "../../wailsjs/go/models";
 import { cn } from "@/lib/utils";
 
 interface QuickAccessBarProps {
   favorites: main.FavoriteViewResponse[];
   activeFavoriteId: string | null;
+  selectedGVK: main.MultiClusterGVK | null;
+  gvkLabel: string;
+  fieldCount: number;
+  isFavoriteSaved: boolean;
   onApply: (favorite: main.FavoriteViewResponse) => void;
   onClear: () => void;
   onRename: (id: string, newName: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onSaveFavorite: (name: string) => Promise<void>;
 }
 
 export function QuickAccessBar({
   favorites,
   activeFavoriteId,
+  selectedGVK,
+  gvkLabel,
+  fieldCount,
+  isFavoriteSaved,
   onApply,
   onClear,
   onRename,
   onDelete,
+  onSaveFavorite,
 }: QuickAccessBarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,7 +58,12 @@ export function QuickAccessBar({
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [savePopoverOpen, setSavePopoverOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const saveInputRef = useRef<HTMLInputElement>(null);
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -60,7 +80,43 @@ export function QuickAccessBar({
     }
   }, [deleteTarget]);
 
-  if (favorites.length === 0) return null;
+  // Focus save input when popover opens
+  useEffect(() => {
+    if (savePopoverOpen) {
+      setSaveName("");
+      setSaveError(null);
+      setTimeout(() => saveInputRef.current?.focus(), 0);
+    }
+  }, [savePopoverOpen]);
+
+  const handleSaveFavorite = async () => {
+    const trimmed = saveName.trim();
+    if (!trimmed) {
+      setSaveError("Name is required");
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onSaveFavorite(trimmed);
+      setSavePopoverOpen(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSaveFavorite();
+    }
+    if (e.key === "Escape") {
+      setSavePopoverOpen(false);
+    }
+  };
 
   const handleStartEdit = (fav: main.FavoriteViewResponse, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -111,24 +167,154 @@ export function QuickAccessBar({
   };
 
   const isConfirmValid = confirmText.toLowerCase() === "confirm";
+  const hasFavorites = favorites.length > 0;
 
+  // Determine message based on state
+  const getEmptyStateMessage = () => {
+    if (!selectedGVK) return "No saved views";
+    if (fieldCount === 0) return "Select fields to save";
+    return "Save as favorite";
+  };
+
+  // Render empty state when no favorites
+  if (!hasFavorites) {
+    const message = getEmptyStateMessage();
+    const canSave = selectedGVK && fieldCount > 0;
+
+    return (
+      <>
+        <div className="border-b border-border">
+          <Popover
+            open={savePopoverOpen}
+            onOpenChange={(newOpen) => {
+              if (newOpen && (isFavoriteSaved || !canSave)) return;
+              setSavePopoverOpen(newOpen);
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                className="w-full px-4 py-2 flex items-center gap-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!canSave}
+              >
+                <Star
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0",
+                    isFavoriteSaved ? "text-accent fill-accent" : "text-accent"
+                  )}
+                />
+                <span className="text-xs text-muted-foreground truncate">
+                  {message}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="start" side="bottom">
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm">Save as favorite</h4>
+                <Input
+                  ref={saveInputRef}
+                  placeholder="Enter name..."
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={handleSaveKeyDown}
+                  disabled={isSaving}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {gvkLabel} &middot; {fieldCount} field{fieldCount !== 1 ? "s" : ""}
+                </p>
+                {saveError && <p className="text-xs text-destructive">{saveError}</p>}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSavePopoverOpen(false)}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleSaveFavorite} disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </>
+    );
+  }
+
+  // Render collapsible list when favorites exist
   return (
     <>
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border-b border-border">
-        <CollapsibleTrigger asChild>
-          <button className="w-full px-4 py-2 flex items-center justify-between hover:bg-focus transition-colors">
-            <div className="flex items-center gap-2">
-              <Star className="h-3.5 w-3.5 text-accent shrink-0" />
-              <span className="text-xs font-medium text-foreground">Favorites</span>
-              <span className="text-xs text-muted-foreground">({favorites.length})</span>
-            </div>
-            {isOpen ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-          </button>
-        </CollapsibleTrigger>
+        <div className="flex items-center">
+          <Popover
+            open={savePopoverOpen}
+            onOpenChange={(newOpen) => {
+              if (newOpen && isFavoriteSaved) return;
+              setSavePopoverOpen(newOpen);
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                className="px-3 py-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!selectedGVK || fieldCount === 0}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Star
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    activeFavoriteId ? "text-accent fill-accent" : "text-accent"
+                  )}
+                />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="start" side="bottom">
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm">Save as favorite</h4>
+                <Input
+                  ref={saveInputRef}
+                  placeholder="Enter name..."
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={handleSaveKeyDown}
+                  disabled={isSaving}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {gvkLabel} &middot; {fieldCount} field{fieldCount !== 1 ? "s" : ""}
+                </p>
+                {saveError && <p className="text-xs text-destructive">{saveError}</p>}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSavePopoverOpen(false)}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleSaveFavorite} disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <CollapsibleTrigger asChild>
+            <button className="flex-1 px-1 py-2 flex items-center justify-between hover:bg-focus transition-colors min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-medium text-foreground truncate">Favorites</span>
+                <span className="text-xs text-muted-foreground shrink-0">({favorites.length})</span>
+              </div>
+              {isOpen ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+        </div>
 
         <CollapsibleContent>
           <div className="border-t border-border">
