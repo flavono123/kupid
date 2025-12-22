@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ListContexts, RefreshContexts, ConnectToContexts } from "../../wailsjs/go/main/App";
 import { K8sIcon } from "./K8sIcon";
+import { KattleLogo } from "./KattleLogo";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -13,9 +14,10 @@ import { toast } from "sonner";
 
 interface ContextGalleryProps {
   onContextsConnected: (selectedContexts: string[], connectedContexts: string[]) => void;
+  onLogoClick?: () => void;
 }
 
-export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
+export function ContextGallery({ onContextsConnected, onLogoClick }: ContextGalleryProps) {
   const [contexts, setContexts] = useState<string[]>([]);
   const [selectedContexts, setSelectedContexts] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
@@ -255,43 +257,15 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
           {/* Fixed Header */}
           <div className="flex-shrink-0">
             <div className="flex items-center gap-3 mb-6">
-              {/* Kupid Logo Placeholder */}
-              <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none">
-                  <path
-                    d="M12 2L21 7v10l-9 5-9-5V7l9-5z"
-                    fill="white"
-                    fillOpacity="0.9"
-                  />
-                  <circle cx="12" cy="12" r="2.5" fill="hsl(var(--primary))" />
-                </svg>
-              </div>
+              {/* Kattle Logo */}
+              <KattleLogo size="md" onClick={onLogoClick} />
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl text-foreground">
-                    Contexts{" "}
-                    <span className="text-muted-foreground">
-                      ({selectedContexts.size > 0 ? `${selectedContexts.size}/` : ""}{filteredContexts.length})
-                    </span>
-                  </h1>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleRefresh}
-                    className="h-8 w-8 p-0"
-                    title="Refresh contexts"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Select one or more contexts to get started
-                </p>
+                <h1 className="font-brand text-2xl font-bold tracking-tight text-foreground">kattle</h1>
               </div>
             </div>
           </div>
 
-          {/* Fixed Search Bar */}
+          {/* Search Bar with Contexts count */}
           <div className="flex-shrink-0">
             <div className="flex items-center gap-2">
               <div className="relative w-80">
@@ -307,6 +281,18 @@ export function ContextGallery({ onContextsConnected }: ContextGalleryProps) {
                   className="pl-9"
                 />
               </div>
+              <span className="text-sm text-muted-foreground">
+                {selectedContexts.size > 0 ? `${selectedContexts.size}/` : ""}{filteredContexts.length} contexts
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefresh}
+                className="h-8 w-8 p-0"
+                title="Refresh contexts"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
               {selectedContexts.size > 0 && (
                 <Button
                   variant="outline"

@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { ContextGallery } from './components/ContextGallery';
 import { MainView } from './components/MainView';
 import { ColorPalette } from './components/debug/ColorPalette';
+import { AboutModal } from './components/AboutModal';
 import { Toaster } from './components/ui/sonner';
 import { ThemeProvider } from 'next-themes';
 
 function App() {
     const [showColors, setShowColors] = useState(false);
     const [showMainView, setShowMainView] = useState(false);
+    const [showAbout, setShowAbout] = useState(false);
     const [selectedContexts, setSelectedContexts] = useState([]);
     const [connectedContexts, setConnectedContexts] = useState([]);
 
@@ -139,8 +141,12 @@ function App() {
                     onBackToContexts={handleBackToContextsGallery}
                 />
             ) : (
-                <ContextGallery onContextsConnected={handleContextsConnected} />
+                <ContextGallery
+                    onContextsConnected={handleContextsConnected}
+                    onLogoClick={() => setShowAbout(true)}
+                />
             )}
+            <AboutModal open={showAbout} onOpenChange={setShowAbout} />
             <Toaster position="top-right" />
         </ThemeProvider>
     );
