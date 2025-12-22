@@ -31,6 +31,10 @@
         --chart-4: 207.2727 44% 49.0196%;
         --chart-5: 138.8710 70.4545% 34.5098%;
         --radius: 0.5rem;
+        /* Kattle logo colors */
+        --kattle-ari: 112 29% 71%;
+        --kattle-bada: 204 30% 58%;
+        --kattle-chorong: 121 24% 60%;
     }
   .dark {
         --background: 220.0000 14.7541% 11.9608%;
@@ -57,6 +61,10 @@
         --chart-3: 218.5401 79.1908% 66.0784%;
         --chart-4: 189.6350 81.0651% 66.8627%;
         --chart-5: 138.8710 70.4545% 34.5098%;
+        /* Kattle logo colors */
+        --kattle-ari: 109 41% 82%;
+        --kattle-bada: 206 47% 70%;
+        --kattle-chorong: 121 35% 72%;
     }
 }
 
