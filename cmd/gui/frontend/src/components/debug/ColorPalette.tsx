@@ -29,6 +29,20 @@ export function ColorPalette({ onBack }: ColorPaletteProps) {
     { name: "ring", desc: "포커스 링 색상" },
   ];
 
+  const chartColors = [
+    { name: "chart-1", desc: "차트 색상 1 (Primary)" },
+    { name: "chart-2", desc: "차트 색상 2 (Secondary)" },
+    { name: "chart-3", desc: "차트 색상 3 (Accent)" },
+    { name: "chart-4", desc: "차트 색상 4" },
+    { name: "chart-5", desc: "차트 색상 5" },
+  ];
+
+  const kattleColors = [
+    { name: "kattle-ari", desc: "Kattle 아리 (연두)" },
+    { name: "kattle-bada", desc: "Kattle 바다 (파랑)" },
+    { name: "kattle-chorong", desc: "Kattle 초롱 (초록)" },
+  ];
+
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto">
@@ -139,6 +153,95 @@ export function ColorPalette({ onBack }: ColorPaletteProps) {
               에러/경고 색상을 사용한 카드
             </p>
           </Card>
+        </div>
+
+        {/* Chart Colors */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-foreground mb-4">
+            Chart Colors
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            차트 및 데이터 시각화에 사용되는 색상
+          </p>
+          <div className="flex flex-wrap gap-4">
+            {chartColors.map(({ name, desc }) => (
+              <div key={name} className="flex flex-col items-center gap-2">
+                <div
+                  className="w-16 h-16 rounded-lg border border-border shadow-sm"
+                  style={{ backgroundColor: `hsl(var(--${name}))` }}
+                />
+                <div className="text-center">
+                  <div className="font-mono text-xs font-semibold text-foreground">
+                    {name}
+                  </div>
+                  <div className="text-xs text-muted-foreground max-w-[80px]">
+                    {desc}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Chart Bar Demo */}
+          <div className="mt-6 flex items-end gap-2 h-32">
+            {chartColors.map(({ name }, index) => (
+              <div
+                key={name}
+                className="w-12 rounded-t-md"
+                style={{
+                  backgroundColor: `hsl(var(--${name}))`,
+                  height: `${((index + 1) * 20) + 20}%`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Kattle Logo Colors */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-foreground mb-4">
+            Kattle Logo Colors
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            Kattle 로고에 사용되는 브랜드 색상
+          </p>
+          <div className="flex flex-wrap gap-6">
+            {kattleColors.map(({ name, desc }) => (
+              <Card key={name} className="overflow-hidden w-48">
+                <div
+                  className="h-24 flex items-center justify-center"
+                  style={{ backgroundColor: `hsl(var(--${name}))` }}
+                >
+                  <span className="text-white font-bold text-lg drop-shadow-md">
+                    {name.replace("kattle-", "").toUpperCase()}
+                  </span>
+                </div>
+                <div className="p-3 bg-card">
+                  <div className="font-mono text-sm font-semibold text-foreground mb-1">
+                    {name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {desc}
+                  </div>
+                  <div className="text-xs font-mono text-muted-foreground mt-2">
+                    var(--{name})
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          {/* Kattle Logo Demo */}
+          <div className="mt-6 flex items-center gap-4">
+            <div className="flex gap-1">
+              {kattleColors.map(({ name }) => (
+                <div
+                  key={name}
+                  className="w-8 h-8 rounded-full"
+                  style={{ backgroundColor: `hsl(var(--${name}))` }}
+                />
+              ))}
+            </div>
+            <span className="text-lg font-bold text-foreground">Kattle</span>
+          </div>
         </div>
       </div>
     </div>
