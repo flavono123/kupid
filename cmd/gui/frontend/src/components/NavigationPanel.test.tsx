@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { NavigationPanel } from './NavigationPanel';
 import { main } from '../../wailsjs/go/models';
@@ -835,6 +835,235 @@ describe('NavigationPanel', () => {
         // This ensures users can always see search results
         expect(screen.getByText('namespace')).toBeInTheDocument();
       }
+    });
+  });
+
+  describe('Ref Methods (Imperative Handle)', () => {
+    const mockTreeData = [
+      {
+        name: 'metadata',
+        type: 'ObjectMeta',
+        fullPath: ['metadata'],
+        level: 0,
+        children: [
+          {
+            name: 'name',
+            type: 'string',
+            fullPath: ['metadata', 'name'],
+            level: 1,
+            children: [],
+          },
+          {
+            name: 'namespace',
+            type: 'string',
+            fullPath: ['metadata', 'namespace'],
+            level: 1,
+            children: [],
+          },
+        ],
+      },
+      {
+        name: 'spec',
+        type: 'PodSpec',
+        fullPath: ['spec'],
+        level: 0,
+        children: [
+          {
+            name: 'nodeName',
+            type: 'string',
+            fullPath: ['spec', 'nodeName'],
+            level: 1,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    it('should set selections via setSelectedPaths (for favorites)', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const ref = { current: null as any };
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Set selections via ref (simulating applying a favorite)
+      const PATH_DELIMITER = '\x00';
+      const pathsToSelect = new Set([
+        ['metadata', 'name'].join(PATH_DELIMITER),
+        ['spec', 'nodeName'].join(PATH_DELIMITER),
+      ]);
+
+      act(() => {
+        ref.current.setSelectedPaths(pathsToSelect);
+      });
+
+      // Parent nodes should be auto-expanded
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('nodeName')).toBeInTheDocument();
+      });
+
+      // Checkboxes should be checked
+      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('name') && !parent?.textContent?.includes('nodeName');
+      });
+      const nodeNameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('nodeName');
+      });
+
+      expect(nameCheckbox).toHaveAttribute('data-state', 'checked');
+      expect(nodeNameCheckbox).toHaveAttribute('data-state', 'checked');
+    });
+
+    it('should clear all selections via clearSelections', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const user = userEvent.setup();
+      const ref = { current: null as any };
+
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Expand and select a field
+      const expandButton = screen.getAllByRole('button')[0];
+      await user.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('name');
+      });
+      await user.click(nameCheckbox!);
+
+      // Verify selection
+      expect(ref.current.getSelectedCount()).toBe(1);
+
+      // Clear via ref
+      act(() => {
+        ref.current.clearSelections();
+      });
+
+      // Should be cleared
+      await waitFor(() => {
+        expect(ref.current.getSelectedCount()).toBe(0);
+      });
+
+      // onFieldsSelected should be called with empty array
+      expect(mockOnFieldsSelected).toHaveBeenLastCalledWith([]);
+    });
+
+    it('should return correct selected count and paths', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const user = userEvent.setup();
+      const ref = { current: null as any };
+
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Initially no selections
+      expect(ref.current.getSelectedCount()).toBe(0);
+      expect(ref.current.getSelectedPaths().size).toBe(0);
+
+      // Expand metadata and select name
+      const expandButton = screen.getAllByRole('button')[0];
+      await user.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('name');
+      });
+      await user.click(nameCheckbox!);
+
+      await waitFor(() => {
+        expect(ref.current.getSelectedCount()).toBe(1);
+      });
+
+      const selectedPaths = ref.current.getSelectedPaths();
+      expect(selectedPaths.size).toBe(1);
+
+      // The path should use PATH_DELIMITER (null character)
+      const PATH_DELIMITER = '\x00';
+      expect(selectedPaths.has(['metadata', 'name'].join(PATH_DELIMITER))).toBe(true);
+    });
+
+    it('should toggle search via toggleSearch', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const ref = { current: null as any };
+
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Search should not be visible initially
+      expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+
+      // Toggle search via ref
+      act(() => {
+        ref.current.toggleSearch();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      });
+
+      // Toggle again to close
+      act(() => {
+        ref.current.toggleSearch();
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+      });
     });
   });
 });
