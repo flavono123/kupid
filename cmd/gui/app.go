@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/store"
@@ -22,6 +23,18 @@ import (
 type App struct {
 	ctx           context.Context
 	favoriteStore *store.Store
+
+	// Watch state
+	watchMu     sync.RWMutex
+	controllers []*watchController
+	stopChs     []chan struct{}
+	watchDone   chan struct{}
+}
+
+// watchController wraps a ResourceController with context info
+type watchController struct {
+	contextName string
+	controller  *kube.ResourceController
 }
 
 // NewApp creates a new App application struct
@@ -363,6 +376,117 @@ func (a *App) GetResources(gvk MultiClusterGVK, contexts []string) ([]map[string
 	wg.Wait()
 
 	return allResources, nil
+}
+
+// ResourceEvent represents a watch event sent to the frontend
+type ResourceEvent struct {
+	Type      string                 `json:"type"`      // "ADDED", "MODIFIED", "DELETED"
+	Context   string                 `json:"context"`   // Kubernetes context name
+	Namespace string                 `json:"namespace"` // Resource namespace (empty for cluster-scoped)
+	Name      string                 `json:"name"`      // Resource name
+	Object    map[string]interface{} `json:"object"`    // Full resource object
+}
+
+// StartWatch starts watching resources for the given GVK across specified contexts
+// Watch events are emitted via Wails runtime events ("resource:update")
+func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
+	// Stop any existing watch first
+	a.StopWatch()
+
+	a.watchMu.Lock()
+	defer a.watchMu.Unlock()
+
+	schemaGVK := schema.GroupVersionKind{
+		Group:   gvk.Group,
+		Version: gvk.Version,
+		Kind:    gvk.Kind,
+	}
+
+	a.controllers = make([]*watchController, 0, len(contexts))
+	a.stopChs = make([]chan struct{}, 0, len(contexts))
+	a.watchDone = make(chan struct{})
+
+	var wg sync.WaitGroup
+
+	for _, contextName := range contexts {
+		gvr, err := kube.GetGVRForContext(contextName, schemaGVK)
+		if err != nil {
+			log.Printf("Warning: failed to get GVR for %s in context %s: %v", schemaGVK.Kind, contextName, err)
+			continue
+		}
+
+		controller := kube.NewResourceControllerForContext(contextName, gvr)
+		stopCh, err := controller.Inform()
+		if err != nil {
+			log.Printf("Warning: failed to start watch for %s in context %s: %v", schemaGVK.Kind, contextName, err)
+			continue
+		}
+
+		a.controllers = append(a.controllers, &watchController{
+			contextName: contextName,
+			controller:  controller,
+		})
+		a.stopChs = append(a.stopChs, stopCh)
+
+		// Start goroutine to forward events to frontend
+		wg.Add(1)
+		go func(ctx string, ctrl *kube.ResourceController) {
+			defer wg.Done()
+			for event := range ctrl.WatchEvents() {
+				obj := event.Obj.Object
+				obj["_context"] = ctx
+
+				resourceEvent := ResourceEvent{
+					Type:      string(event.Type),
+					Context:   ctx,
+					Namespace: event.Obj.GetNamespace(),
+					Name:      event.Obj.GetName(),
+					Object:    obj,
+				}
+
+				runtime.EventsEmit(a.ctx, "resource:update", resourceEvent)
+			}
+		}(contextName, controller)
+	}
+
+	// Wait for all event forwarders to finish in background
+	go func() {
+		wg.Wait()
+		close(a.watchDone)
+	}()
+
+	log.Printf("Started watching %s/%s/%s across %d contexts", gvk.Group, gvk.Version, gvk.Kind, len(a.controllers))
+	return nil
+}
+
+// StopWatch stops all active resource watches
+func (a *App) StopWatch() {
+	a.watchMu.Lock()
+	defer a.watchMu.Unlock()
+
+	if len(a.stopChs) == 0 {
+		return
+	}
+
+	// Close all stop channels to stop informers
+	for _, stopCh := range a.stopChs {
+		close(stopCh)
+	}
+
+	// Wait for event forwarders to finish (with timeout)
+	if a.watchDone != nil {
+		select {
+		case <-a.watchDone:
+		case <-time.After(2 * time.Second):
+			log.Printf("Warning: watch cleanup timed out")
+		}
+	}
+
+	a.controllers = nil
+	a.stopChs = nil
+	a.watchDone = nil
+
+	log.Printf("Stopped all resource watches")
 }
 
 // convertNodeTree converts kube.Node map to frontend TreeNode array

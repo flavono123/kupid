@@ -57,3 +57,11 @@ export function SaveFavoriteView(arg1, arg2, arg3, arg4, arg5) {
 export function SaveFile(arg1, arg2) {
   return window['go']['main']['App']['SaveFile'](arg1, arg2);
 }
+
+export function StartWatch(arg1, arg2) {
+  return window['go']['main']['App']['StartWatch'](arg1, arg2);
+}
+
+export function StopWatch() {
+  return window['go']['main']['App']['StopWatch']();
+}

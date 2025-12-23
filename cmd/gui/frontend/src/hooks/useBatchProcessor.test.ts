@@ -79,10 +79,6 @@ describe('useBatchProcessor', () => {
   it('should batch multiple events into single update', () => {
     const { result } = renderHook(() => useTestBatchProcessor(100));
 
-    // Track render count via setter
-    let updateCount = 0;
-    const originalSetData = result.current.setData;
-
     // Push multiple events
     act(() => {
       result.current.pushEvents([

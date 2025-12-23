@@ -10,6 +10,11 @@ vi.mock('../../wailsjs/go/main/App', () => ({
   GetNodeTree: vi.fn(),
 }));
 
+// Mock the Wails runtime (for EventsOn used by watch)
+vi.mock('../../wailsjs/runtime/runtime', () => ({
+  EventsOn: vi.fn(() => () => {}), // Returns unsubscribe function
+}));
+
 const createMockGVK = (
   kind: string,
   group: string = '',

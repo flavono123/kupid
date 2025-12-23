@@ -1,7 +1,9 @@
 import { useReducer, useEffect, useMemo, useCallback, useRef } from 'react';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetNodeTree } from '../../wailsjs/go/main/App';
 import { main } from '../../wailsjs/go/models';
 import { useFuzzySearch } from './useFuzzySearch';
+import type { ResourceEvent } from '../lib/resource-utils';
 
 // Use null character as path delimiter to avoid conflicts with field names containing '/'
 // (e.g., Kubernetes annotations like "karpenter.sh/node-hash-version")
@@ -288,6 +290,10 @@ export interface UseTreeOptions {
   connectedContexts: string[];
   onFieldsSelected?: (fields: string[][]) => void;
   onReady?: () => void;
+  /** Enable real-time tree updates via watch events (default: false) */
+  watch?: boolean;
+  /** Debounce interval for tree refresh on watch events (default: 100ms) */
+  watchDebounceMs?: number;
 }
 
 export function useTree({
@@ -295,6 +301,8 @@ export function useTree({
   connectedContexts,
   onFieldsSelected,
   onReady,
+  watch = false,
+  watchDebounceMs = 100,
 }: UseTreeOptions) {
   const [state, dispatch] = useReducer(treeReducer, initialState);
   const {
@@ -320,26 +328,71 @@ export function useTree({
     dispatch({ type: 'RESET_FOR_GVK' });
   }, [selectedGVK]);
 
-  // Fetch node tree
-  useEffect(() => {
+  // Fetch node tree function (extracted for reuse)
+  // silent: when true, skip loading state (for background watch refreshes)
+  const fetchNodeTree = useCallback((silent = false) => {
     if (!selectedGVK || connectedContexts.length === 0) {
       dispatch({ type: 'SET_NODE_TREE', nodeTree: [] });
-      dispatch({ type: 'SET_LOADING', loading: false });
+      if (!silent) dispatch({ type: 'SET_LOADING', loading: false });
       return;
     }
 
-    dispatch({ type: 'SET_LOADING', loading: true });
+    if (!silent) dispatch({ type: 'SET_LOADING', loading: true });
     GetNodeTree(selectedGVK, connectedContexts)
       .then((nodes) => {
         dispatch({ type: 'SET_NODE_TREE', nodeTree: nodes || [] });
-        dispatch({ type: 'SET_LOADING', loading: false });
+        if (!silent) dispatch({ type: 'SET_LOADING', loading: false });
       })
       .catch((error) => {
         console.error('Failed to load node tree:', error);
         dispatch({ type: 'SET_NODE_TREE', nodeTree: [] });
-        dispatch({ type: 'SET_LOADING', loading: false });
+        if (!silent) dispatch({ type: 'SET_LOADING', loading: false });
       });
   }, [selectedGVK, connectedContexts]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchNodeTree();
+  }, [fetchNodeTree]);
+
+  // Watch subscription for real-time tree updates
+  useEffect(() => {
+    if (!watch || !selectedGVK || connectedContexts.length === 0) {
+      return;
+    }
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingRefresh = false;
+
+    const handleEvent = (event: ResourceEvent) => {
+      // Only refresh on ADDED or MODIFIED (which could add new keys/indices)
+      // DELETED doesn't add new tree nodes
+      if (event.type === 'ADDED' || event.type === 'MODIFIED') {
+        pendingRefresh = true;
+
+        // Debounce: wait for events to settle before refreshing
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(() => {
+          if (pendingRefresh) {
+            console.log('useTree: refreshing tree due to watch events');
+            fetchNodeTree(true);  // silent refresh - no loading indicator
+            pendingRefresh = false;
+          }
+        }, watchDebounceMs);
+      }
+    };
+
+    const unsubscribe = EventsOn('resource:update', handleEvent);
+
+    return () => {
+      unsubscribe();
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+    };
+  }, [watch, selectedGVK, connectedContexts, watchDebounceMs, fetchNodeTree]);
 
   // Notify parent when loading completes
   useEffect(() => {
@@ -547,6 +600,27 @@ export function useTree({
       onFieldsSelectedRef.current(selectedFields);
     }
   }, [selectedPaths]);
+
+  // Cleanup stale selections when tree changes (e.g., field removed from all resources)
+  useEffect(() => {
+    if (flatNodesMap.size === 0 || selectedPaths.size === 0) return;
+
+    const stalePaths: string[] = [];
+    selectedPaths.forEach((pathKey) => {
+      // Skip wildcard paths (they're virtual)
+      if (pathKey.includes('*')) return;
+      if (!flatNodesMap.has(pathKey)) {
+        stalePaths.push(pathKey);
+      }
+    });
+
+    if (stalePaths.length > 0) {
+      console.log('useTree: removing stale selections:', stalePaths);
+      const newPaths = new Set(selectedPaths);
+      stalePaths.forEach((p) => newPaths.delete(p));
+      dispatch({ type: 'SET_SELECTIONS', paths: newPaths, parentPathKeys: [] });
+    }
+  }, [flatNodesMap, selectedPaths]);
 
   const clearAllSelections = useCallback(() => {
     dispatch({ type: 'CLEAR_SELECTIONS' });

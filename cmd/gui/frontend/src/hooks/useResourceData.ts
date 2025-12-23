@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GetResources } from '../../wailsjs/go/main/App';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
+import { GetResources, StartWatch, StopWatch } from '../../wailsjs/go/main/App';
 import type { main } from '../../wailsjs/go/models';
 import { getResourceKey, type ResourceEvent } from '../lib/resource-utils';
 import { useBatchProcessor } from './useBatchProcessor';
@@ -98,28 +99,37 @@ export function useResourceData(
       return;
     }
 
-    // TODO: Implement when backend StartWatch/StopWatch are ready
-    // setWatchStatus('connecting');
-    //
-    // StartWatch(gvk, contexts)
-    //   .then(() => setWatchStatus('connected'))
-    //   .catch((err) => {
-    //     setError(err);
-    //     setWatchStatus('error');
-    //   });
-    //
-    // const unsubscribe = EventsOn('resource:update', (event: ResourceEvent) => {
-    //   pendingEvents.current.push(event);
-    // });
-    //
-    // return () => {
-    //   unsubscribe();
-    //   StopWatch();
-    //   setWatchStatus('disconnected');
-    // };
+    setWatchStatus('connecting');
 
-    // For now, just log that watch is requested but not implemented
-    console.debug('useResourceData: watch requested but not yet implemented');
+    // Start watch on backend
+    StartWatch(gvk, contexts)
+      .then(() => {
+        console.log(`useResourceData: watch connected for ${gvk.kind}`);
+        setWatchStatus('connected');
+      })
+      .catch((err) => {
+        console.error('useResourceData: failed to start watch:', err);
+        setError(err instanceof Error ? err : new Error(String(err)));
+        setWatchStatus('error');
+      });
+
+    // Subscribe to events from backend
+    const unsubscribe = EventsOn('resource:update', (event: ResourceEvent) => {
+      pendingEvents.current.push(event);
+    });
+
+    // Cleanup: unsubscribe and stop watch
+    return () => {
+      unsubscribe();
+      StopWatch()
+        .then(() => {
+          console.log('useResourceData: watch stopped');
+        })
+        .catch((err) => {
+          console.error('useResourceData: failed to stop watch:', err);
+        });
+      setWatchStatus('disconnected');
+    };
   }, [watch, gvk, contexts]);
 
   // Setup batch processor (only processes when events are pending)

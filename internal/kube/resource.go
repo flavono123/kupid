@@ -15,9 +15,23 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type emitMsg struct {
-	Obj *unstructured.Unstructured
+// EventType represents the type of watch event
+type EventType string
+
+const (
+	EventAdded    EventType = "ADDED"
+	EventModified EventType = "MODIFIED"
+	EventDeleted  EventType = "DELETED"
+)
+
+// WatchEvent represents a watch event with type and object
+type WatchEvent struct {
+	Type EventType
+	Obj  *unstructured.Unstructured
 }
+
+// Deprecated: use WatchEvent instead
+type emitMsg = WatchEvent
 
 type ResourceController struct {
 	contextName string // optional, for GUI multi-context support
@@ -89,7 +103,7 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 					return
 				}
 
-				go func() { i.emitCh <- emitMsg{Obj: u} }()
+				go func() { i.emitCh <- emitMsg{Type: EventAdded, Obj: u} }()
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				n, ok := newObj.(*unstructured.Unstructured)
@@ -97,7 +111,7 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 					return
 				}
 
-				go func() { i.emitCh <- emitMsg{Obj: n} }()
+				go func() { i.emitCh <- emitMsg{Type: EventModified, Obj: n} }()
 			},
 			DeleteFunc: func(obj interface{}) {
 				var d *unstructured.Unstructured
@@ -116,7 +130,7 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 					}
 				}
 
-				go func() { i.emitCh <- emitMsg{Obj: d} }()
+				go func() { i.emitCh <- emitMsg{Type: EventDeleted, Obj: d} }()
 			},
 		},
 	}
@@ -136,6 +150,12 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 	return stop, nil
 }
 
+// WatchEvents returns a read-only channel of watch events
+func (i *ResourceController) WatchEvents() <-chan WatchEvent {
+	return i.emitCh
+}
+
+// Deprecated: use WatchEvents instead
 func (i *ResourceController) EventEmitted() <-chan emitMsg {
 	return i.emitCh
 }

@@ -199,6 +199,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     connectedContexts,
     onFieldsSelected,
     onReady,
+    watch: true,  // Enable real-time tree updates
   });
 
   useImperativeHandle(ref, () => ({

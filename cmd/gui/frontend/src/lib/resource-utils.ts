@@ -6,12 +6,19 @@
  * - Batch processing of watch events
  */
 
-// Types for resource events (will be imported from wailsjs once backend is ready)
+// Types for resource events (matches backend ResourceEvent struct)
 export type ResourceEventType = 'ADDED' | 'MODIFIED' | 'DELETED';
 
 export interface ResourceEvent {
   type: ResourceEventType;
-  object: any;
+  /** Kubernetes context name (optional, also in object._context) */
+  context?: string;
+  /** Resource namespace (optional, also in object.metadata.namespace) */
+  namespace?: string;
+  /** Resource name (optional, also in object.metadata.name) */
+  name?: string;
+  /** Full resource object */
+  object: Record<string, unknown>;
 }
 
 /**
