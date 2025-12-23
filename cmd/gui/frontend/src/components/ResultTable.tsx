@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,7 +13,7 @@ import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
 import { ResultTableToolbar } from './ResultTableToolbar';
 import { useCellHighlight } from '../hooks/useCellHighlight';
-import { GetResources } from '../../wailsjs/go/main/App';
+import { useResourceData } from '../hooks/useResourceData';
 import type { main } from '../../wailsjs/go/models';
 
 interface ResultTableProps {
@@ -44,30 +44,15 @@ export function ResultTable({
   selectedGVK,
   connectedContexts,
 }: ResultTableProps) {
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Use extracted hook for data fetching (watch enabled for future real-time updates)
+  const { data, loading, getRowId } = useResourceData(
+    selectedGVK,
+    connectedContexts,
+    { watch: true }
+  );
+
   const [globalFilter, setGlobalFilter] = useState('');
   const tableContainerRef = useRef<HTMLDivElement>(null);
-
-  // Fetch resource data when GVK or contexts change
-  useEffect(() => {
-    if (!selectedGVK || connectedContexts.length === 0) {
-      setData([]);
-      return;
-    }
-
-    setLoading(true);
-    GetResources(selectedGVK, connectedContexts)
-      .then((resources) => {
-        setData(resources || []);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Failed to load resources:', error);
-        setData([]);
-        setLoading(false);
-      });
-  }, [selectedGVK, connectedContexts]);
 
   // Get highlight function based on current search query
   const getHighlightIndices = useCellHighlight(globalFilter);
@@ -168,6 +153,7 @@ export function ResultTable({
   const table = useReactTable({
     data,
     columns,
+    getRowId,  // Stable row identity for real-time updates
     filterFns: {
       fuzzy: fuzzyFilter,
     },
