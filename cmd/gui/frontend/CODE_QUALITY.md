@@ -9,6 +9,7 @@ This document defines the code quality standards for the frontend codebase. All 
 - ✅ **No unused imports**
 - ✅ **Explicit type declarations**
 - ✅ **React best practices**
+- ✅ **Focused components** (split when "fat")
 
 ---
 
@@ -353,6 +354,136 @@ describe('indexesToRanges', () => {
 
 ---
 
+## 8. Component Decomposition
+
+### Rule: Keep Components Focused and Manageable
+
+When a component becomes too "fat" (doing too much), split it into smaller, focused units.
+
+### 8.1 Signs a Component Needs Splitting
+
+- **Too many lines**: Component exceeds ~200-300 lines
+- **Multiple concerns**: Handles unrelated UI sections or logic
+- **Repeated patterns**: Same structure duplicated within or across files
+- **Complex state**: Multiple `useState` calls managing different features
+- **Mixed data types**: Combines unrelated data types in a single structure via union types
+
+### 8.2 Extraction Strategies
+
+**Extract to Components** when:
+- A UI section is visually distinct (header, sidebar, card, badge)
+- The section has its own props and could be reused
+- It represents a clear "thing" in the UI
+
+```tsx
+// ❌ Don't: Fat component with embedded UI sections
+function NavigationPanel({ ... }) {
+  return (
+    <div>
+      <div className="header">
+        <button onClick={onCollapse}>...</button>
+        <span>{title}</span>
+      </div>
+      <div className="context-display">
+        {/* 50+ lines of context display logic */}
+      </div>
+      {/* ... more sections */}
+    </div>
+  );
+}
+
+// ✅ Do: Extract focused components
+function NavigationPanel({ ... }) {
+  return (
+    <div>
+      <NavHeader title={title} onCollapse={onCollapse} />
+      <ContextDisplay contexts={contexts} />
+      {/* ... */}
+    </div>
+  );
+}
+```
+
+**Extract to Custom Hooks** when:
+- State logic is reusable across components
+- Complex `useEffect` chains or subscriptions
+- Data fetching or transformation logic
+
+```tsx
+// ❌ Don't: Complex inline logic
+function CommandPalette({ items }) {
+  const [query, setQuery] = useState("");
+  const results = useMemo(() => {
+    // 30+ lines of fuzzy search logic
+  }, [items, query]);
+
+  return /* ... */;
+}
+
+// ✅ Do: Extract to custom hook
+function CommandPalette({ items }) {
+  const { query, setQuery, results } = useFuzzySearch(items, getSearchText);
+
+  return /* ... */;
+}
+```
+
+**Extract to Utility Functions** when:
+- Pure data transformation (no React dependencies)
+- Parsing, formatting, or calculation logic
+- Comparison or sorting functions
+
+```tsx
+// ❌ Don't: Inline utility logic
+function CommandPalette() {
+  const parseVersion = (version: string) => {
+    // 20+ lines of version parsing
+  };
+
+  const compareVersions = (a: string, b: string) => {
+    // 20+ lines of comparison logic
+  };
+}
+
+// ✅ Do: Extract to lib/utils
+// lib/version.ts
+export function parseVersion(version: string): VersionInfo { ... }
+export function compareVersions(a: string, b: string): number { ... }
+```
+
+### 8.3 File Organization
+
+When extracting components:
+- Place in the same directory if tightly coupled
+- Create subdirectories for feature groups (e.g., `components/nav/`)
+- Co-locate related hooks in `hooks/`
+- Co-locate utilities in `lib/`
+
+```
+components/
+├── MainView.tsx
+├── NavigationPanel.tsx
+├── NavHeader.tsx          # Extracted from NavigationPanel
+├── ContextDisplay.tsx     # Extracted from NavigationPanel
+├── ResourceDisplay.tsx    # Extracted from NavigationPanel
+└── ui/
+    └── ...
+hooks/
+├── useFuzzySearch.ts      # Extracted search logic
+└── useCellHighlight.ts
+lib/
+├── version.ts             # Version parsing utilities
+└── csv-export.ts
+```
+
+### 8.4 When NOT to Split
+
+- **Premature abstraction**: Don't extract until there's clear benefit
+- **Over-fragmentation**: Avoid single-use 10-line components
+- **Prop drilling**: If extraction requires passing 5+ props through layers
+
+---
+
 ## Quick Checklist
 
 Before submitting code, verify:
@@ -365,6 +496,7 @@ Before submitting code, verify:
 - [ ] All dependencies are in dependency arrays
 - [ ] All list items have unique keys
 - [ ] Types are explicitly declared for complex structures
+- [ ] Components are focused (<300 lines, single concern)
 - [ ] Tests pass: `npm run test:run`
 
 ---
