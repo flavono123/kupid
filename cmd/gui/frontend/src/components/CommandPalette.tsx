@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { main } from "../../wailsjs/go/models";
 import {
   Command,
@@ -13,7 +13,7 @@ import { Kbd } from "./ui/kbd";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Spinner } from "./ui/spinner";
 import { Check, X, Star } from "lucide-react";
-import { useFuzzySearch } from "@/hooks/useFuzzySearch";
+import { useCommandSearch } from "@/hooks/useCommandSearch";
 import { HighlightedText } from "./HighlightedText";
 import { K8sIcon } from "./K8sIcon";
 
@@ -74,31 +74,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // Combined search items: favorites first, then GVKs
-  type SearchItem =
-    | { type: 'favorite'; favorite: main.FavoriteViewResponse; searchText: string }
-    | { type: 'gvk'; gvk: main.MultiClusterGVK; searchText: string };
-
-  const searchItems = useMemo((): SearchItem[] => {
-    const favItems: SearchItem[] = favorites.map((fav) => {
-      const gvkText = fav.gvk.group ? `${fav.gvk.group} ${fav.gvk.kind}` : fav.gvk.kind;
-      return {
-        type: 'favorite' as const,
-        favorite: fav,
-        searchText: `${fav.name} ${gvkText}`,
-      };
-    });
-
-    const gvkItems: SearchItem[] = gvks.map((gvk) => ({
-      type: 'gvk' as const,
-      gvk,
-      searchText: gvk.group ? `${gvk.group} ${gvk.kind}` : gvk.kind,
-    }));
-
-    return [...favItems, ...gvkItems];
-  }, [favorites, gvks]);
-
-  const { query, setQuery, results } = useFuzzySearch(searchItems, (item) => item.searchText);
+  const { query, setQuery, filteredFavorites, filteredGVKs } = useCommandSearch(favorites, gvks);
 
   // Reset scroll to top when query changes (including when cleared)
   useEffect(() => {
@@ -113,103 +89,6 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
       return () => clearTimeout(timeoutId);
     }
   }, [query]);
-
-  // Parse version string into comparable parts
-  const parseVersion = (version: string): { major: number; stability: number; stabilityOrder: number } => {
-    // Extract version number (e.g., "v2", "v1beta1" -> 2, 1)
-    const match = version.match(/^v(\d+)/);
-    const major = match ? parseInt(match[1], 10) : 0;
-
-    // Determine stability: stable (3) > beta (2) > alpha (1)
-    let stability = 3; // default to stable
-    let stabilityOrder = 0; // for beta1, beta2, etc.
-
-    if (version.includes('alpha')) {
-      stability = 1;
-      const alphaMatch = version.match(/alpha(\d+)?/);
-      stabilityOrder = alphaMatch?.[1] ? parseInt(alphaMatch[1], 10) : 0;
-    } else if (version.includes('beta')) {
-      stability = 2;
-      const betaMatch = version.match(/beta(\d+)?/);
-      stabilityOrder = betaMatch?.[1] ? parseInt(betaMatch[1], 10) : 0;
-    }
-
-    return { major, stability, stabilityOrder };
-  };
-
-  // Compare versions: returns negative if a < b, positive if a > b, 0 if equal
-  // Higher versions come first (descending order)
-  const compareVersions = (a: string, b: string): number => {
-    const vA = parseVersion(a);
-    const vB = parseVersion(b);
-
-    // Compare major version first (higher first)
-    if (vA.major !== vB.major) {
-      return vB.major - vA.major;
-    }
-
-    // Same major version: compare stability (stable > beta > alpha)
-    if (vA.stability !== vB.stability) {
-      return vB.stability - vA.stability;
-    }
-
-    // Same stability: compare stability order (higher first)
-    return vB.stabilityOrder - vA.stabilityOrder;
-  };
-
-  // Separate results into favorites and GVKs
-  const { filteredFavorites, filteredGVKs } = useMemo(() => {
-    const favoriteResults: Array<{
-      favorite: main.FavoriteViewResponse;
-      indices: readonly [number, number][] | null;
-    }> = [];
-
-    const gvkResults: Array<{
-      gvk: main.MultiClusterGVK;
-      indices: readonly [number, number][] | null;
-      originalIndex: number;
-    }> = [];
-
-    results.forEach((result, idx) => {
-      if (result.item.type === 'favorite') {
-        favoriteResults.push({
-          favorite: result.item.favorite,
-          indices: result.indices.length > 0 ? result.indices : null,
-        });
-      } else {
-        gvkResults.push({
-          gvk: result.item.gvk,
-          indices: result.indices.length > 0 ? result.indices : null,
-          originalIndex: idx,
-        });
-      }
-    });
-
-    // Sort GVKs: group (core first) -> kind -> version (semver desc)
-    gvkResults.sort((a, b) => {
-      // 1. Core group (empty string) comes first
-      const aIsCore = a.gvk.group === "";
-      const bIsCore = b.gvk.group === "";
-
-      if (aIsCore && !bIsCore) return -1;
-      if (!aIsCore && bIsCore) return 1;
-
-      // 2. Compare groups alphabetically
-      if (a.gvk.group !== b.gvk.group) {
-        return a.gvk.group.localeCompare(b.gvk.group);
-      }
-
-      // 3. Compare kinds alphabetically
-      if (a.gvk.kind !== b.gvk.kind) {
-        return a.gvk.kind.localeCompare(b.gvk.kind);
-      }
-
-      // 4. Compare versions (semver descending)
-      return compareVersions(a.gvk.version, b.gvk.version);
-    });
-
-    return { filteredFavorites: favoriteResults, filteredGVKs: gvkResults };
-  }, [results]);
 
   // Reset selected value to first item when query changes
   // This ensures keyboard input always focuses the top result, ignoring mouse position
