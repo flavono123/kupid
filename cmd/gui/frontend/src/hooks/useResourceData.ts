@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
-import { GetResources, StartWatch, StopWatch } from '../../wailsjs/go/main/App';
+import { StartWatch, StopWatch } from '../../wailsjs/go/main/App';
 import type { main } from '../../wailsjs/go/models';
 import { getResourceKey, type ResourceEvent, type CellChange } from '../lib/resource-utils';
 import { useBatchProcessor } from './useBatchProcessor';
@@ -9,7 +9,7 @@ import { useBatchProcessor } from './useBatchProcessor';
 export type WatchStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export interface UseResourceDataOptions {
-  /** Enable real-time updates via watch (default: false) */
+  /** Enable real-time updates via watch (default: true) */
   watch?: boolean;
   /** Batch interval in ms (default: 100) */
   batchInterval?: number;
@@ -22,7 +22,7 @@ export interface UseResourceDataResult {
   loading: boolean;
   /** Error from fetch or watch */
   error: Error | null;
-  /** Manually refresh data */
+  /** Manually refresh data (restarts watch) */
   refresh: () => void;
   /** Watch connection status */
   watchStatus: WatchStatus;
@@ -33,12 +33,10 @@ export interface UseResourceDataResult {
 }
 
 /**
- * Hook for fetching and managing Kubernetes resource data
+ * Hook for fetching and managing Kubernetes resource data via watch
  *
- * Extracts data fetching logic from ResultTable for:
- * - Cleaner component code
- * - Testability
- * - Future watch subscription support
+ * Uses Kubernetes watch for both initial data (via ADDED events) and real-time updates.
+ * This eliminates duplicate List API calls that occurred with separate GetResources + StartWatch.
  *
  * @param gvk The Group/Version/Kind to fetch
  * @param contexts Array of Kubernetes contexts to query
@@ -49,75 +47,67 @@ export function useResourceData(
   contexts: string[],
   options: UseResourceDataOptions = {}
 ): UseResourceDataResult {
-  const { watch = false, batchInterval = 100 } = options;
+  const { watch = true, batchInterval = 100 } = options;
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [watchStatus, setWatchStatus] = useState<WatchStatus>('disconnected');
 
-  // Ref to track current fetch to avoid race conditions
-  const fetchIdRef = useRef(0);
+  // Track watch generation to avoid stale operations
+  const watchGenRef = useRef(0);
 
-  // Pending events for batch processing (used when watch is enabled)
+  // Pending events for batch processing
   const pendingEvents = useRef<ResourceEvent[]>([]);
 
-  // Initial fetch
+  // Watch subscription - provides both initial data (ADDED events) and real-time updates
   useEffect(() => {
-    if (!gvk || contexts.length === 0) {
+    if (!watch || !gvk || contexts.length === 0) {
       setData([]);
       setLoading(false);
       setError(null);
-      return;
-    }
-
-    const fetchId = ++fetchIdRef.current;
-    setLoading(true);
-    setError(null);
-
-    GetResources(gvk, contexts)
-      .then((resources) => {
-        // Ignore stale responses
-        if (fetchId !== fetchIdRef.current) return;
-
-        setData(resources || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        // Ignore stale errors
-        if (fetchId !== fetchIdRef.current) return;
-
-        console.error('Failed to load resources:', err);
-        setError(err instanceof Error ? err : new Error(String(err)));
-        setData([]);
-        setLoading(false);
-      });
-  }, [gvk, contexts]);
-
-  // Watch subscription (when enabled)
-  useEffect(() => {
-    if (!watch || !gvk || contexts.length === 0) {
       setWatchStatus('disconnected');
       return;
     }
 
+    const watchGen = ++watchGenRef.current;
+    setLoading(true);
+    setError(null);
+    setData([]); // Clear previous data
     setWatchStatus('connecting');
 
-    // Start watch on backend
+    // Start watch - backend will emit ADDED events for all initial resources
     StartWatch(gvk, contexts)
       .then(() => {
+        // Ignore if this watch was superseded
+        if (watchGen !== watchGenRef.current) return;
+
         console.log(`useResourceData: watch connected for ${gvk.kind}`);
         setWatchStatus('connected');
+        // Loading will be set to false by batch processor after initial events arrive
+        // Use a small delay to ensure events have been processed
+        setTimeout(() => {
+          if (watchGen === watchGenRef.current) {
+            setLoading(false);
+          }
+        }, 50);
       })
       .catch((err) => {
+        // Ignore if this watch was superseded
+        if (watchGen !== watchGenRef.current) return;
+
         console.error('useResourceData: failed to start watch:', err);
         setError(err instanceof Error ? err : new Error(String(err)));
         setWatchStatus('error');
+        setLoading(false);
       });
 
     // Subscribe to events from backend
     const unsubscribe = EventsOn('resource:update', (event: ResourceEvent) => {
-      pendingEvents.current.push(event);
+      // Only process events for current watch generation
+      if (watchGen === watchGenRef.current) {
+        pendingEvents.current.push(event);
+      }
     });
 
     // Cleanup: unsubscribe and stop watch
@@ -134,25 +124,32 @@ export function useResourceData(
     };
   }, [watch, gvk, contexts]);
 
-  // Setup batch processor (only processes when events are pending)
+  // Setup batch processor (processes ADDED for initial data, MODIFIED/DELETED for updates)
   const changedCells = useBatchProcessor(pendingEvents, setData, batchInterval);
 
-  // Manual refresh
+  // Manual refresh - restarts the watch to get fresh data
   const refresh = useCallback(() => {
     if (!gvk || contexts.length === 0) return;
 
-    const fetchId = ++fetchIdRef.current;
+    const watchGen = ++watchGenRef.current;
     setLoading(true);
     setError(null);
+    setData([]);
 
-    GetResources(gvk, contexts)
-      .then((resources) => {
-        if (fetchId !== fetchIdRef.current) return;
-        setData(resources || []);
-        setLoading(false);
+    // Stop and restart watch
+    StopWatch()
+      .then(() => StartWatch(gvk, contexts))
+      .then(() => {
+        if (watchGen !== watchGenRef.current) return;
+        setWatchStatus('connected');
+        setTimeout(() => {
+          if (watchGen === watchGenRef.current) {
+            setLoading(false);
+          }
+        }, 50);
       })
       .catch((err) => {
-        if (fetchId !== fetchIdRef.current) return;
+        if (watchGen !== watchGenRef.current) return;
         setError(err instanceof Error ? err : new Error(String(err)));
         setLoading(false);
       });

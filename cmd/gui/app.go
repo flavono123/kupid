@@ -268,10 +268,14 @@ func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, 
 		return nil, fmt.Errorf("failed to create field tree: %w", err)
 	}
 
-	// 2. Get resources from all contexts
-	objs, err := getResourcesForContexts(schemaGVK, contexts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get resources: %w", err)
+	// 2. Get resources - prefer active watch store to avoid duplicate List calls
+	objs := a.getWatchedResources()
+	if len(objs) == 0 {
+		// No active watch, fetch directly (with cleanup)
+		objs, err = a.getResourcesWithCleanup(schemaGVK, contexts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get resources: %w", err)
+		}
 	}
 
 	// 3. Create node tree
@@ -281,8 +285,25 @@ func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, 
 	return convertNodeTree(nodes), nil
 }
 
-// getResourcesForContexts retrieves resources from multiple contexts
-func getResourcesForContexts(gvk schema.GroupVersionKind, contexts []string) ([]*unstructured.Unstructured, error) {
+// getWatchedResources returns resources from active watch controllers if available
+func (a *App) getWatchedResources() []*unstructured.Unstructured {
+	a.watchMu.RLock()
+	defer a.watchMu.RUnlock()
+
+	if len(a.controllers) == 0 {
+		return nil
+	}
+
+	var allObjs []*unstructured.Unstructured
+	for _, wc := range a.controllers {
+		objs := wc.controller.Objects()
+		allObjs = append(allObjs, objs...)
+	}
+	return allObjs
+}
+
+// getResourcesWithCleanup fetches resources and properly cleans up controllers
+func (a *App) getResourcesWithCleanup(gvk schema.GroupVersionKind, contexts []string) ([]*unstructured.Unstructured, error) {
 	var allObjs []*unstructured.Unstructured
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -292,28 +313,23 @@ func getResourcesForContexts(gvk schema.GroupVersionKind, contexts []string) ([]
 		go func(ctx string) {
 			defer wg.Done()
 
-			// Get GVR from GVK
 			gvr, err := kube.GetGVRForContext(ctx, gvk)
 			if err != nil {
 				log.Printf("Warning: failed to get GVR for %s in context %s: %v", gvk.Kind, ctx, err)
 				return
 			}
 
-			// Create resource controller for this context
 			controller := kube.NewResourceControllerForContext(ctx, gvr)
-
-			// Start the informer
-			_, err = controller.Inform()
+			stopCh, err := controller.Inform()
 			if err != nil {
-				// Some resources (like Binding) may not support list operations
-				// Log the error but don't fail the entire request
 				log.Printf("Warning: failed to start informer for %s in context %s: %v", gvk.Kind, ctx, err)
-				// Return empty object list for this context
 				return
 			}
 
-			// Get objects from controller
+			// Get objects then immediately cleanup
 			objs := controller.Objects()
+			close(stopCh)
+			controller.Close()
 
 			mu.Lock()
 			allObjs = append(allObjs, objs...)
@@ -322,66 +338,40 @@ func getResourcesForContexts(gvk schema.GroupVersionKind, contexts []string) ([]
 	}
 
 	wg.Wait()
-
-	// Note: We no longer fail the entire request if some contexts fail to start informers
-	// Individual context errors are logged as warnings instead
-
 	return allObjs, nil
 }
 
-// GetResources fetches actual resource data for the given GVK and contexts
-// Returns raw resource data as map[string]interface{} for flexible frontend consumption
-// Adds _context field to each resource to indicate which context it came from
+// GetResources returns resources from active watch or fetches them directly
+// Deprecated: Frontend should use watch events (ADDED) for initial data instead
+// This is kept for backward compatibility and manual refresh
 func (a *App) GetResources(gvk MultiClusterGVK, contexts []string) ([]map[string]interface{}, error) {
-	// Convert MultiClusterGVK to schema.GroupVersionKind
-	schemaGVK := schema.GroupVersionKind{
-		Group:   gvk.Group,
-		Version: gvk.Version,
-		Kind:    gvk.Kind,
+	// Prefer active watch data to avoid duplicate List calls
+	objs := a.getWatchedResources()
+
+	if len(objs) == 0 {
+		// No active watch, fetch with cleanup
+		schemaGVK := schema.GroupVersionKind{
+			Group:   gvk.Group,
+			Version: gvk.Version,
+			Kind:    gvk.Kind,
+		}
+		var err error
+		objs, err = a.getResourcesWithCleanup(schemaGVK, contexts)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// Get resources from each context separately to track context origin
+	// Convert to frontend format with _context field
 	var allResources []map[string]interface{}
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, contextName := range contexts {
-		wg.Add(1)
-		go func(ctx string) {
-			defer wg.Done()
-
-			// Get GVR from GVK
-			gvr, err := kube.GetGVRForContext(ctx, schemaGVK)
-			if err != nil {
-				log.Printf("Warning: failed to get GVR for %s in context %s: %v", schemaGVK.Kind, ctx, err)
-				return
-			}
-
-			// Create resource controller for this context
-			controller := kube.NewResourceControllerForContext(ctx, gvr)
-
-			// Start the informer
-			_, err = controller.Inform()
-			if err != nil {
-				log.Printf("Warning: failed to start informer for %s in context %s: %v", schemaGVK.Kind, ctx, err)
-				return
-			}
-
-			// Get objects from controller
-			objs := controller.Objects()
-
-			mu.Lock()
-			for _, obj := range objs {
-				resource := obj.Object
-				// Add _context field to indicate which context this resource came from
-				resource["_context"] = ctx
-				allResources = append(allResources, resource)
-			}
-			mu.Unlock()
-		}(contextName)
+	for _, obj := range objs {
+		resource := obj.Object
+		// _context should already be set by watch, but ensure it exists
+		if _, ok := resource["_context"]; !ok {
+			resource["_context"] = ""
+		}
+		allResources = append(allResources, resource)
 	}
-
-	wg.Wait()
 
 	return allResources, nil
 }
