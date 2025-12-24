@@ -50,6 +50,12 @@ const createMockGVK = (
   allCount,
 });
 
+// Default props for all tests
+const defaultProps = {
+  theme: 'light',
+  onThemeToggle: () => {},
+};
+
 describe('CommandPalette - Context Availability Badge Visibility', () => {
   const mockOnClose = () => {};
   const mockOnGVKSelect = () => {};
@@ -64,6 +70,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
 
       render(
         <CommandPalette
+          {...defaultProps}
           contexts={['context-1']}
           gvks={gvks}
           favorites={[]}
@@ -88,6 +95,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
 
       render(
         <CommandPalette
+          {...defaultProps}
           contexts={['context-1', 'context-2']}
           gvks={gvks}
           favorites={[]}
@@ -109,6 +117,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
 
       render(
         <CommandPalette
+          {...defaultProps}
           contexts={['context-1', 'context-2']}
           gvks={gvks}
           favorites={[]}
@@ -132,6 +141,7 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
 
       render(
         <CommandPalette
+          {...defaultProps}
           contexts={['context-1', 'context-2']}
           gvks={gvks}
           favorites={[]}
@@ -155,9 +165,10 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
   });
 
   describe('Edge cases', () => {
-    it('should handle empty GVK list', () => {
+    it('should handle empty GVK list - shows Settings when no search query', () => {
       render(
         <CommandPalette
+          {...defaultProps}
           contexts={['context-1', 'context-2']}
           gvks={[]}
           favorites={[]}
@@ -168,13 +179,16 @@ describe('CommandPalette - Context Availability Badge Visibility', () => {
         />
       );
 
-      // Should show "No results found." message
-      expect(screen.getByText('No results found.')).toBeInTheDocument();
+      // Should show SETTINGS group even when GVK list is empty
+      expect(screen.getByText('SETTINGS')).toBeInTheDocument();
+      // Should show theme toggle option
+      expect(screen.getByText(/(Light|Dark) Mode/)).toBeInTheDocument();
     });
 
     it('should show loading state correctly', () => {
       render(
         <CommandPalette
+          {...defaultProps}
           contexts={['context-1', 'context-2']}
           gvks={[]}
           favorites={[]}
@@ -213,6 +227,7 @@ describe('CommandPalette - Focus Management', () => {
 
     render(
       <CommandPalette
+        {...defaultProps}
         contexts={['context-1']}
         gvks={gvks}
         favorites={[]}
@@ -256,6 +271,7 @@ describe('CommandPalette - Focus Management', () => {
 
     render(
       <CommandPalette
+        {...defaultProps}
         contexts={['context-1']}
         gvks={gvks}
         favorites={[]}
@@ -292,6 +308,7 @@ describe('CommandPalette - Focus Management', () => {
 
     render(
       <CommandPalette
+        {...defaultProps}
         contexts={['context-1']}
         gvks={gvks}
         favorites={[]}
@@ -336,6 +353,7 @@ describe('CommandPalette - Focus Management', () => {
 
     render(
       <CommandPalette
+        {...defaultProps}
         contexts={['context-1']}
         gvks={gvks}
         favorites={[]}
@@ -376,6 +394,7 @@ describe('CommandPalette - Resource Sorting', () => {
 
     render(
       <CommandPalette
+        {...defaultProps}
         contexts={['ctx']}
         gvks={gvks}
         favorites={[]}
@@ -406,6 +425,7 @@ describe('CommandPalette - Resource Sorting', () => {
 
     render(
       <CommandPalette
+        {...defaultProps}
         contexts={['ctx']}
         gvks={gvks}
         favorites={[]}
@@ -446,6 +466,7 @@ describe('CommandPalette - Resource Sorting', () => {
 
     render(
       <CommandPalette
+        {...defaultProps}
         contexts={['ctx']}
         gvks={gvks}
         favorites={[]}

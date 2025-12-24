@@ -12,7 +12,7 @@ import { Badge } from "./ui/badge";
 import { Kbd } from "./ui/kbd";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Spinner } from "./ui/spinner";
-import { Check, X, Star } from "lucide-react";
+import { Check, X, Star, Sun, Moon } from "lucide-react";
 import { useCommandSearch } from "@/hooks/useCommandSearch";
 import { HighlightedText } from "./HighlightedText";
 import { K8sIcon } from "./K8sIcon";
@@ -22,12 +22,14 @@ interface CommandPaletteProps {
   gvks: main.MultiClusterGVK[];
   favorites: main.FavoriteViewResponse[];
   loading: boolean;
+  theme: string | undefined;
   onClose: () => void;
   onGVKSelect: (gvk: main.MultiClusterGVK) => void;
   onFavoriteSelect: (favorite: main.FavoriteViewResponse) => void;
+  onThemeToggle: (event: React.MouseEvent | React.KeyboardEvent) => void;
 }
 
-export function CommandPalette({ contexts, gvks, favorites, loading, onClose, onGVKSelect, onFavoriteSelect }: CommandPaletteProps) {
+export function CommandPalette({ contexts, gvks, favorites, loading, theme, onClose, onGVKSelect, onFavoriteSelect, onThemeToggle }: CommandPaletteProps) {
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const [selectedValue, setSelectedValue] = useState<string>("");
   const [disablePointer, setDisablePointer] = useState(true);
@@ -206,6 +208,47 @@ export function CommandPalette({ contexts, gvks, favorites, loading, onClose, on
                         </CommandItem>
                       );
                     })}
+                  </CommandGroup>
+                )}
+
+                {/* SETTINGS Group - always visible when not searching */}
+                {!query && (
+                  <CommandGroup heading="SETTINGS">
+                    <CommandItem
+                      value="theme-toggle"
+                      onSelect={() => {
+                        // onSelect doesn't provide event - find the item element and use its center
+                        const item = document.querySelector('[data-value="theme-toggle"]');
+                        if (item) {
+                          const rect = item.getBoundingClientRect();
+                          const syntheticEvent = {
+                            clientX: rect.left + rect.width / 2,
+                            clientY: rect.top + rect.height / 2,
+                          } as React.MouseEvent;
+                          onThemeToggle(syntheticEvent);
+                        } else {
+                          const syntheticEvent = {
+                            clientX: window.innerWidth / 2,
+                            clientY: window.innerHeight / 2,
+                          } as React.MouseEvent;
+                          onThemeToggle(syntheticEvent);
+                        }
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onThemeToggle(e);
+                      }}
+                      className="flex items-center gap-2 py-2"
+                    >
+                      {theme === "dark" ? (
+                        <Sun className="h-4 w-4 ml-2" />
+                      ) : (
+                        <Moon className="h-4 w-4 ml-2" />
+                      )}
+                      <span>
+                        {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                      </span>
+                    </CommandItem>
                   </CommandGroup>
                 )}
 
