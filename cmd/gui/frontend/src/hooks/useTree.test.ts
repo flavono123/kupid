@@ -37,6 +37,7 @@ type TreeAction =
   | { type: 'TOGGLE_SELECT_WILDCARD'; wildcardPathKey: string; targetPathKeys: string[]; parentPathKeys: string[] }
   | { type: 'CLEAR_SELECTIONS' }
   | { type: 'SET_SELECTIONS'; paths: Set<string>; parentPathKeys: string[] }
+  | { type: 'REMOVE_STALE_PATHS'; stalePaths: string[] }
   | { type: 'MERGE_TREE_NODES'; additions: { parentPathKey: string; node: TreeNode }[]; removals: string[] };
 
 const initialState: TreeState = {
@@ -193,6 +194,57 @@ function treeReducer(state: TreeState, action: TreeAction): TreeState {
         ...state,
         selectedPaths: action.paths,
         manualExpandedPaths: expanded,
+      };
+    }
+
+    case 'REMOVE_STALE_PATHS': {
+      if (action.stalePaths.length === 0) return state;
+
+      const staleSet = new Set(action.stalePaths);
+
+      // Helper to check if a path is stale or is a child of a stale path
+      const isStaleOrChild = (pathKey: string): boolean => {
+        if (staleSet.has(pathKey)) return true;
+        // Check if any stale path is a prefix of this path
+        for (const stalePath of action.stalePaths) {
+          if (pathKey.startsWith(stalePath + PATH_DELIMITER)) return true;
+        }
+        return false;
+      };
+
+      // Clean up selectedPaths
+      const newSelectedPaths = new Set<string>();
+      state.selectedPaths.forEach((pathKey) => {
+        // Skip wildcard paths (they're virtual) - they'll be handled separately
+        if (pathKey.includes('*')) {
+          // Keep wildcard if its base path still exists
+          const basePath = pathKey.split(PATH_DELIMITER + '*')[0];
+          if (!isStaleOrChild(basePath)) {
+            newSelectedPaths.add(pathKey);
+          }
+        } else if (!isStaleOrChild(pathKey)) {
+          newSelectedPaths.add(pathKey);
+        }
+      });
+
+      // Clean up manualExpandedPaths
+      const newExpandedPaths = new Set<string>();
+      state.manualExpandedPaths.forEach((pathKey) => {
+        if (!isStaleOrChild(pathKey)) {
+          newExpandedPaths.add(pathKey);
+        }
+      });
+
+      // Only return new state if something changed
+      if (newSelectedPaths.size === state.selectedPaths.size &&
+          newExpandedPaths.size === state.manualExpandedPaths.size) {
+        return state;
+      }
+
+      return {
+        ...state,
+        selectedPaths: newSelectedPaths,
+        manualExpandedPaths: newExpandedPaths,
       };
     }
 
@@ -454,6 +506,155 @@ describe('useTree reducer', () => {
     });
   });
 
+  describe('REMOVE_STALE_PATHS (edge case handling)', () => {
+    it('should remove stale paths from selectedPaths', () => {
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['metadata', 'name'].join(PATH_DELIMITER),
+          ['metadata', 'labels', 'app'].join(PATH_DELIMITER),  // will be stale
+          ['spec', 'replicas'].join(PATH_DELIMITER),
+        ]),
+      };
+
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['metadata', 'labels', 'app'].join(PATH_DELIMITER)],
+      });
+
+      expect(result.selectedPaths.has(['metadata', 'name'].join(PATH_DELIMITER))).toBe(true);
+      expect(result.selectedPaths.has(['metadata', 'labels', 'app'].join(PATH_DELIMITER))).toBe(false);
+      expect(result.selectedPaths.has(['spec', 'replicas'].join(PATH_DELIMITER))).toBe(true);
+    });
+
+    it('should remove stale paths from manualExpandedPaths', () => {
+      const state = {
+        ...initialState,
+        manualExpandedPaths: new Set([
+          ['metadata'].join(PATH_DELIMITER),
+          ['metadata', 'labels'].join(PATH_DELIMITER),  // will be stale
+          ['spec'].join(PATH_DELIMITER),
+        ]),
+      };
+
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['metadata', 'labels'].join(PATH_DELIMITER)],
+      });
+
+      expect(result.manualExpandedPaths.has(['metadata'].join(PATH_DELIMITER))).toBe(true);
+      expect(result.manualExpandedPaths.has(['metadata', 'labels'].join(PATH_DELIMITER))).toBe(false);
+      expect(result.manualExpandedPaths.has(['spec'].join(PATH_DELIMITER))).toBe(true);
+    });
+
+    it('should also remove child paths when parent is stale', () => {
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['metadata', 'labels'].join(PATH_DELIMITER),
+          ['metadata', 'labels', 'app'].join(PATH_DELIMITER),  // child of stale
+          ['metadata', 'labels', 'env'].join(PATH_DELIMITER),  // child of stale
+        ]),
+        manualExpandedPaths: new Set([
+          ['metadata'].join(PATH_DELIMITER),
+          ['metadata', 'labels'].join(PATH_DELIMITER),
+        ]),
+      };
+
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['metadata', 'labels'].join(PATH_DELIMITER)],
+      });
+
+      // Parent removed
+      expect(result.selectedPaths.has(['metadata', 'labels'].join(PATH_DELIMITER))).toBe(false);
+      // Children also removed
+      expect(result.selectedPaths.has(['metadata', 'labels', 'app'].join(PATH_DELIMITER))).toBe(false);
+      expect(result.selectedPaths.has(['metadata', 'labels', 'env'].join(PATH_DELIMITER))).toBe(false);
+      // Expanded paths cleaned up too
+      expect(result.manualExpandedPaths.has(['metadata', 'labels'].join(PATH_DELIMITER))).toBe(false);
+      // Parent of stale path should remain
+      expect(result.manualExpandedPaths.has(['metadata'].join(PATH_DELIMITER))).toBe(true);
+    });
+
+    it('should handle wildcard paths correctly', () => {
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['spec', 'containers', '*', 'name'].join(PATH_DELIMITER),  // wildcard path
+          ['spec', 'containers', '0', 'name'].join(PATH_DELIMITER),
+          ['spec', 'containers', '1', 'name'].join(PATH_DELIMITER),
+        ]),
+      };
+
+      // Remove spec.containers (base of the wildcard)
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['spec', 'containers'].join(PATH_DELIMITER)],
+      });
+
+      // Wildcard path should be removed because its base is stale
+      expect(result.selectedPaths.has(['spec', 'containers', '*', 'name'].join(PATH_DELIMITER))).toBe(false);
+      // Children are also removed
+      expect(result.selectedPaths.has(['spec', 'containers', '0', 'name'].join(PATH_DELIMITER))).toBe(false);
+      expect(result.selectedPaths.has(['spec', 'containers', '1', 'name'].join(PATH_DELIMITER))).toBe(false);
+    });
+
+    it('should return same state reference when no paths are stale', () => {
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([['metadata', 'name'].join(PATH_DELIMITER)]),
+        manualExpandedPaths: new Set([['metadata'].join(PATH_DELIMITER)]),
+      };
+
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['nonexistent', 'path'].join(PATH_DELIMITER)],
+      });
+
+      // Same state reference when nothing changed
+      expect(result).toBe(state);
+    });
+
+    it('should return same state reference when stalePaths is empty', () => {
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([['metadata', 'name'].join(PATH_DELIMITER)]),
+      };
+
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [],
+      });
+
+      expect(result).toBe(state);
+    });
+
+    it('should clean up both selectedPaths and manualExpandedPaths atomically', () => {
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['metadata', 'labels', 'app'].join(PATH_DELIMITER),
+        ]),
+        manualExpandedPaths: new Set([
+          ['metadata'].join(PATH_DELIMITER),
+          ['metadata', 'labels'].join(PATH_DELIMITER),
+        ]),
+      };
+
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['metadata', 'labels'].join(PATH_DELIMITER)],
+      });
+
+      // Both should be cleaned up in the same result
+      expect(result.selectedPaths.has(['metadata', 'labels', 'app'].join(PATH_DELIMITER))).toBe(false);
+      expect(result.manualExpandedPaths.has(['metadata', 'labels'].join(PATH_DELIMITER))).toBe(false);
+      // Parent should remain
+      expect(result.manualExpandedPaths.has(['metadata'].join(PATH_DELIMITER))).toBe(true);
+    });
+  });
+
   describe('MERGE_TREE_NODES (placeholder for real-time updates)', () => {
     it('should be a no-op until implemented', () => {
       const state = {
@@ -519,5 +720,36 @@ describe('PATH_DELIMITER', () => {
     const splitPath = pathKey.split(PATH_DELIMITER);
     expect(splitPath).toEqual(path);
     expect(splitPath[2]).toBe(annotationName);
+  });
+});
+
+describe('boundedMatchIndex helper', () => {
+  // Test the bounding logic used in useTree return value
+  const computeBoundedIndex = (currentMatchIndex: number, matchedPathsLength: number) => {
+    return matchedPathsLength > 0
+      ? Math.min(currentMatchIndex, matchedPathsLength - 1)
+      : 0;
+  };
+
+  it('should return 0 when matchedPaths is empty', () => {
+    expect(computeBoundedIndex(5, 0)).toBe(0);
+    expect(computeBoundedIndex(0, 0)).toBe(0);
+  });
+
+  it('should return currentMatchIndex when within bounds', () => {
+    expect(computeBoundedIndex(0, 5)).toBe(0);
+    expect(computeBoundedIndex(2, 5)).toBe(2);
+    expect(computeBoundedIndex(4, 5)).toBe(4);
+  });
+
+  it('should clamp to last index when currentMatchIndex exceeds bounds', () => {
+    // This happens when matchedPaths shrinks but currentMatchIndex hasn't been reset yet
+    expect(computeBoundedIndex(10, 5)).toBe(4);  // max index for length 5 is 4
+    expect(computeBoundedIndex(5, 3)).toBe(2);   // max index for length 3 is 2
+  });
+
+  it('should handle single-item list correctly', () => {
+    expect(computeBoundedIndex(0, 1)).toBe(0);
+    expect(computeBoundedIndex(5, 1)).toBe(0);  // clamped to 0
   });
 });

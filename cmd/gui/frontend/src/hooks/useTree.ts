@@ -59,6 +59,9 @@ type TreeAction =
   | { type: 'CLEAR_SELECTIONS' }
   | { type: 'SET_SELECTIONS'; paths: Set<string>; parentPathKeys: string[] }
 
+  // Cleanup stale paths (from both selection and expansion)
+  | { type: 'REMOVE_STALE_PATHS'; stalePaths: string[] }
+
   // Real-time tree structure updates (batched)
   // - additions: new array indices or map keys discovered from watch events
   // - removals: paths that no longer exist in any watched resource
@@ -227,6 +230,57 @@ function treeReducer(state: TreeState, action: TreeAction): TreeState {
       };
     }
 
+    case 'REMOVE_STALE_PATHS': {
+      if (action.stalePaths.length === 0) return state;
+
+      const staleSet = new Set(action.stalePaths);
+
+      // Helper to check if a path is stale or is a child of a stale path
+      const isStaleOrChild = (pathKey: string): boolean => {
+        if (staleSet.has(pathKey)) return true;
+        // Check if any stale path is a prefix of this path
+        for (const stalePath of action.stalePaths) {
+          if (pathKey.startsWith(stalePath + PATH_DELIMITER)) return true;
+        }
+        return false;
+      };
+
+      // Clean up selectedPaths
+      const newSelectedPaths = new Set<string>();
+      state.selectedPaths.forEach((pathKey) => {
+        // Skip wildcard paths (they're virtual) - they'll be handled separately
+        if (pathKey.includes('*')) {
+          // Keep wildcard if its base path still exists
+          const basePath = pathKey.split(PATH_DELIMITER + '*')[0];
+          if (!isStaleOrChild(basePath)) {
+            newSelectedPaths.add(pathKey);
+          }
+        } else if (!isStaleOrChild(pathKey)) {
+          newSelectedPaths.add(pathKey);
+        }
+      });
+
+      // Clean up manualExpandedPaths
+      const newExpandedPaths = new Set<string>();
+      state.manualExpandedPaths.forEach((pathKey) => {
+        if (!isStaleOrChild(pathKey)) {
+          newExpandedPaths.add(pathKey);
+        }
+      });
+
+      // Only return new state if something changed
+      if (newSelectedPaths.size === state.selectedPaths.size &&
+          newExpandedPaths.size === state.manualExpandedPaths.size) {
+        return state;
+      }
+
+      return {
+        ...state,
+        selectedPaths: newSelectedPaths,
+        manualExpandedPaths: newExpandedPaths,
+      };
+    }
+
     case 'MERGE_TREE_NODES': {
       // TODO: Implement tree merging when real-time updates feature is added
       // This action will:
@@ -364,24 +418,23 @@ export function useTree({
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingRefresh = false;
 
-    const handleEvent = (event: ResourceEvent) => {
-      // Only refresh on ADDED or MODIFIED (which could add new keys/indices)
-      // DELETED doesn't add new tree nodes
-      if (event.type === 'ADDED' || event.type === 'MODIFIED') {
-        pendingRefresh = true;
+    const handleEvent = (_event: ResourceEvent) => {
+      // Refresh tree on any event type:
+      // - ADDED/MODIFIED: may add new keys/indices to tree
+      // - DELETED: may remove nodes if field only existed in deleted resource
+      pendingRefresh = true;
 
-        // Debounce: wait for events to settle before refreshing
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
-        debounceTimer = setTimeout(() => {
-          if (pendingRefresh) {
-            console.log('useTree: refreshing tree due to watch events');
-            fetchNodeTree(true);  // silent refresh - no loading indicator
-            pendingRefresh = false;
-          }
-        }, watchDebounceMs);
+      // Debounce: wait for events to settle before refreshing
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
       }
+      debounceTimer = setTimeout(() => {
+        if (pendingRefresh) {
+          console.log('useTree: refreshing tree due to watch events');
+          fetchNodeTree(true);  // silent refresh - no loading indicator
+          pendingRefresh = false;
+        }
+      }, watchDebounceMs);
     };
 
     const unsubscribe = EventsOn('resource:update', handleEvent);
@@ -601,11 +654,15 @@ export function useTree({
     }
   }, [selectedPaths]);
 
-  // Cleanup stale selections when tree changes (e.g., field removed from all resources)
+  // Cleanup stale paths when tree changes (e.g., field removed from all resources)
+  // This handles both selectedPaths and manualExpandedPaths
   useEffect(() => {
-    if (flatNodesMap.size === 0 || selectedPaths.size === 0) return;
+    if (flatNodesMap.size === 0) return;
+    if (selectedPaths.size === 0 && manualExpandedPaths.size === 0) return;
 
     const stalePaths: string[] = [];
+
+    // Check selectedPaths for stale entries
     selectedPaths.forEach((pathKey) => {
       // Skip wildcard paths (they're virtual)
       if (pathKey.includes('*')) return;
@@ -614,13 +671,18 @@ export function useTree({
       }
     });
 
+    // Check manualExpandedPaths for stale entries
+    manualExpandedPaths.forEach((pathKey) => {
+      if (!flatNodesMap.has(pathKey) && !stalePaths.includes(pathKey)) {
+        stalePaths.push(pathKey);
+      }
+    });
+
     if (stalePaths.length > 0) {
-      console.log('useTree: removing stale selections:', stalePaths);
-      const newPaths = new Set(selectedPaths);
-      stalePaths.forEach((p) => newPaths.delete(p));
-      dispatch({ type: 'SET_SELECTIONS', paths: newPaths, parentPathKeys: [] });
+      console.log('useTree: removing stale paths:', stalePaths);
+      dispatch({ type: 'REMOVE_STALE_PATHS', stalePaths });
     }
-  }, [flatNodesMap, selectedPaths]);
+  }, [flatNodesMap, selectedPaths, manualExpandedPaths]);
 
   const clearAllSelections = useCallback(() => {
     dispatch({ type: 'CLEAR_SELECTIONS' });
@@ -686,6 +748,11 @@ export function useTree({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchVisible, query, navigateMatches, toggleSearch, closeSearch]);
 
+  // Ensure currentMatchIndex is always valid (handles race between matchedPaths shrinking and RESET_MATCH_INDEX effect)
+  const boundedMatchIndex = matchedPaths.length > 0
+    ? Math.min(currentMatchIndex, matchedPaths.length - 1)
+    : 0;
+
   return {
     // State
     nodeTree,
@@ -700,7 +767,7 @@ export function useTree({
     closeSearch,
     matchedPaths,
     searchResultsMap,
-    currentMatchIndex,
+    currentMatchIndex: boundedMatchIndex,
     navigateMatches,
     hasMoreResults,
     debouncedQuery,
