@@ -47,6 +47,7 @@ export function useResourceData(
   contexts: string[],
   options: UseResourceDataOptions = {}
 ): UseResourceDataResult {
+  // TODO: [CONFIG] Move to YAML config. Must sync with useBatchProcessor.ts intervalMs default
   const { watch = true, batchInterval = 100 } = options;
 
   const [data, setData] = useState<any[]>([]);

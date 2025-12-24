@@ -23,6 +23,7 @@ import {
 export function useBatchProcessor(
   pendingEvents: MutableRefObject<ResourceEvent[]>,
   setData: Dispatch<SetStateAction<any[]>>,
+  // TODO: [CONFIG] Move to YAML config. Must sync with useResourceData.ts batchInterval default
   intervalMs: number = 100
 ): CellChange[] {
   const [changedCells, setChangedCells] = useState<CellChange[]>([]);

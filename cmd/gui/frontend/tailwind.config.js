@@ -17,6 +17,7 @@ export default {
   			},
   		},
   		animation: {
+  			// TODO: [CONFIG] Move to YAML config. Must sync with useFlashingCells.ts FLASH_DURATION_MS
   			'cell-flash': 'cell-flash 1s ease-out forwards',
   		},
   		borderRadius: {

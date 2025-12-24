@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CellChange } from '../lib/resource-utils';
 
-/** Duration of flash effect in milliseconds */
+/**
+ * Duration of flash effect in milliseconds
+ * TODO: [CONFIG] Move to YAML config. Must sync with tailwind.config.js cell-flash animation duration
+ */
 const FLASH_DURATION_MS = 1000;
 
 /**
