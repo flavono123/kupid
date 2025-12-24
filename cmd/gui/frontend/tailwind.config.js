@@ -10,6 +10,15 @@ export default {
   		fontFamily: {
   			brand: ['Outfit', 'sans-serif'],
   		},
+  		keyframes: {
+  			'cell-flash': {
+  				'0%': { backgroundColor: 'hsl(var(--accent) / 0.10)' },
+  				'100%': { backgroundColor: 'transparent' },
+  			},
+  		},
+  		animation: {
+  			'cell-flash': 'cell-flash 1s ease-out forwards',
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',

@@ -9,11 +9,13 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { rankItem } from '@tanstack/match-sorter-utils';
+import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
 import { ResultTableToolbar } from './ResultTableToolbar';
 import { useCellHighlight } from '../hooks/useCellHighlight';
 import { useResourceData } from '../hooks/useResourceData';
+import { useFlashingCells } from '../hooks/useFlashingCells';
 import type { main } from '../../wailsjs/go/models';
 
 interface ResultTableProps {
@@ -44,12 +46,15 @@ export function ResultTable({
   selectedGVK,
   connectedContexts,
 }: ResultTableProps) {
-  // Use extracted hook for data fetching (watch enabled for future real-time updates)
-  const { data, loading, getRowId } = useResourceData(
+  // Use extracted hook for data fetching (watch enabled for real-time updates)
+  const { data, loading, getRowId, changedCells } = useResourceData(
     selectedGVK,
     connectedContexts,
     { watch: true }
   );
+
+  // Track flashing cells for real-time update visualization
+  const { isFlashing } = useFlashingCells(changedCells);
 
   const [globalFilter, setGlobalFilter] = useState('');
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -288,7 +293,10 @@ export function ResultTable({
                     {row.getVisibleCells().map((cell) => (
                       <div
                         key={cell.id}
-                        className="px-4 py-1 text-sm flex-shrink-0"
+                        className={cn(
+                          "px-4 py-1 text-sm flex-shrink-0",
+                          isFlashing(row.id, cell.column.id) && "animate-cell-flash"
+                        )}
                         style={{
                           width: `${cell.column.getSize()}px`,
                           minWidth: `${cell.column.getSize()}px`,

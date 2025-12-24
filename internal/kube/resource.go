@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,6 +40,8 @@ type ResourceController struct {
 	gvr         schema.GroupVersionResource
 	store       cache.Store
 	emitCh      chan emitMsg
+	doneCh      chan struct{} // signals that controller is closed (for event consumers)
+	closed      atomic.Bool   // guards trySend to prevent sends after close
 }
 
 // NewResourceController creates a controller for the current context (legacy, kept for TUI compatibility)
@@ -62,7 +65,8 @@ func NewResourceControllerForContext(contextName string, gvr schema.GroupVersion
 		contextName: contextName,
 		client:      client,
 		gvr:         gvr,
-		emitCh:      make(chan emitMsg, 1),
+		emitCh:      make(chan emitMsg, 256),
+		doneCh:      make(chan struct{}),
 	}
 }
 
@@ -102,16 +106,14 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 				if !ok {
 					return
 				}
-
-				go func() { i.emitCh <- emitMsg{Type: EventAdded, Obj: u} }()
+				i.trySend(emitMsg{Type: EventAdded, Obj: u})
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				n, ok := newObj.(*unstructured.Unstructured)
 				if !ok {
 					return
 				}
-
-				go func() { i.emitCh <- emitMsg{Type: EventModified, Obj: n} }()
+				i.trySend(emitMsg{Type: EventModified, Obj: n})
 			},
 			DeleteFunc: func(obj interface{}) {
 				var d *unstructured.Unstructured
@@ -129,8 +131,7 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 						return
 					}
 				}
-
-				go func() { i.emitCh <- emitMsg{Type: EventDeleted, Obj: d} }()
+				i.trySend(emitMsg{Type: EventDeleted, Obj: d})
 			},
 		},
 	}
@@ -158,4 +159,34 @@ func (i *ResourceController) WatchEvents() <-chan WatchEvent {
 // Deprecated: use WatchEvents instead
 func (i *ResourceController) EventEmitted() <-chan emitMsg {
 	return i.emitCh
+}
+
+// trySend attempts to send an event to the channel without blocking.
+// If the channel buffer is full or controller is closed, the event is dropped.
+// This is safe for Kubernetes watch events since they send full object state.
+func (i *ResourceController) trySend(msg emitMsg) {
+	if i.closed.Load() {
+		return
+	}
+	select {
+	case i.emitCh <- msg:
+	default:
+		// buffer full, drop event (next event will have latest state)
+	}
+}
+
+// Done returns a channel that is closed when the controller is closed.
+// Use this to detect when to stop consuming events from WatchEvents().
+func (i *ResourceController) Done() <-chan struct{} {
+	return i.doneCh
+}
+
+// Close marks the controller as closed and signals consumers to stop.
+// After Close is called, new events will be dropped.
+// It is safe to call Close multiple times (subsequent calls are no-ops).
+func (i *ResourceController) Close() {
+	// Use atomic.Bool to ensure we only close doneCh once
+	if i.closed.CompareAndSwap(false, true) {
+		close(i.doneCh)
+	}
 }

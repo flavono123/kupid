@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { getResourceKey, applyBatchEvents, type ResourceEvent } from './resource-utils';
+import {
+  getResourceKey,
+  applyBatchEvents,
+  applyBatchEventsWithChanges,
+  diffFields,
+  type ResourceEvent,
+} from './resource-utils';
 
 describe('getResourceKey', () => {
   it('should generate key from context, namespace, and name', () => {
@@ -217,5 +223,173 @@ describe('Performance characteristics', () => {
     expect(result).toHaveLength(1000);
     // Should complete in reasonable time (< 100ms)
     expect(duration).toBeLessThan(100);
+  });
+});
+
+describe('diffFields', () => {
+  it('should return empty array for identical objects', () => {
+    const obj = { a: 1, b: 'hello' };
+    expect(diffFields(obj, obj)).toEqual([]);
+  });
+
+  it('should detect changed leaf values', () => {
+    const prev = { status: { phase: 'Running' } };
+    const next = { status: { phase: 'Pending' } };
+    expect(diffFields(prev, next)).toContain('status.phase');
+  });
+
+  it('should detect multiple changed fields', () => {
+    const prev = { a: 1, b: 2, c: 3 };
+    const next = { a: 1, b: 20, c: 30 };
+    const changes = diffFields(prev, next);
+    expect(changes).toContain('b');
+    expect(changes).toContain('c');
+    expect(changes).not.toContain('a');
+  });
+
+  it('should detect deeply nested changes', () => {
+    const prev = { spec: { containers: { image: 'nginx:1.0' } } };
+    const next = { spec: { containers: { image: 'nginx:2.0' } } };
+    expect(diffFields(prev, next)).toContain('spec.containers.image');
+  });
+
+  it('should detect added fields', () => {
+    const prev = { a: 1 };
+    const next = { a: 1, b: 2 };
+    expect(diffFields(prev, next)).toContain('b');
+  });
+
+  it('should detect removed fields', () => {
+    const prev = { a: 1, b: 2 };
+    const next = { a: 1 };
+    expect(diffFields(prev, next)).toContain('b');
+  });
+
+  it('should handle null to value change', () => {
+    const prev = { a: null };
+    const next = { a: 'value' };
+    expect(diffFields(prev, next)).toContain('a');
+  });
+
+  it('should handle value to null change', () => {
+    const prev = { a: 'value' };
+    const next = { a: null };
+    expect(diffFields(prev, next)).toContain('a');
+  });
+
+  it('should handle undefined to value change', () => {
+    const prev = { a: undefined };
+    const next = { a: 'value' };
+    expect(diffFields(prev, next)).toContain('a');
+  });
+
+  it('should treat array changes as single field change', () => {
+    const prev = { items: [1, 2, 3] };
+    const next = { items: [1, 2, 3, 4] };
+    expect(diffFields(prev, next)).toEqual(['items']);
+  });
+
+  it('should return empty for identical arrays', () => {
+    const prev = { items: [1, 2, 3] };
+    const next = { items: [1, 2, 3] };
+    expect(diffFields(prev, next)).toEqual([]);
+  });
+
+  it('should handle empty objects', () => {
+    expect(diffFields({}, {})).toEqual([]);
+  });
+
+  it('should handle both null', () => {
+    expect(diffFields(null, null)).toEqual([]);
+  });
+
+  it('should handle one null one object', () => {
+    expect(diffFields(null, { a: 1 })).toEqual([]);
+    expect(diffFields({ a: 1 }, null)).toEqual([]);
+  });
+});
+
+describe('applyBatchEventsWithChanges', () => {
+  const createResource = (context: string, namespace: string, name: string, extra: Record<string, any> = {}) => ({
+    _context: context,
+    metadata: { namespace, name },
+    ...extra,
+  });
+
+  it('should return empty changes for empty events', () => {
+    const data = [createResource('cluster1', 'default', 'pod-1')];
+    const result = applyBatchEventsWithChanges(data, []);
+
+    expect(result.data).toBe(data);
+    expect(result.changes).toEqual([]);
+  });
+
+  it('should track changes on MODIFIED event', () => {
+    const data = [
+      createResource('cluster1', 'default', 'pod-1', { status: { phase: 'Running' } }),
+    ];
+    const updated = createResource('cluster1', 'default', 'pod-1', { status: { phase: 'Pending' } });
+
+    const result = applyBatchEventsWithChanges(data, [
+      { type: 'MODIFIED', object: updated },
+    ]);
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].status.phase).toBe('Pending');
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0].rowId).toBe('cluster1/default/pod-1');
+    expect(result.changes[0].columnId).toBe('status.phase');
+  });
+
+  it('should not track changes for ADDED event', () => {
+    const data: any[] = [];
+    const newPod = createResource('cluster1', 'default', 'pod-1');
+
+    const result = applyBatchEventsWithChanges(data, [
+      { type: 'ADDED', object: newPod },
+    ]);
+
+    expect(result.data).toHaveLength(1);
+    expect(result.changes).toEqual([]);
+  });
+
+  it('should not track changes for DELETED event', () => {
+    const data = [createResource('cluster1', 'default', 'pod-1')];
+
+    const result = applyBatchEventsWithChanges(data, [
+      { type: 'DELETED', object: createResource('cluster1', 'default', 'pod-1') },
+    ]);
+
+    expect(result.data).toHaveLength(0);
+    expect(result.changes).toEqual([]);
+  });
+
+  it('should track multiple field changes in single MODIFIED event', () => {
+    const data = [
+      createResource('cluster1', 'default', 'pod-1', { a: 1, b: 2 }),
+    ];
+    const updated = createResource('cluster1', 'default', 'pod-1', { a: 10, b: 20 });
+
+    const result = applyBatchEventsWithChanges(data, [
+      { type: 'MODIFIED', object: updated },
+    ]);
+
+    expect(result.changes).toHaveLength(2);
+    expect(result.changes.map(c => c.columnId)).toContain('a');
+    expect(result.changes.map(c => c.columnId)).toContain('b');
+  });
+
+  it('should include timestamp in changes', () => {
+    const now = Date.now();
+    const data = [
+      createResource('cluster1', 'default', 'pod-1', { value: 1 }),
+    ];
+    const updated = createResource('cluster1', 'default', 'pod-1', { value: 2 });
+
+    const result = applyBatchEventsWithChanges(data, [
+      { type: 'MODIFIED', object: updated },
+    ]);
+
+    expect(result.changes[0].timestamp).toBeGreaterThanOrEqual(now);
   });
 });

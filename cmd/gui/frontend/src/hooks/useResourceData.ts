@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetResources, StartWatch, StopWatch } from '../../wailsjs/go/main/App';
 import type { main } from '../../wailsjs/go/models';
-import { getResourceKey, type ResourceEvent } from '../lib/resource-utils';
+import { getResourceKey, type ResourceEvent, type CellChange } from '../lib/resource-utils';
 import { useBatchProcessor } from './useBatchProcessor';
 
 // Watch connection status
@@ -28,6 +28,8 @@ export interface UseResourceDataResult {
   watchStatus: WatchStatus;
   /** Get stable row ID for TanStack Table */
   getRowId: (row: any) => string;
+  /** Cells that changed in the most recent batch update */
+  changedCells: CellChange[];
 }
 
 /**
@@ -133,7 +135,7 @@ export function useResourceData(
   }, [watch, gvk, contexts]);
 
   // Setup batch processor (only processes when events are pending)
-  useBatchProcessor(pendingEvents, setData, batchInterval);
+  const changedCells = useBatchProcessor(pendingEvents, setData, batchInterval);
 
   // Manual refresh
   const refresh = useCallback(() => {
@@ -168,5 +170,6 @@ export function useResourceData(
     refresh,
     watchStatus,
     getRowId,
+    changedCells,
   };
 }

@@ -9,12 +9,13 @@ function useTestBatchProcessor(intervalMs: number = 100) {
   const [data, setData] = useState<any[]>([]);
   const pendingEvents = useRef<ResourceEvent[]>([]);
 
-  useBatchProcessor(pendingEvents, setData, intervalMs);
+  const changedCells = useBatchProcessor(pendingEvents, setData, intervalMs);
 
   return {
     data,
     setData,
     pendingEvents,
+    changedCells,
     pushEvent: (event: ResourceEvent) => {
       pendingEvents.current.push(event);
     },
@@ -221,5 +222,87 @@ describe('useBatchProcessor', () => {
 
     expect(result.current.data).toHaveLength(50);
     expect(result.current.pendingEvents.current.length).toBe(0);
+  });
+
+  it('should return empty changedCells initially', () => {
+    const { result } = renderHook(() => useTestBatchProcessor(100));
+    expect(result.current.changedCells).toEqual([]);
+  });
+
+  it('should return changedCells for MODIFIED events', () => {
+    const { result } = renderHook(() => useTestBatchProcessor(100));
+
+    // Add initial data
+    act(() => {
+      result.current.setData([
+        { _context: 'c1', metadata: { namespace: 'ns', name: 'pod-1' }, status: { phase: 'Running' } },
+      ]);
+    });
+
+    // Push a MODIFIED event
+    act(() => {
+      result.current.pushEvent({
+        type: 'MODIFIED',
+        object: { _context: 'c1', metadata: { namespace: 'ns', name: 'pod-1' }, status: { phase: 'Pending' } },
+      });
+    });
+
+    // Flush
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(result.current.changedCells).toHaveLength(1);
+    expect(result.current.changedCells[0].rowId).toBe('c1/ns/pod-1');
+    expect(result.current.changedCells[0].columnId).toBe('status.phase');
+  });
+
+  it('should not return changedCells for ADDED events', () => {
+    const { result } = renderHook(() => useTestBatchProcessor(100));
+
+    act(() => {
+      result.current.pushEvent({
+        type: 'ADDED',
+        object: { _context: 'c1', metadata: { namespace: 'ns', name: 'pod-1' } },
+      });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(result.current.changedCells).toEqual([]);
+  });
+
+  it('should clear changedCells when no events in next batch', () => {
+    const { result } = renderHook(() => useTestBatchProcessor(100));
+
+    // Add initial data and modify
+    act(() => {
+      result.current.setData([
+        { _context: 'c1', metadata: { namespace: 'ns', name: 'pod-1' }, value: 1 },
+      ]);
+    });
+
+    act(() => {
+      result.current.pushEvent({
+        type: 'MODIFIED',
+        object: { _context: 'c1', metadata: { namespace: 'ns', name: 'pod-1' }, value: 2 },
+      });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(result.current.changedCells).toHaveLength(1);
+
+    // Wait another interval with no events
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    // changedCells should remain the same (no new flush occurred)
+    expect(result.current.changedCells).toHaveLength(1);
   });
 });

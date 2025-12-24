@@ -63,6 +63,14 @@ func (a *App) startup(ctx context.Context) {
 	}
 }
 
+// shutdown is called when the app is closing.
+// Cleans up resources including active watches.
+func (a *App) shutdown(ctx context.Context) {
+	log.Printf("App shutting down, cleaning up resources...")
+	a.StopWatch()
+	log.Printf("App shutdown complete")
+}
+
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, It's show time!", name)
@@ -432,19 +440,27 @@ func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
 		wg.Add(1)
 		go func(ctx string, ctrl *kube.ResourceController) {
 			defer wg.Done()
-			for event := range ctrl.WatchEvents() {
-				obj := event.Obj.Object
-				obj["_context"] = ctx
+			for {
+				select {
+				case event := <-ctrl.WatchEvents():
+					if event.Obj == nil {
+						continue // skip invalid events
+					}
+					obj := event.Obj.Object
+					obj["_context"] = ctx
 
-				resourceEvent := ResourceEvent{
-					Type:      string(event.Type),
-					Context:   ctx,
-					Namespace: event.Obj.GetNamespace(),
-					Name:      event.Obj.GetName(),
-					Object:    obj,
+					resourceEvent := ResourceEvent{
+						Type:      string(event.Type),
+						Context:   ctx,
+						Namespace: event.Obj.GetNamespace(),
+						Name:      event.Obj.GetName(),
+						Object:    obj,
+					}
+
+					runtime.EventsEmit(a.ctx, "resource:update", resourceEvent)
+				case <-ctrl.Done():
+					return
 				}
-
-				runtime.EventsEmit(a.ctx, "resource:update", resourceEvent)
 			}
 		}(contextName, controller)
 	}
@@ -471,6 +487,11 @@ func (a *App) StopWatch() {
 	// Close all stop channels to stop informers
 	for _, stopCh := range a.stopChs {
 		close(stopCh)
+	}
+
+	// Close all controllers to unblock goroutines and release resources
+	for _, wc := range a.controllers {
+		wc.controller.Close()
 	}
 
 	// Wait for event forwarders to finish (with timeout)
