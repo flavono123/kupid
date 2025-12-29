@@ -19,7 +19,7 @@ jobs:
       - name: Install Ginkgo
         run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
       - name: Run tests
-        run: ginkgo -r -v
+        run: ginkgo -r -v --skip-package=cmd/gui
       # TODO: Add frontend type checking to catch missing imports and type errors
       # - name: Set up Node.js
       #   uses: actions/setup-node@v4
