@@ -36,7 +36,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const navigationPanelRef = useRef<NavigationPanelHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
 
   // Handle theme toggle with animation
   const handleThemeToggle = useCallback((event: React.MouseEvent | React.KeyboardEvent) => {
