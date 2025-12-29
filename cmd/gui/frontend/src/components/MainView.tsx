@@ -36,12 +36,12 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const navigationPanelRef = useRef<NavigationPanelHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   // Handle theme toggle with animation
   const handleThemeToggle = useCallback((event: React.MouseEvent | React.KeyboardEvent) => {
-    toggleThemeWithAnimation(event, theme, setTheme);
-  }, [theme, setTheme]);
+    toggleThemeWithAnimation(event, resolvedTheme, setTheme);
+  }, [resolvedTheme, setTheme]);
 
   // Convert selectedFields to Set<string> for favorite comparison
   const selectedPaths = useMemo(() => {
@@ -300,7 +300,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
           gvks={gvks}
           favorites={allFavorites}
           loading={loading}
-          theme={theme}
+          theme={resolvedTheme}
           onClose={() => setShowCommandPalette(false)}
           onGVKSelect={(gvk) => {
             setSelectedGVK(gvk);
