@@ -85,3 +85,25 @@
     }
 }
 
+/* CTA pulse animation for visibility */
+@keyframes cta-pulse {
+  0%, 100% {
+    background-color: hsl(var(--accent) / 0.15);
+    color: hsl(var(--accent));
+  }
+  50% {
+    background-color: hsl(var(--accent) / 0.25);
+    color: hsl(var(--accent-foreground));
+  }
+}
+
+.animate-cta-pulse {
+  animation: cta-pulse 2s ease-in-out infinite;
+}
+
+.animate-cta-pulse:hover {
+  animation: none;
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+

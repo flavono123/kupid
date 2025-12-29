@@ -243,10 +243,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 <div className="h-full flex items-center justify-center px-4">
                   <Button
                     variant="ghost"
-                    className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground"
+                    className="text-sm flex items-center gap-1 rounded-lg px-4 py-2 animate-cta-pulse"
                     onClick={() => setShowCommandPalette(true)}
                   >
-                    Press <Kbd>⌘</Kbd><Kbd>K</Kbd> to select a resource
+                    Press <Kbd>⌘</Kbd><Kbd>K</Kbd> to show schema fields
                   </Button>
                 </div>
               )}
@@ -282,7 +282,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               <div className="h-full flex items-center justify-center px-4">
                 <Button
                   variant="ghost"
-                  className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground"
+                  className="text-sm flex items-center gap-1 rounded-lg px-4 py-2 animate-cta-pulse"
                   onClick={() => setShowCommandPalette(true)}
                 >
                   Press <Kbd>⌘</Kbd><Kbd>K</Kbd> to select a resource
