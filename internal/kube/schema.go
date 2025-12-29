@@ -12,10 +12,17 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
+// GetDocument retrieves the OpenAPI document for a GVR from the current context (legacy, kept for TUI compatibility)
 func GetDocument(gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
+	return getDocumentForContext("", gvr)
+}
+
+// getDocumentForContext retrieves the OpenAPI document for a GVR from the specified context
+// If contextName is empty, uses the current context
+func getDocumentForContext(contextName string, gvr schema.GroupVersionResource) (*spec3.OpenAPI, error) {
 	var result *spec3.OpenAPI
 
-	discoveryClient, err := DiscoveryClient()
+	discoveryClient, err := DiscoveryClientForContext(contextName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery client: %v", err)
 	}
@@ -47,57 +54,8 @@ func getPathPrefix(gvr schema.GroupVersionResource) string {
 	return "/api"
 }
 
-func FindGVK(document *spec3.OpenAPI, paths []string) *schema.GroupVersionKind {
-	methods := []string{"get", "post", "put", "patch", "delete"}
-
-	// 각 경로에 대해 검색
-	for _, searchPath := range paths {
-		// paths에서 해당 경로의 PathItem 찾기
-		pathItem, exists := document.Paths.Paths[searchPath]
-		if !exists {
-			continue
-		}
-
-		// 각 HTTP 메서드에 대해 검색
-		for _, method := range methods {
-			var operation *spec3.Operation
-			// 메서드에 따라 적절한 Operation 가져오기
-			switch method {
-			case "get":
-				operation = pathItem.Get
-			case "post":
-				operation = pathItem.Post
-			case "put":
-				operation = pathItem.Put
-			case "patch":
-				operation = pathItem.Patch
-			case "delete":
-				operation = pathItem.Delete
-			}
-
-			if operation == nil {
-				continue
-			}
-
-			// x-kubernetes-group-version-kind 확장 필드 확인
-			if gvk, exists := operation.Extensions["x-kubernetes-group-version-kind"]; exists {
-				// Extension은 interface{}로 저장되어 있으므로 적절한 타입으로 변환
-				if gvkMap, ok := gvk.(map[string]interface{}); ok {
-					return &schema.GroupVersionKind{
-						Group:   gvkMap["group"].(string),
-						Version: gvkMap["version"].(string),
-						Kind:    gvkMap["kind"].(string),
-					}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// FindSchema searches for a schema with the given GVK in the OpenAPI document
-func FindSchema(document *spec3.OpenAPI, gvk schema.GroupVersionKind) (*spec.Schema, error) {
+// findSchema searches for a schema with the given GVK in the OpenAPI document
+func findSchema(document *spec3.OpenAPI, gvk schema.GroupVersionKind) (*spec.Schema, error) {
 	// components/schemas에서 GVK에 해당하는 스키마 찾기
 	for _, schema := range document.Components.Schemas {
 		if matchXKubeGVK(schema.Extensions, gvk) {
@@ -127,25 +85,32 @@ func matchXKubeGVK(extension spec.Extensions, gvk schema.GroupVersionKind) bool 
 	return false
 }
 
+// CreateFieldTree creates a field tree for a GVK from the current context (legacy, kept for TUI compatibility)
 func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
-	gvr, err := GetGVR(gvk)
+	return CreateFieldTreeForContext("", gvk)
+}
+
+// CreateFieldTreeForContext creates a field tree for a GVK from the specified context
+// If contextName is empty, uses the current context
+func CreateFieldTreeForContext(contextName string, gvk schema.GroupVersionKind) (map[string]*Field, error) {
+	gvr, err := GetGVRForContext(contextName, gvk)
 	if err != nil {
 		return nil, err
 	}
-	document, err := GetDocument(gvr)
+	document, err := getDocumentForContext(contextName, gvr)
 	if err != nil {
 		return nil, err
 	}
-	schema, err := FindSchema(document, gvk)
+	schema, err := findSchema(document, gvk)
 	if err != nil {
 		return nil, err
 	}
 	history := make(map[string]bool)
 
-	// 참조 문자열 가져오기
+	// Get reference string
 	refString := schema.Ref.String()
 
-	// 순환 참조 감지
+	// Circular reference detection (commented out for now)
 	// if refString != "" {
 	// 	if history[refString] {
 	// 		return nil, nil
@@ -153,7 +118,7 @@ func CreateFieldTree(gvk schema.GroupVersionKind) (map[string]*Field, error) {
 	// 	history[refString] = true
 	// }
 
-	// 스키마 해석 (참조인 경우 참조를 따라감
+	// Resolve schema reference if exists
 	if resolved := resolveRef(refString, document); resolved != nil {
 		schema = resolved
 	}

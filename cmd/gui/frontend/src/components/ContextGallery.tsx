@@ -1,0 +1,436 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ListContexts, RefreshContexts, ConnectToContexts } from "../../wailsjs/go/main/App";
+import { K8sIcon } from "./K8sIcon";
+import { KattleLogo } from "./KattleLogo";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { Spinner } from "./ui/spinner";
+import { Search, X, RefreshCw } from "lucide-react";
+import { useFuzzySearch } from "@/hooks/useFuzzySearch";
+import { HighlightedText } from "./HighlightedText";
+import { Kbd } from "./ui/kbd";
+import { toast } from "sonner";
+
+interface ContextGalleryProps {
+  onContextsConnected: (selectedContexts: string[], connectedContexts: string[]) => void;
+  onLogoClick?: () => void;
+}
+
+export function ContextGallery({ onContextsConnected, onLogoClick }: ContextGalleryProps) {
+  const [contexts, setContexts] = useState<string[]>([]);
+  const [selectedContexts, setSelectedContexts] = useState<Set<string>>(new Set());
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    // Load contexts on mount
+    ListContexts().then(setContexts);
+  }, []);
+
+  // Fuzzy search hook with fuzzysort
+  const { query, setQuery, results } = useFuzzySearch(contexts);
+
+  // Results are already processed by useFuzzySearch
+  const filteredContexts = results;
+
+  const handleConnect = useCallback(async (contextsToConnect?: Set<string>) => {
+    const contexts = contextsToConnect || selectedContexts;
+    console.log("handleConnect called, contexts:", contexts);
+    if (contexts.size === 0) {
+      console.log("No contexts selected");
+      return;
+    }
+
+    setIsConnecting(true);
+    const contextsArray = Array.from(contexts);
+
+    try {
+      const results = await ConnectToContexts(contextsArray);
+
+      // Filter successful connections
+      const successful = results
+        .filter((r) => r.success)
+        .map((r) => r.context);
+
+      const failed = results.filter((r) => !r.success);
+
+      // Show toast notifications
+      if (successful.length > 0) {
+        toast.success(`Connected to ${successful.length} context${successful.length > 1 ? 's' : ''}`, {
+          description: successful.join(', '),
+        });
+      }
+
+      if (failed.length > 0) {
+        failed.forEach((f) => {
+          toast.error(`Failed to connect to ${f.context}`, {
+            description: f.error,
+          });
+        });
+      }
+
+      // If at least one context connected successfully, navigate to main view
+      if (successful.length > 0) {
+        onContextsConnected(Array.from(contexts), successful);
+      }
+    } catch (error) {
+      console.error("Connection error:", error);
+      toast.error("Connection failed", {
+        description: String(error),
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [selectedContexts, onContextsConnected]);
+
+  const handleCardClick = useCallback((context: string, index: number) => {
+    // Update focus and selection immediately for responsive UX
+    setFocusedIndex(index);
+    setSelectedContexts((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(context)) {
+        newSelected.delete(context);
+      } else {
+        newSelected.add(context);
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const handleCardDoubleClick = useCallback((context: string, _index: number) => {
+    // Calculate which contexts to connect
+    const contextsToConnect = new Set(selectedContexts);
+    contextsToConnect.add(context); // Ensure the double-clicked card is included
+
+    // Update selection state
+    setSelectedContexts(contextsToConnect);
+
+    // Connect with the calculated contexts immediately
+    handleConnect(contextsToConnect);
+  }, [selectedContexts, handleConnect]);
+
+  const handleClearAll = useCallback(() => {
+    setSelectedContexts(new Set());
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    const newContexts = await RefreshContexts();
+    setContexts(newContexts);
+    toast.success("Contexts refreshed");
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+R / Ctrl+R: Refresh contexts
+      if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+        e.preventDefault();
+        handleRefresh();
+        return;
+      }
+
+      // Cmd+F / Ctrl+F: Focus search input
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // Tab: Toggle focus between search and contexts
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (isSearchFocused) {
+          // Focus first context
+          searchInputRef.current?.blur();
+          if (filteredContexts.length > 0) {
+            setFocusedIndex(0);
+          }
+        } else {
+          // Focus search
+          setFocusedIndex(null);
+          searchInputRef.current?.focus();
+        }
+        return;
+      }
+
+      // Esc: Clear all selections
+      if (e.key === 'Escape') {
+        if (selectedContexts.size > 0) {
+          handleClearAll();
+        }
+        return;
+      }
+
+      // Don't handle other keys if search input is focused
+      if (isSearchFocused) {
+        return;
+      }
+
+      // Arrow keys: Navigate grid
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+
+        if (filteredContexts.length === 0) return;
+
+        let newIndex: number;
+
+        if (focusedIndex === null) {
+          // Start at first item
+          newIndex = 0;
+        } else {
+          const cols = 3;
+
+          switch (e.key) {
+            case 'ArrowUp':
+              newIndex = focusedIndex - cols;
+              if (newIndex < 0) newIndex = focusedIndex; // Stay at current position
+              break;
+            case 'ArrowDown':
+              newIndex = focusedIndex + cols;
+              if (newIndex >= filteredContexts.length) newIndex = focusedIndex; // Stay at current position
+              break;
+            case 'ArrowLeft':
+              newIndex = focusedIndex - 1;
+              if (newIndex < 0) newIndex = 0;
+              break;
+            case 'ArrowRight':
+              newIndex = focusedIndex + 1;
+              if (newIndex >= filteredContexts.length) newIndex = filteredContexts.length - 1;
+              break;
+            default:
+              newIndex = focusedIndex;
+          }
+        }
+
+        setFocusedIndex(newIndex);
+        return;
+      }
+
+      // Space: Toggle selection of focused item
+      if (e.key === ' ' && focusedIndex !== null) {
+        e.preventDefault();
+        const focusedContext = filteredContexts[focusedIndex];
+        if (focusedContext) {
+          handleCardClick(focusedContext.item, focusedIndex);
+        }
+        return;
+      }
+
+      // Enter: Connect to selected contexts
+      if (e.key === 'Enter' && selectedContexts.size > 0) {
+        e.preventDefault();
+        handleConnect(selectedContexts);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusedIndex, filteredContexts, selectedContexts, isSearchFocused, handleCardClick, handleConnect, handleClearAll, handleRefresh]);
+
+  // Reset focused index when filtered contexts change
+  useEffect(() => {
+    if (focusedIndex !== null && focusedIndex >= filteredContexts.length) {
+      setFocusedIndex(filteredContexts.length > 0 ? 0 : null);
+    }
+  }, [filteredContexts, focusedIndex]);
+
+  // Scroll focused card into view
+  useEffect(() => {
+    if (focusedIndex !== null) {
+      const card = cardRefs.current.get(focusedIndex);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [focusedIndex]);
+
+  return (
+    <div className="h-screen bg-background flex flex-col">
+      <div className="max-w-7xl mx-auto w-full flex flex-col h-full px-8">
+        {/* Top Spacer - 1/3 */}
+        <div className="flex-1 flex flex-col justify-end pb-8">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-3 mb-6">
+              {/* Kattle Logo */}
+              <KattleLogo size="md" onClick={onLogoClick} />
+              <div className="flex-1">
+                <h1 className="font-brand text-2xl font-bold tracking-tight text-foreground">kattle</h1>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Bar with Contexts count */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="relative w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search contexts..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  className="pl-9"
+                />
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {selectedContexts.size > 0 ? `${selectedContexts.size}/` : ""}{filteredContexts.length} contexts
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefresh}
+                className="h-8 w-8 p-0"
+                title="Refresh contexts"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              {selectedContexts.size > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearAll}
+                  className="gap-1"
+                >
+                  <X className="w-4 h-4" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Middle Content - 1/3 */}
+        <div className="flex-1 overflow-y-auto py-8">
+          <div className="grid grid-cols-3 gap-x-2 gap-y-2">
+            {filteredContexts.map(({ item, indices }, index) => {
+              const isSelected = selectedContexts.has(item);
+              const isFocused = focusedIndex === index;
+
+              return (
+                <div
+                  key={item}
+                  ref={(el) => {
+                    if (el) {
+                      cardRefs.current.set(index, el);
+                    } else {
+                      cardRefs.current.delete(index);
+                    }
+                  }}
+                >
+                  <Card
+                    onClick={() => handleCardClick(item, index)}
+                    onDoubleClick={() => handleCardDoubleClick(item, index)}
+                    className={`
+                      px-3 py-1 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5
+                      ${isSelected ? "bg-accent" : ""}
+                      ${isFocused
+                        ? "ring-2 ring-ring ring-offset-2"
+                        : ""
+                      }
+                    `}
+                  >
+                    <div className="flex items-center gap-3">
+                      <K8sIcon className="w-10 h-10 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base truncate">
+                          <HighlightedText text={item} indices={indices} />
+                        </h3>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Bottom Spacer - 1/3 */}
+        <div className="flex-1 flex flex-col justify-between pt-8">
+          <div className="flex-shrink-0 flex justify-center border-t pt-6">
+            <Button
+              onClick={() => handleConnect(selectedContexts)}
+              disabled={selectedContexts.size === 0 || isConnecting}
+              size="lg"
+            >
+              {isConnecting ? (
+                <>
+                  <Spinner className="w-4 h-4 mr-2" />
+                  Connecting...
+                </>
+              ) : (
+                "Connect →"
+              )}
+            </Button>
+          </div>
+
+          {/* Keyboard shortcuts guide */}
+          <div className="flex-shrink-0 pb-4 flex gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Kbd>⌘</Kbd>
+              <Kbd>R</Kbd>
+              <span>Refresh</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Kbd>⌘</Kbd>
+              <Kbd>F</Kbd>
+              <span>Search</span>
+            </div>
+
+            {isSearchFocused ? (
+              // Search focused shortcuts
+              <>
+                <div className="flex items-center gap-1">
+                  <Kbd>Tab</Kbd>
+                  <span>Focus contexts</span>
+                </div>
+              </>
+            ) : (
+              // Context focused shortcuts
+              <>
+                <div className="flex items-center gap-1">
+                  <Kbd>Tab</Kbd>
+                  <span>Focus search</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Kbd>↑</Kbd>
+                  <Kbd>↓</Kbd>
+                  <Kbd>←</Kbd>
+                  <Kbd>→</Kbd>
+                  <span>Navigate</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Kbd>Space</Kbd>
+                  <span>Select</span>
+                </div>
+              </>
+            )}
+
+            {/* Common shortcuts */}
+            {selectedContexts.size > 0 && (
+              <div className="flex items-center gap-1">
+                <Kbd>Enter</Kbd>
+                <span>Connect</span>
+              </div>
+            )}
+
+            {selectedContexts.size > 0 && (
+              <div className="flex items-center gap-1">
+                <Kbd>Esc</Kbd>
+                <span>Clear</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

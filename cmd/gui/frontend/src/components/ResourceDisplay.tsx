@@ -1,0 +1,30 @@
+import { main } from "../../wailsjs/go/models";
+
+interface ResourceDisplayProps {
+  selectedGVK: main.MultiClusterGVK | null;
+  className?: string;
+}
+
+export function ResourceDisplay({
+  selectedGVK,
+  className = "",
+}: ResourceDisplayProps) {
+  if (!selectedGVK) {
+    return (
+      <div className={`text-xs text-muted-foreground italic truncate ${className}`}>
+        Select a resource
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-2 min-w-0 overflow-hidden ${className}`}>
+      <h3 className="text-sm font-medium text-foreground truncate">
+        {selectedGVK.kind}
+      </h3>
+      <span className="text-xs text-muted-foreground truncate">
+        {selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version}
+      </span>
+    </div>
+  );
+}

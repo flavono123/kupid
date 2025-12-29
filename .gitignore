@@ -1,5 +1,20 @@
 .vscode
+.serena
 
 /bin
 
 *.log
+*.test
+
+# Planning and analysis documents
+/planning
+
+# UI mockups and prototypes
+/mocks
+
+# Wails
+*.md5
+cmd/gui/frontend/context-gallery-preview.html
+
+# macOS
+.DS_Store

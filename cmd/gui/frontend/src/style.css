@@ -1,0 +1,87 @@
+@import "@fontsource/outfit/700.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+@layer base {
+  :root {
+        --background: 240 9.0909% 97.8431%;
+        --foreground: 0 0% 20%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 20%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 20%;
+        --primary: 139.6552 52.7273% 43.1373%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 218.5401 79.1908% 66.0784%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 50.4000 26.8817% 81.7647%;
+        --muted-foreground: 0 0% 43.1373%;
+        --accent: 189.6350 81.0651% 66.8627%;
+        --accent-foreground: 0 0% 20%;
+        --destructive: 0 84.2365% 60.1961%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 0 0% 83.1373%;
+        --input: 0 0% 83.1373%;
+        --ring: 139.6552 52.7273% 43.1373%;
+        --chart-1: 139.6552 52.7273% 43.1373%;
+        --chart-2: 218.5401 79.1908% 66.0784%;
+        --chart-3: 189.6350 81.0651% 66.8627%;
+        --chart-4: 207.2727 44% 49.0196%;
+        --chart-5: 138.8710 70.4545% 34.5098%;
+        --radius: 0.5rem;
+        /* Kattle logo colors */
+        --kattle-ari: 112 29% 71%;
+        --kattle-bada: 204 30% 58%;
+        --kattle-chorong: 121 24% 60%;
+    }
+  .dark {
+        --background: 220.0000 14.7541% 11.9608%;
+        --foreground: 0 0% 89.8039%;
+        --card: 197.1429 6.9307% 19.8039%;
+        --card-foreground: 0 0% 89.8039%;
+        --popover: 197.1429 6.9307% 19.8039%;
+        --popover-foreground: 0 0% 89.8039%;
+        --primary: 139.6552 52.7273% 43.1373%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 207.2727 44% 49.0196%;
+        --secondary-foreground: 0 0% 89.8039%;
+        --muted: 0 0% 26.6667%;
+        --muted-foreground: 0 0% 63.9216%;
+        --accent: 218.5401 79.1908% 66.0784%;
+        --accent-foreground: 0 0% 89.8039%;
+        --destructive: 0 84.2365% 60.1961%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 0 0% 26.6667%;
+        --input: 0 0% 26.6667%;
+        --ring: 139.6552 52.7273% 43.1373%;
+        --chart-1: 139.6552 52.7273% 43.1373%;
+        --chart-2: 207.2727 44% 49.0196%;
+        --chart-3: 218.5401 79.1908% 66.0784%;
+        --chart-4: 189.6350 81.0651% 66.8627%;
+        --chart-5: 138.8710 70.4545% 34.5098%;
+        /* Kattle logo colors */
+        --kattle-ari: 109 41% 82%;
+        --kattle-bada: 206 47% 70%;
+        --kattle-chorong: 121 35% 72%;
+    }
+}
+
+
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  /* Lucide icons stroke width */
+  svg[class*="lucide"] {
+    stroke-width: 1;
+    }
+}
+
