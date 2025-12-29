@@ -63,9 +63,11 @@ export function ResultTable({
   const getHighlightIndices = useCellHighlight(globalFilter);
 
   // Calculate column width based on field name and data
-  const calculateColumnWidth = (fieldName: string, values: any[]): number => {
-    // Min width based on header name (8px per char + 32px padding)
-    const headerWidth = fieldName.length * 8 + 32;
+  // Returns { size: initial display width, maxSize: max possible width }
+  const calculateColumnWidth = (fieldName: string, values: any[]): { size: number; maxSize: number } => {
+    // Header is displayed in UPPERCASE, so use wider char width (10px per char)
+    // Add 40px for padding (px-4 = 32px) + resize handle (8px)
+    const headerWidth = fieldName.length * 10 + 40;
 
     // Sample first 100 values to estimate max width
     const sampleSize = Math.min(100, values.length);
@@ -76,12 +78,16 @@ export function ResultTable({
       const text = typeof value === 'object' && value !== null
         ? JSON.stringify(value)
         : String(value ?? '');
-      const width = Math.min(text.length * 8 + 32, 300);  // Cap at 300px
+      const width = text.length * 8 + 32;
       maxValueWidth = Math.max(maxValueWidth, width);
     }
 
-    // Return max(header, value) but cap at 300px
-    return Math.min(Math.max(headerWidth, maxValueWidth), 300);
+    // maxSize: actual max of header and values (no cap)
+    const maxSize = Math.max(headerWidth, maxValueWidth, 80);
+    // size: initial display width capped at 300px
+    const size = Math.min(maxSize, 300);
+
+    return { size, maxSize };
   };
 
   // Memoize column widths separately (only recalculate when fields or data change)
@@ -97,7 +103,7 @@ export function ResultTable({
       fieldsToUse = [['_context'], ['metadata', 'name'], ...selectedFields];
     }
 
-    const widths: Record<string, number> = {};
+    const widths: Record<string, { size: number; maxSize: number }> = {};
     fieldsToUse.forEach((fieldPath) => {
       const fieldName = fieldPath[fieldPath.length - 1];
       const columnValues = data.map((row) => getNestedValue(row, fieldPath));
@@ -123,14 +129,15 @@ export function ResultTable({
     return fieldsToUse.map((fieldPath) => {
       const fieldName = fieldPath[fieldPath.length - 1];
       const columnId = fieldPath.join('.');
+      const widths = columnWidths[columnId] || { size: 100, maxSize: 300 };
 
       return {
         id: columnId,
         header: fieldName === '_context' ? 'context' : fieldName,  // Rename _context to context
         accessorFn: (row) => getNestedValue(row, fieldPath),
-        size: columnWidths[columnId] || 100,  // Use pre-calculated width
+        size: widths.size,  // Use pre-calculated initial width
         minSize: 80,  // Minimum column width
-        maxSize: 300,  // Maximum column width
+        maxSize: widths.maxSize,  // Dynamic max based on header/values
         cell: (info) => {
           const value = info.getValue();
 
@@ -159,6 +166,7 @@ export function ResultTable({
     data,
     columns,
     getRowId,  // Stable row identity for real-time updates
+    columnResizeMode: 'onChange',  // Enable column resizing
     filterFns: {
       fuzzy: fuzzyFilter,
     },
@@ -175,12 +183,8 @@ export function ResultTable({
   // Get filtered rows for virtualization
   const { rows } = table.getRowModel();
 
-  // Calculate total width of all columns for horizontal scrolling
-  const totalColumnsWidth = useMemo(() => {
-    return columns.reduce((sum, col) => {
-      return sum + (col.size || 100);
-    }, 0);
-  }, [columns]);
+  // Get total width from table state (updates on resize)
+  const totalColumnsWidth = table.getTotalSize();
 
   // Setup row virtualizer
   const rowVirtualizer = useVirtualizer({
@@ -256,14 +260,23 @@ export function ResultTable({
                     return (
                       <div
                         key={header.id}
-                        className="px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0"
+                        className="relative px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground"
                         style={{
                           width: `${header.getSize()}px`,
-                          minWidth: `${header.getSize()}px`,
-                          maxWidth: `${header.getSize()}px`,
+                          minWidth: `${header.column.columnDef.minSize || 80}px`,
                         }}
                       >
                         <CellContent value={headerText} />
+                        {/* Column resize handle */}
+                        <div
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          className={cn(
+                            "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
+                            "hover:bg-primary/50",
+                            header.column.getIsResizing() && "bg-primary"
+                          )}
+                        />
                       </div>
                     );
                   })}
@@ -287,7 +300,7 @@ export function ResultTable({
                     style={{
                       height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,
-                      width: '100%',
+                      width: `max(${totalColumnsWidth}px, 100%)`,
                     }}
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -299,8 +312,7 @@ export function ResultTable({
                         )}
                         style={{
                           width: `${cell.column.getSize()}px`,
-                          minWidth: `${cell.column.getSize()}px`,
-                          maxWidth: `${cell.column.getSize()}px`,
+                          minWidth: `${cell.column.columnDef.minSize || 80}px`,
                         }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

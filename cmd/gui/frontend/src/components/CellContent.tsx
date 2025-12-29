@@ -53,7 +53,7 @@ export function CellContent({
     <Popover open={isHovered} onOpenChange={setIsHovered}>
       <PopoverTrigger asChild>
         <div
-          className="text-sm truncate hover:underline hover:bg-accent/50 -mx-4 px-4 -my-2 py-2 rounded cursor-pointer"
+          className="text-sm overflow-hidden whitespace-nowrap hover:underline hover:bg-accent/50 rounded cursor-pointer"
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           onClick={handleClick}
