@@ -1,3 +1,4 @@
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { X } from "lucide-react";
@@ -11,14 +12,26 @@ interface FieldSearchBarProps {
   onClose: () => void;
 }
 
-export function FieldSearchBar({
+export interface FieldSearchBarHandle {
+  isInputFocused: () => boolean;
+  focus: () => void;
+}
+
+export const FieldSearchBar = forwardRef<FieldSearchBarHandle, FieldSearchBarProps>(({
   query,
   onQueryChange,
   currentMatchIndex,
   totalMatches,
   hasMoreResults,
   onClose,
-}: FieldSearchBarProps) {
+}, ref) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    isInputFocused: () => document.activeElement === inputRef.current,
+    focus: () => inputRef.current?.focus(),
+  }), []);
+
   return (
     <div className="
       p-2 flex items-center gap-1.5
@@ -29,6 +42,7 @@ export function FieldSearchBar({
       md:p-1.5
     ">
       <Input
+        ref={inputRef}
         placeholder="Search ..."
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
@@ -50,4 +64,6 @@ export function FieldSearchBar({
       </Button>
     </div>
   );
-}
+});
+
+FieldSearchBar.displayName = 'FieldSearchBar';

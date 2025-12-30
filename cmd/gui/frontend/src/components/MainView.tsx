@@ -118,7 +118,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         return;
       }
 
-      // cmd+f to focus search in current panel
+      // cmd+f to focus/toggle search in current panel
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
         if (focusedPanel === 'nav') {
@@ -300,7 +300,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
             className={`flex flex-col h-full transition-shadow ${
               focusedPanel === 'nav' ? 'ring-2 ring-primary/50 ring-inset' : ''
             }`}
-            onClick={() => setFocusedPanel('nav')}
+            onMouseDown={() => setFocusedPanel('nav')}
           >
             {/* Nav Header */}
             <NavHeader
@@ -362,7 +362,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
             className={`h-full relative transition-shadow ${
               focusedPanel === 'table' ? 'ring-2 ring-primary/50 ring-inset' : ''
             }`}
-            onClick={() => setFocusedPanel('table')}
+            onMouseDown={() => setFocusedPanel('table')}
           >
             {/* Floating Expand Button (only when collapsed) */}
             {isSidebarCollapsed && (
@@ -402,15 +402,13 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      {/* Keymap Bar */}
-      {selectedGVK && (
-        <KeymapBar
-          focusedPanel={focusedPanel}
-          selectedFieldCount={selectedFields.length}
-          isSearchFocused={isNavSearchFocused() || isTableSearchFocused()}
-          hasTableData={selectedFields.length > 0}
-        />
-      )}
+      {/* Keymap Bar - always visible */}
+      <KeymapBar
+        focusedPanel={focusedPanel}
+        selectedFieldCount={selectedFields.length}
+        isSearchFocused={isNavSearchFocused() || isTableSearchFocused()}
+        hasTableData={selectedFields.length > 0}
+      />
 
       {/* CommandPalette Modal */}
       {showCommandPalette && (

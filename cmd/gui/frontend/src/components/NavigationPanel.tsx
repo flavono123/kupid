@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { Spinner } from './ui/spinner';
-import { FieldSearchBar } from './FieldSearchBar';
+import { FieldSearchBar, FieldSearchBarHandle } from './FieldSearchBar';
 import { main } from '../../wailsjs/go/models';
 import { useTree, TreeNode, PATH_DELIMITER } from '@/hooks/useTree';
 import { HighlightedText } from './HighlightedText';
@@ -212,6 +212,8 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     watch: true,  // Enable real-time tree updates
   });
 
+  const fieldSearchBarRef = useRef<FieldSearchBarHandle>(null);
+
   useImperativeHandle(ref, () => ({
     clearSelections: clearAllSelections,
     getSelectedCount: () => selectedPaths.size,
@@ -221,8 +223,8 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     navigateUp: () => navigateFocus('up'),
     navigateDown: () => navigateFocus('down'),
     toggleFocused,
-    isSearchFocused: () => searchVisible,
-  }), [clearAllSelections, selectedPaths, setSelectionsFromPaths, toggleSearch, navigateFocus, toggleFocused, searchVisible]);
+    isSearchFocused: () => fieldSearchBarRef.current?.isInputFocused() ?? false,
+  }), [clearAllSelections, selectedPaths, setSelectionsFromPaths, toggleSearch, navigateFocus, toggleFocused]);
 
   return (
     <div className="flex flex-col h-full relative">
@@ -230,6 +232,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
       {/* TODO: Add slide-down/slide-up animation when showing/hiding */}
       {searchVisible && (
         <FieldSearchBar
+          ref={fieldSearchBarRef}
           query={query}
           onQueryChange={setQuery}
           currentMatchIndex={currentMatchIndex}
