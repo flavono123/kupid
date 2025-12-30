@@ -3,6 +3,8 @@ import { Image } from 'astro:assets';
 import logoSvg from '../assets/logo.svg';
 import GitHubStars from './GitHubStars.astro';
 
+const base = import.meta.env.BASE_URL;
+
 interface NavItem {
   label: string;
   href: string;
@@ -11,16 +13,16 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Price-less', href: '/priceless', color: 'hover:text-kattle-chorong' },
-  { label: 'Changelog', href: '/changelog', color: 'hover:text-kattle-ari' },
-  { label: 'Blog', href: '/blog', color: 'hover:text-kattle-bada' },
+  { label: 'Price-less', href: `${base}priceless`, color: 'hover:text-kattle-chorong' },
+  { label: 'Changelog', href: `${base}changelog`, color: 'hover:text-kattle-ari' },
+  { label: 'Blog', href: `${base}blog`, color: 'hover:text-kattle-bada' },
 ];
 ---
 
 <header class="fixed top-0 left-0 right-0 z-50 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur-xl">
   <nav class="container-narrow flex h-14 items-center justify-between">
     <!-- Logo -->
-    <a href="/" class="flex items-center gap-2 font-display text-xl font-bold">
+    <a href={base} class="flex items-center gap-2 font-display text-xl font-bold">
       <Image src={logoSvg} alt="kattle logo" class="h-6 w-auto" loading="eager" />
       <span class="kattle-gradient">kattle</span>
     </a>

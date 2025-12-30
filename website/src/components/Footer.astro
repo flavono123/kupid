@@ -1,6 +1,7 @@
 ---
 import { GITHUB_REPO } from '../config';
 const currentYear = new Date().getFullYear();
+const base = import.meta.env.BASE_URL;
 ---
 
 <footer class="border-t border-neutral-800 bg-neutral-950 py-12">
@@ -18,13 +19,13 @@ const currentYear = new Date().getFullYear();
         <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" class="hover:text-kattle-bada transition-colors">
           GitHub
         </a>
-        <a href="/priceless" class="hover:text-kattle-chorong transition-colors">
+        <a href={`${base}priceless`} class="hover:text-kattle-chorong transition-colors">
           Price-less
         </a>
-        <a href="/changelog" class="hover:text-kattle-ari transition-colors">
+        <a href={`${base}changelog`} class="hover:text-kattle-ari transition-colors">
           Changelog
         </a>
-        <a href="/blog" class="hover:text-kattle-bada transition-colors">
+        <a href={`${base}blog`} class="hover:text-kattle-bada transition-colors">
           Blog
         </a>
       </div>

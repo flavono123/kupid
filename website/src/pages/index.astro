@@ -5,6 +5,8 @@ import DownloadButtons from '../components/DownloadButtons.astro';
 import FeatureSection from '../components/FeatureSection.astro';
 import Footer from '../components/Footer.astro';
 import { Sparkles, Monitor } from '@lucide/astro';
+
+const base = import.meta.env.BASE_URL;
 ---
 
 <BaseLayout title="kattle - Pick any field from your clusters">
@@ -22,7 +24,7 @@ import { Sparkles, Monitor } from '@lucide/astro';
 
       <div class="container-narrow text-center py-24">
         <!-- Priceless Badge -->
-        <a href="/priceless" class="mb-8 inline-flex items-center gap-2 rounded-full border-2 border-kattle-chorong/50 bg-kattle-chorong/10 px-4 py-2 text-sm font-medium transition-colors hover:bg-kattle-chorong/20">
+        <a href={`${base}priceless`} class="mb-8 inline-flex items-center gap-2 rounded-full border-2 border-kattle-chorong/50 bg-kattle-chorong/10 px-4 py-2 text-sm font-medium transition-colors hover:bg-kattle-chorong/20">
           <Sparkles class="h-4 w-4 text-kattle-chorong" />
           <span class="text-kattle-chorong">Price-less</span>
           <span class="text-neutral-500">—</span>
