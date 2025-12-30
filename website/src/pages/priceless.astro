@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import { Sparkles, Gem, Check } from '@lucide/astro';
+import { GITHUB_RELEASES } from '../config';
 ---
 
 <BaseLayout title="Priceless - kattle">
@@ -44,7 +45,7 @@ import { Sparkles, Gem, Check } from '@lucide/astro';
           </ul>
 
           <a
-            href="https://github.com/flavono123/kupid/releases"
+            href={GITHUB_RELEASES}
             class="inline-flex items-center gap-2 rounded-lg bg-kattle-ari px-6 py-3 font-medium text-neutral-900 transition-all hover:bg-kattle-ari/90"
           >
             Download Now

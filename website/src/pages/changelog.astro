@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import { FileText } from '@lucide/astro';
+import { GITHUB_RELEASES } from '../config';
 ---
 
 <BaseLayout title="Changelog - kattle">
@@ -26,7 +27,7 @@ import { FileText } from '@lucide/astro';
               Release notes coming soon.
             </p>
             <a
-              href="https://github.com/flavono123/kupid/releases"
+              href={GITHUB_RELEASES}
               target="_blank"
               rel="noopener noreferrer"
               class="mt-6 inline-flex items-center gap-2 text-sm text-brand-400 hover:text-brand-300 transition-colors"
