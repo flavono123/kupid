@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Download, Clipboard, FileDown, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, forwardRef, useRef, useImperativeHandle } from 'react';
 import { convertToCSV, copyToClipboard, downloadCSV } from '@/lib/csv-export';
 import { SaveFile } from '../../wailsjs/go/main/App';
 
@@ -22,7 +22,12 @@ interface ResultTableToolbarProps {
   resourceKind?: string; // For filename generation
 }
 
-export function ResultTableToolbar({
+export interface ResultTableToolbarHandle {
+  focusSearch: () => void;
+  isSearchFocused: () => boolean;
+}
+
+export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTableToolbarProps>(({
   globalFilter,
   onGlobalFilterChange,
   filteredRowCount,
@@ -30,9 +35,19 @@ export function ResultTableToolbar({
   headers,
   rows,
   resourceKind = 'resources',
-}: ResultTableToolbarProps) {
+}, ref) => {
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'downloaded' | 'error'>('idle');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    isSearchFocused: () => {
+      return document.activeElement === searchInputRef.current;
+    },
+  }), []);
 
   const handleExportToClipboard = async () => {
     try {
@@ -88,6 +103,7 @@ export function ResultTableToolbar({
         {/* Left: Search input */}
         <div className="flex-1 max-w-sm">
           <Input
+            ref={searchInputRef}
             placeholder="Search ..."
             value={globalFilter}
             onChange={(e) => onGlobalFilterChange(e.target.value)}
@@ -141,4 +157,6 @@ export function ResultTableToolbar({
       </div>
     </div>
   );
-}
+});
+
+ResultTableToolbar.displayName = 'ResultTableToolbar';

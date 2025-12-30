@@ -244,7 +244,7 @@ describe('CommandPalette - Focus Management', () => {
       expect(hasTextContent('Deployment')).toBe(true);
     });
 
-    const searchInput = screen.getByPlaceholderText('Search resources...');
+    const searchInput = screen.getByPlaceholderText('Search ...');
 
     // Type "po" to filter
     await user.type(searchInput, 'po');
@@ -288,7 +288,7 @@ describe('CommandPalette - Focus Management', () => {
       expect(hasTextContent('Deployment')).toBe(true);
     });
 
-    const searchInput = screen.getByPlaceholderText('Search resources...');
+    const searchInput = screen.getByPlaceholderText('Search ...');
 
     // Type "deploy" to filter
     await user.type(searchInput, 'deploy');
@@ -324,7 +324,7 @@ describe('CommandPalette - Focus Management', () => {
       expect(hasTextContent('Pod')).toBe(true);
     });
 
-    const searchInput = screen.getByPlaceholderText('Search resources...');
+    const searchInput = screen.getByPlaceholderText('Search ...');
 
     // Type a search query
     await user.type(searchInput, 'deploy');
@@ -369,7 +369,7 @@ describe('CommandPalette - Focus Management', () => {
       expect(hasTextContent('Pod')).toBe(true);
     });
 
-    const searchInput = screen.getByPlaceholderText('Search resources...');
+    const searchInput = screen.getByPlaceholderText('Search ...');
 
     // Type a query that matches nothing
     await user.type(searchInput, 'xyz123');

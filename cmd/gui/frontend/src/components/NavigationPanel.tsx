@@ -22,6 +22,11 @@ export interface NavigationPanelHandle {
   getSelectedPaths: () => Set<string>;
   setSelectedPaths: (paths: Set<string>) => void;
   toggleSearch: () => void;
+  // Keyboard navigation
+  navigateUp: () => void;
+  navigateDown: () => void;
+  toggleFocused: () => void;
+  isSearchFocused: () => boolean;
 }
 
 interface TreeNodeItemProps {
@@ -192,6 +197,11 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     clearAllSelections,
     setSelectionsFromPaths,
 
+    // Keyboard navigation
+    focusedPathKey,
+    navigateFocus,
+    toggleFocused,
+
     // Filtered view
     filteredNodeTree,
   } = useTree({
@@ -208,7 +218,11 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     getSelectedPaths: () => new Set(selectedPaths),
     setSelectedPaths: setSelectionsFromPaths,
     toggleSearch,
-  }), [clearAllSelections, selectedPaths, setSelectionsFromPaths, toggleSearch]);
+    navigateUp: () => navigateFocus('up'),
+    navigateDown: () => navigateFocus('down'),
+    toggleFocused,
+    isSearchFocused: () => searchVisible,
+  }), [clearAllSelections, selectedPaths, setSelectionsFromPaths, toggleSearch, navigateFocus, toggleFocused, searchVisible]);
 
   return (
     <div className="flex flex-col h-full relative">
@@ -249,7 +263,12 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                 onToggleExpand={toggleExpand}
                 onToggleSelect={toggleSelect}
                 searchResultsMap={searchResultsMap}
-                focusedPath={debouncedQuery && matchedPaths.length > 0 ? matchedPaths[currentMatchIndex] : undefined}
+                focusedPath={
+                  // Priority: search match focus > keyboard focus
+                  debouncedQuery && matchedPaths.length > 0
+                    ? matchedPaths[currentMatchIndex]
+                    : focusedPathKey ?? undefined
+                }
               />
             ))}
           </div>

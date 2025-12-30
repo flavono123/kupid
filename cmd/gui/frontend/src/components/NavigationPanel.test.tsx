@@ -220,13 +220,13 @@ describe('NavigationPanel', () => {
       });
 
       // Search bar should not be visible initially
-      expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
 
       // Press Cmd+F
       await user.keyboard('{Meta>}f{/Meta}');
 
       // Search bar should now be visible
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
     });
 
     it('should close search with Escape', async () => {
@@ -248,14 +248,14 @@ describe('NavigationPanel', () => {
 
       // Open search
       await user.keyboard('{Meta>}f{/Meta}');
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
 
       // Press Escape
       await user.keyboard('{Escape}');
 
       // Search bar should be closed
       await waitFor(() => {
-        expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
       });
     });
   });
@@ -776,7 +776,7 @@ describe('NavigationPanel', () => {
 
       // Open search and search for "nodeName"
       await user.keyboard('{Meta>}f{/Meta}');
-      const searchInput = screen.getByPlaceholderText('Search...');
+      const searchInput = screen.getByPlaceholderText('Search ...');
       await user.type(searchInput, 'nodeName');
 
       // Wait for search results - spec should auto-expand to show nodeName
@@ -817,7 +817,7 @@ describe('NavigationPanel', () => {
 
       // Open search and search for "namespace"
       await user.keyboard('{Meta>}f{/Meta}');
-      const searchInput = screen.getByPlaceholderText('Search...');
+      const searchInput = screen.getByPlaceholderText('Search ...');
       await user.type(searchInput, 'namespace');
 
       // metadata should auto-expand due to search
@@ -1050,7 +1050,7 @@ describe('NavigationPanel', () => {
       });
 
       // Search should not be visible initially
-      expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
 
       // Toggle search via ref
       act(() => {
@@ -1058,7 +1058,7 @@ describe('NavigationPanel', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
       });
 
       // Toggle again to close
@@ -1067,7 +1067,7 @@ describe('NavigationPanel', () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
       });
     });
   });

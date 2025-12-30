@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -12,7 +12,7 @@ import { rankItem } from '@tanstack/match-sorter-utils';
 import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
-import { ResultTableToolbar } from './ResultTableToolbar';
+import { ResultTableToolbar, ResultTableToolbarHandle } from './ResultTableToolbar';
 import { useCellHighlight } from '../hooks/useCellHighlight';
 import { useResourceData } from '../hooks/useResourceData';
 import { useFlashingCells } from '../hooks/useFlashingCells';
@@ -22,6 +22,16 @@ interface ResultTableProps {
   selectedFields: string[][];  // From NavigationPanel
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
+}
+
+export interface ResultTableHandle {
+  focusSearch: () => void;
+  isSearchFocused: () => boolean;
+  navigateUp: () => void;
+  navigateDown: () => void;
+  navigateLeft: () => void;
+  navigateRight: () => void;
+  copyFocusedCell: () => void;
 }
 
 // Helper function to get nested value from object using path
@@ -41,11 +51,11 @@ const fuzzyFilter = (row: any, columnId: string, value: any, addMeta: any) => {
   return itemRank.passed;
 };
 
-export function ResultTable({
+export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   selectedFields,
   selectedGVK,
   connectedContexts,
-}: ResultTableProps) {
+}, ref) => {
   // Use extracted hook for data fetching (watch enabled for real-time updates)
   const { data, loading, getRowId, changedCells } = useResourceData(
     selectedGVK,
@@ -58,9 +68,20 @@ export function ResultTable({
 
   const [globalFilter, setGlobalFilter] = useState('');
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<ResultTableToolbarHandle>(null);
+
+  // Keyboard navigation state
+  const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
+  const [focusedColIndex, setFocusedColIndex] = useState<number | null>(null);
 
   // Get highlight function based on current search query
   const getHighlightIndices = useCellHighlight(globalFilter);
+
+  // Reset focus when data changes
+  useEffect(() => {
+    setFocusedRowIndex(null);
+    setFocusedColIndex(null);
+  }, [selectedGVK]);
 
   // Calculate column width based on field name and data
   // Returns { size: initial display width, maxSize: max possible width }
@@ -183,6 +204,77 @@ export function ResultTable({
   // Get filtered rows for virtualization
   const { rows } = table.getRowModel();
 
+  // Navigation callbacks (must be defined after rows and columns)
+  const navigateUp = useCallback(() => {
+    setFocusedRowIndex((prev) => {
+      if (prev === null) return rows.length > 0 ? 0 : null;
+      return Math.max(0, prev - 1);
+    });
+    if (focusedColIndex === null && columns.length > 0) {
+      setFocusedColIndex(0);
+    }
+  }, [rows.length, focusedColIndex, columns.length]);
+
+  const navigateDown = useCallback(() => {
+    setFocusedRowIndex((prev) => {
+      if (prev === null) return rows.length > 0 ? 0 : null;
+      return Math.min(rows.length - 1, prev + 1);
+    });
+    if (focusedColIndex === null && columns.length > 0) {
+      setFocusedColIndex(0);
+    }
+  }, [rows.length, focusedColIndex, columns.length]);
+
+  const navigateLeft = useCallback(() => {
+    setFocusedColIndex((prev) => {
+      if (prev === null) return columns.length > 0 ? 0 : null;
+      return Math.max(0, prev - 1);
+    });
+    if (focusedRowIndex === null && rows.length > 0) {
+      setFocusedRowIndex(0);
+    }
+  }, [columns.length, focusedRowIndex, rows.length]);
+
+  const navigateRight = useCallback(() => {
+    setFocusedColIndex((prev) => {
+      if (prev === null) return columns.length > 0 ? 0 : null;
+      return Math.min(columns.length - 1, prev + 1);
+    });
+    if (focusedRowIndex === null && rows.length > 0) {
+      setFocusedRowIndex(0);
+    }
+  }, [columns.length, focusedRowIndex, rows.length]);
+
+  const copyFocusedCell = useCallback(() => {
+    if (focusedRowIndex === null || focusedColIndex === null) return;
+    const row = rows[focusedRowIndex];
+    if (!row) return;
+    const cell = row.getVisibleCells()[focusedColIndex];
+    if (!cell) return;
+
+    const value = cell.getValue();
+    const text = typeof value === 'object' && value !== null
+      ? JSON.stringify(value)
+      : String(value ?? '');
+
+    navigator.clipboard.writeText(text).catch(console.error);
+  }, [focusedRowIndex, focusedColIndex, rows]);
+
+  // Expose handle methods
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => {
+      toolbarRef.current?.focusSearch();
+    },
+    isSearchFocused: () => {
+      return toolbarRef.current?.isSearchFocused() ?? false;
+    },
+    navigateUp,
+    navigateDown,
+    navigateLeft,
+    navigateRight,
+    copyFocusedCell,
+  }), [navigateUp, navigateDown, navigateLeft, navigateRight, copyFocusedCell]);
+
   // Get total width from table state (updates on resize)
   const totalColumnsWidth = table.getTotalSize();
 
@@ -193,6 +285,13 @@ export function ResultTable({
     estimateSize: () => 28,  // Estimated row height in pixels (reduced from 35)
     overscan: 10,  // Render 10 extra rows above/below viewport
   });
+
+  // Auto-scroll to keep focused row visible
+  useEffect(() => {
+    if (focusedRowIndex !== null) {
+      rowVirtualizer.scrollToIndex(focusedRowIndex, { align: 'auto' });
+    }
+  }, [focusedRowIndex, rowVirtualizer]);
 
   // Prepare export data (headers and rows for CSV)
   const exportData = useMemo(() => {
@@ -221,6 +320,7 @@ export function ResultTable({
     <div className="flex flex-col h-full">
       {/* Toolbar with Search and Export */}
       <ResultTableToolbar
+        ref={toolbarRef}
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
         filteredRowCount={rows.length}
@@ -293,31 +393,39 @@ export function ResultTable({
             >
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const row = rows[virtualRow.index];
+                const isRowFocused = focusedRowIndex === virtualRow.index;
                 return (
                   <div
                     key={row.id}
-                    className="flex border-b border-border hover:bg-focus transition-colors absolute top-0 left-0"
+                    className={cn(
+                      "flex border-b border-border hover:bg-focus transition-colors absolute top-0 left-0",
+                      isRowFocused && "bg-focus"
+                    )}
                     style={{
                       height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,
                       width: `max(${totalColumnsWidth}px, 100%)`,
                     }}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <div
-                        key={cell.id}
-                        className={cn(
-                          "px-4 py-1 text-sm flex-shrink-0",
-                          isFlashing(row.id, cell.column.id) && "animate-cell-flash"
-                        )}
-                        style={{
-                          width: `${cell.column.getSize()}px`,
-                          minWidth: `${cell.column.columnDef.minSize || 80}px`,
-                        }}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    ))}
+                    {row.getVisibleCells().map((cell, cellIndex) => {
+                      const isCellFocused = isRowFocused && focusedColIndex === cellIndex;
+                      return (
+                        <div
+                          key={cell.id}
+                          className={cn(
+                            "px-4 py-1 text-sm flex-shrink-0",
+                            isFlashing(row.id, cell.column.id) && "animate-cell-flash",
+                            isCellFocused && "ring-2 ring-primary ring-inset"
+                          )}
+                          style={{
+                            width: `${cell.column.getSize()}px`,
+                            minWidth: `${cell.column.columnDef.minSize || 80}px`,
+                          }}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -327,4 +435,6 @@ export function ResultTable({
       </div>
     </div>
   );
-}
+});
+
+ResultTable.displayName = 'ResultTable';
