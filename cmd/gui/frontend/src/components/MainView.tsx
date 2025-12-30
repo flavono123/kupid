@@ -87,11 +87,19 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   }, [connectedContexts]);
 
   useEffect(() => {
-    // cmd+k to toggle CommandPalette
     const handleKeydown = (e: KeyboardEvent) => {
+      // cmd+k to toggle CommandPalette
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setShowCommandPalette((prev) => !prev);
+        return;
+      }
+
+      // cmd+shift+a to clear all field selections
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        navigationPanelRef.current?.clearSelections();
+        return;
       }
     };
 
