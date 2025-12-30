@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Star, ChevronRight, ChevronDown, Pencil, Trash2, Check, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { Kbd } from "./ui/kbd";
 import {
   Collapsible,
   CollapsibleContent,
@@ -318,9 +319,10 @@ export function QuickAccessBar({
 
         <CollapsibleContent>
           <div className="border-t border-border">
-            {favorites.map((fav) => {
+            {favorites.map((fav, index) => {
               const isActive = fav.id === activeFavoriteId;
               const isEditing = fav.id === editingId;
+              const shortcutNumber = index < 9 ? index + 1 : null;
 
               if (isEditing) {
                 return (
@@ -382,12 +384,18 @@ export function QuickAccessBar({
                     }
                   }}
                 >
-                  <Star
-                    className={cn(
-                      "h-3 w-3 shrink-0",
-                      isActive ? "text-accent fill-accent" : "text-accent/60"
-                    )}
-                  />
+                  {shortcutNumber ? (
+                    <Kbd className="text-[10px] w-4 h-4 flex items-center justify-center shrink-0">
+                      {shortcutNumber}
+                    </Kbd>
+                  ) : (
+                    <Star
+                      className={cn(
+                        "h-3 w-3 shrink-0",
+                        isActive ? "text-accent fill-accent" : "text-accent/60"
+                      )}
+                    />
+                  )}
 
                   {/* Name with minimum width guarantee */}
                   <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">

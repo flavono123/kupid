@@ -99,6 +99,85 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     return resultTableRef.current?.isSearchFocused() ?? false;
   }, []);
 
+  // Reset selectedFields when GVK changes
+  useEffect(() => {
+    setSelectedFields([]);
+  }, [selectedGVK]);
+
+  const toggleSidebar = () => {
+    const panel = sidebarPanelRef.current;
+    if (panel) {
+      if (isSidebarCollapsed) {
+        panel.expand();
+      } else {
+        panel.collapse();
+      }
+    }
+  };
+
+  const handleClearAllFields = useCallback(() => {
+    navigationPanelRef.current?.clearSelections();
+  }, []);
+
+  const handleSearch = useCallback(() => {
+    navigationPanelRef.current?.toggleSearch();
+  }, []);
+
+  const handleSaveFavorite = useCallback(async (name: string) => {
+    await saveFavorite(name);
+  }, [saveFavorite]);
+
+  // Convert favorite fields to path set for NavigationPanel
+  const fieldsToPathSet = useCallback((fields: string[][]) => {
+    return new Set(fields.map((f) => f.join(PATH_DELIMITER)));
+  }, []);
+
+  // Apply favorite by ID (sets paths in NavigationPanel and activates)
+  const applyFavoriteById = useCallback((id: string) => {
+    const fields = applyFavorite(id);
+    if (!fields || !navigationPanelRef.current) {
+      return;
+    }
+
+    const pathSet = fieldsToPathSet(fields);
+    navigationPanelRef.current.setSelectedPaths(pathSet);
+  }, [applyFavorite, fieldsToPathSet]);
+
+  // Called when NavigationPanel finishes loading - apply pending favorite if any
+  const handleNavigationReady = useCallback(() => {
+    if (pendingFavoriteIdRef.current) {
+      applyFavoriteById(pendingFavoriteIdRef.current);
+      pendingFavoriteIdRef.current = null;
+    }
+  }, [applyFavoriteById]);
+
+  // Apply favorite (same logic as CommandPalette)
+  const handleApplyFavorite = useCallback((favorite: main.FavoriteViewResponse) => {
+    const matchingGVK = gvks.find(
+      (g) =>
+        g.group === favorite.gvk.group &&
+        g.version === favorite.gvk.version &&
+        g.kind === favorite.gvk.kind
+    );
+    if (!matchingGVK) return;
+
+    // Check if same GVK is already selected
+    const isSameGVK = selectedGVK &&
+      selectedGVK.group === matchingGVK.group &&
+      selectedGVK.version === matchingGVK.version &&
+      selectedGVK.kind === matchingGVK.kind;
+
+    if (isSameGVK) {
+      // Same GVK - apply directly without waiting for onReady
+      applyFavoriteById(favorite.id);
+    } else {
+      // Different GVK - need to wait for NavigationPanel to load
+      pendingFavoriteIdRef.current = favorite.id;
+      setSelectedGVK(matchingGVK);
+    }
+  }, [gvks, selectedGVK, applyFavoriteById]);
+
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeydown = (e: KeyboardEvent) => {
       // Skip if CommandPalette is open
@@ -115,6 +194,16 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         navigationPanelRef.current?.clearSelections();
+        return;
+      }
+
+      // cmd+1~9 to apply favorite (works regardless of panel focus)
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+        const index = parseInt(e.key) - 1;
+        if (index < allFavorites.length) {
+          e.preventDefault();
+          handleApplyFavorite(allFavorites[index]);
+        }
         return;
       }
 
@@ -200,85 +289,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [showCommandPalette, focusedPanel, isNavSearchFocused, isTableSearchFocused]);
-
-  // Reset selectedFields when GVK changes
-  useEffect(() => {
-    setSelectedFields([]);
-  }, [selectedGVK]);
-
-  const toggleSidebar = () => {
-    const panel = sidebarPanelRef.current;
-    if (panel) {
-      if (isSidebarCollapsed) {
-        panel.expand();
-      } else {
-        panel.collapse();
-      }
-    }
-  };
-
-  const handleClearAllFields = useCallback(() => {
-    navigationPanelRef.current?.clearSelections();
-  }, []);
-
-  const handleSearch = useCallback(() => {
-    navigationPanelRef.current?.toggleSearch();
-  }, []);
-
-  const handleSaveFavorite = useCallback(async (name: string) => {
-    await saveFavorite(name);
-  }, [saveFavorite]);
-
-  // Convert favorite fields to path set for NavigationPanel
-  const fieldsToPathSet = useCallback((fields: string[][]) => {
-    return new Set(fields.map((f) => f.join(PATH_DELIMITER)));
-  }, []);
-
-  // Apply favorite by ID (sets paths in NavigationPanel and activates)
-  const applyFavoriteById = useCallback((id: string) => {
-    const fields = applyFavorite(id);
-    if (!fields || !navigationPanelRef.current) {
-      return;
-    }
-
-    const pathSet = fieldsToPathSet(fields);
-    navigationPanelRef.current.setSelectedPaths(pathSet);
-  }, [applyFavorite, fieldsToPathSet]);
-
-  // Called when NavigationPanel finishes loading - apply pending favorite if any
-  const handleNavigationReady = useCallback(() => {
-    if (pendingFavoriteIdRef.current) {
-      applyFavoriteById(pendingFavoriteIdRef.current);
-      pendingFavoriteIdRef.current = null;
-    }
-  }, [applyFavoriteById]);
-
-  // Apply favorite (same logic as CommandPalette)
-  const handleApplyFavorite = useCallback((favorite: main.FavoriteViewResponse) => {
-    const matchingGVK = gvks.find(
-      (g) =>
-        g.group === favorite.gvk.group &&
-        g.version === favorite.gvk.version &&
-        g.kind === favorite.gvk.kind
-    );
-    if (!matchingGVK) return;
-
-    // Check if same GVK is already selected
-    const isSameGVK = selectedGVK &&
-      selectedGVK.group === matchingGVK.group &&
-      selectedGVK.version === matchingGVK.version &&
-      selectedGVK.kind === matchingGVK.kind;
-
-    if (isSameGVK) {
-      // Same GVK - apply directly without waiting for onReady
-      applyFavoriteById(favorite.id);
-    } else {
-      // Different GVK - need to wait for NavigationPanel to load
-      pendingFavoriteIdRef.current = favorite.id;
-      setSelectedGVK(matchingGVK);
-    }
-  }, [gvks, selectedGVK, applyFavoriteById]);
+  }, [showCommandPalette, focusedPanel, isNavSearchFocused, isTableSearchFocused, allFavorites, handleApplyFavorite]);
 
   const handleClearFavorite = useCallback(() => {
     clearFavorite();
