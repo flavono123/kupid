@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - '.github/workflows/deploy-website.yaml'
   workflow_dispatch:
 
 permissions:
@@ -12,24 +13,18 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Build with Astro
-        uses: withastro/action@v3
+      - name: Checkout your repository using git
+        uses: actions/checkout@v6
+      - name: Install, build, and upload your site output
+        uses: withastro/action@v5
         with:
           path: ./website
+        env:
+          GITHUB_PAGES: 'true'
 
   deploy:
     needs: build
