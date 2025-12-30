@@ -4,7 +4,6 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  flexRender,
   type ColumnDef,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -73,6 +72,8 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   // Keyboard navigation state
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const [focusedColIndex, setFocusedColIndex] = useState<number | null>(null);
+  // Track copied cell for "Copied" feedback
+  const [copiedCellKey, setCopiedCellKey] = useState<string | null>(null);
 
   // Get highlight function based on current search query
   const getHighlightIndices = useCellHighlight(globalFilter);
@@ -257,7 +258,13 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
       ? JSON.stringify(value)
       : String(value ?? '');
 
-    navigator.clipboard.writeText(text).catch(console.error);
+    navigator.clipboard.writeText(text).then(() => {
+      // Set copied cell key to show "Copied" feedback
+      const cellKey = `${row.id}-${cell.column.id}`;
+      setCopiedCellKey(cellKey);
+      // Clear after 1 second
+      setTimeout(() => setCopiedCellKey(null), 1000);
+    }).catch(console.error);
   }, [focusedRowIndex, focusedColIndex, rows]);
 
   // Expose handle methods
@@ -409,20 +416,34 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                   >
                     {row.getVisibleCells().map((cell, cellIndex) => {
                       const isCellFocused = isRowFocused && focusedColIndex === cellIndex;
+                      const cellKey = `${row.id}-${cell.column.id}`;
+                      const showCopied = copiedCellKey === cellKey;
+
+                      // Get cell value and highlight indices for direct rendering
+                      const value = cell.getValue();
+                      const fullText = typeof value === 'object' && value !== null
+                        ? JSON.stringify(value)
+                        : String(value ?? '');
+                      const highlightIndices = getHighlightIndices(fullText);
+
                       return (
                         <div
                           key={cell.id}
                           className={cn(
                             "px-4 py-1 text-sm flex-shrink-0",
-                            isFlashing(row.id, cell.column.id) && "animate-cell-flash",
-                            isCellFocused && "ring-2 ring-primary ring-inset"
+                            isFlashing(row.id, cell.column.id) && "animate-cell-flash"
                           )}
                           style={{
                             width: `${cell.column.getSize()}px`,
                             minWidth: `${cell.column.columnDef.minSize || 80}px`,
                           }}
                         >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          <CellContent
+                            value={value}
+                            highlightIndices={highlightIndices}
+                            isFocused={isCellFocused}
+                            showCopied={showCopied}
+                          />
                         </div>
                       );
                     })}
