@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from 'react';  // For copied state
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { HighlightedText } from './HighlightedText';
 import { cn } from '@/lib/utils';
@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 interface CellContentProps {
   value: any;
   highlightIndices?: [number, number][] | null;
-  /** Whether this cell is focused via keyboard navigation */
+  /** Whether this cell is focused (keyboard or mouse) */
   isFocused?: boolean;
   /** Whether to show "Copied" feedback (controlled by parent) */
   showCopied?: boolean;
@@ -18,12 +18,9 @@ export function CellContent({
   isFocused = false,
   showCopied = false,
 }: CellContentProps) {
-  const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Show popover when hovered OR focused
-  const isOpen = isHovered || isFocused;
-  // Show "Copied" when clicked (hover) OR space pressed (focus)
+  // Show "Copied" when clicked OR space pressed
   const displayCopied = copied || showCopied;
 
   // Handle null/undefined
@@ -62,16 +59,14 @@ export function CellContent({
 
   // Always render with popover for consistency
   return (
-    <Popover open={isOpen} onOpenChange={setIsHovered}>
+    <Popover open={isFocused}>
       <PopoverTrigger asChild>
         <div
           className={cn(
             "text-sm overflow-hidden whitespace-nowrap rounded cursor-pointer",
-            "hover:underline hover:bg-accent/50",
+            // Same style for both keyboard and mouse focus
             isFocused && "underline bg-accent/50"
           )}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
           onClick={handleClick}
         >
           {content}

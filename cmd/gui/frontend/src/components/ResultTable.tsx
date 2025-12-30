@@ -69,7 +69,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<ResultTableToolbarHandle>(null);
 
-  // Keyboard navigation state
+  // Unified focus state (keyboard navigation + mouse hover)
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const [focusedColIndex, setFocusedColIndex] = useState<number | null>(null);
   // Track copied cell for "Copied" feedback
@@ -436,6 +436,11 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                           style={{
                             width: `${cell.column.getSize()}px`,
                             minWidth: `${cell.column.columnDef.minSize || 80}px`,
+                          }}
+                          onMouseEnter={() => {
+                            // Mouse hover moves focus to this cell
+                            setFocusedRowIndex(virtualRow.index);
+                            setFocusedColIndex(cellIndex);
                           }}
                         >
                           <CellContent
