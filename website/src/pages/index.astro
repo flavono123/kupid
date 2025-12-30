@@ -1,0 +1,83 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import DownloadButtons from '../components/DownloadButtons.astro';
+import GitHubStars from '../components/GitHubStars.astro';
+import FeatureSection from '../components/FeatureSection.astro';
+import Footer from '../components/Footer.astro';
+import { Sparkles, Monitor } from '@lucide/astro';
+---
+
+<BaseLayout title="kattle - Pick any field from your clusters">
+  <Header />
+
+  <main>
+    <!-- Hero Section -->
+    <section class="relative min-h-screen flex items-center justify-center pt-14">
+      <!-- Background gradient -->
+      <div class="absolute inset-0 -z-10 overflow-hidden">
+        <div class="absolute top-1/4 left-1/2 -translate-x-1/2 h-[600px] w-[900px] rounded-full bg-kattle-ari/10 blur-[150px]"></div>
+        <div class="absolute top-1/3 left-1/4 h-[400px] w-[500px] rounded-full bg-kattle-bada/10 blur-[120px]"></div>
+        <div class="absolute top-1/2 right-1/4 h-[350px] w-[450px] rounded-full bg-kattle-chorong/10 blur-[130px]"></div>
+      </div>
+
+      <div class="container-narrow text-center py-24">
+        <!-- Priceless Badge -->
+        <a href="/priceless" class="mb-8 inline-flex items-center gap-2 rounded-full border-2 border-kattle-chorong/50 bg-kattle-chorong/10 px-4 py-2 text-sm font-medium transition-colors hover:bg-kattle-chorong/20">
+          <Sparkles class="h-4 w-4 text-kattle-chorong" />
+          <span class="text-kattle-chorong">Priceless</span>
+          <span class="text-neutral-500">—</span>
+          <span class="text-neutral-300">Free and Open Source</span>
+        </a>
+
+        <!-- Main Headline -->
+        <h1 class="mb-6 text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
+          Pick <span class="bg-gradient-to-r from-kattle-ari via-kattle-bada to-kattle-chorong bg-clip-text text-transparent">any field</span> from your clusters
+        </h1>
+
+        <!-- Subheadline -->
+        <p class="mx-auto mb-8 max-w-3xl text-lg text-neutral-300 sm:text-xl">
+          Select any field from your Kubernetes resources and view them in a table.
+          <br class="hidden sm:block" />
+          No more writing <code class="rounded bg-kattle-bada/20 px-2 py-0.5 text-kattle-bada">kubectl + jq</code> every time. Just a few clicks.
+        </p>
+
+        <!-- GitHub Stars -->
+        <div class="mb-10">
+          <GitHubStars />
+        </div>
+
+        <!-- Download Buttons -->
+        <DownloadButtons />
+
+        <!-- Product Screenshot Placeholder -->
+        <div class="mt-16 overflow-hidden rounded-xl border-2 border-neutral-700 bg-neutral-900/80 shadow-2xl shadow-kattle-ari/5">
+          <div class="aspect-video flex items-center justify-center p-8">
+            <div class="text-center">
+              <Monitor class="mx-auto mb-4 h-16 w-16 text-neutral-500" />
+              <p class="text-lg text-neutral-400">Product screenshot coming soon</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <FeatureSection />
+
+    <!-- Final CTA Section -->
+    <section class="py-24 border-t border-neutral-800">
+      <div class="container-narrow text-center">
+        <h2 class="mb-4 text-3xl font-bold text-white">
+          Ready to explore your clusters?
+        </h2>
+        <p class="mb-8 text-lg text-neutral-300">
+          Start for free. Open source, free forever.
+        </p>
+        <DownloadButtons />
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>

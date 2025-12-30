@@ -1,0 +1,46 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { FileText } from '@lucide/astro';
+---
+
+<BaseLayout title="Changelog - kattle">
+  <Header />
+
+  <main class="min-h-screen pt-14">
+    <section class="py-24">
+      <div class="container-narrow">
+        <div class="mb-16 text-center">
+          <h1 class="mb-4 text-4xl font-bold text-neutral-100">Changelog</h1>
+          <p class="text-lg text-neutral-400">
+            New features and updates for kattle.
+          </p>
+        </div>
+
+        <div class="mx-auto max-w-2xl">
+          <div class="rounded-xl border border-neutral-800 bg-neutral-900/50 p-12 text-center">
+            <FileText class="mx-auto mb-4 h-10 w-10 text-neutral-500" />
+            <h2 class="mb-2 text-xl font-semibold text-neutral-100">Coming Soon</h2>
+            <p class="text-neutral-500">
+              Release notes coming soon.
+            </p>
+            <a
+              href="https://github.com/flavono123/kupid/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-6 inline-flex items-center gap-2 text-sm text-brand-400 hover:text-brand-300 transition-colors"
+            >
+              View on GitHub Releases
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>

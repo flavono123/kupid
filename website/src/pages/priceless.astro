@@ -1,0 +1,62 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { Sparkles, Gem, Check } from '@lucide/astro';
+---
+
+<BaseLayout title="Priceless - kattle">
+  <Header />
+
+  <main class="min-h-screen pt-14">
+    <section class="py-24">
+      <div class="container-narrow text-center">
+        <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-kattle-chorong/30 bg-kattle-chorong/10 px-4 py-1.5 text-sm">
+          <Sparkles class="h-4 w-4 text-kattle-chorong" />
+          <span class="text-kattle-chorong">Priceless</span>
+        </div>
+
+        <h1 class="mb-6 text-4xl font-bold text-neutral-100 sm:text-5xl">
+          Completely Free
+        </h1>
+
+        <p class="mx-auto mb-12 max-w-2xl text-lg text-neutral-400">
+          <span class="font-display font-bold text-kattle-ari">kattle</span> is open source software.
+          <br />
+          No paid plans, no hidden features, no limits.
+        </p>
+
+        <div class="mx-auto max-w-md rounded-xl border border-kattle-ari/30 bg-neutral-900/50 p-8">
+          <Gem class="mx-auto mb-6 h-12 w-12 text-kattle-ari" />
+          <h2 class="mb-2 text-2xl font-semibold text-kattle-ari">Priceless</h2>
+          <p class="mb-6 text-neutral-500">Free forever</p>
+
+          <ul class="mb-8 space-y-3 text-left text-neutral-400">
+            <li class="flex items-center gap-2">
+              <Check class="h-4 w-4 text-kattle-ari" /> All features free
+            </li>
+            <li class="flex items-center gap-2">
+              <Check class="h-4 w-4 text-kattle-ari" /> BYOC (Bring Your Own local Context config)
+            </li>
+            <li class="flex items-center gap-2">
+              <Check class="h-4 w-4 text-kattle-ari" /> Open source (MIT License)
+            </li>
+          </ul>
+
+          <a
+            href="https://github.com/flavono123/kupid/releases"
+            class="inline-flex items-center gap-2 rounded-lg bg-kattle-ari px-6 py-3 font-medium text-neutral-900 transition-all hover:bg-kattle-ari/90"
+          >
+            Download Now
+          </a>
+        </div>
+
+        <p class="mt-12 text-sm text-neutral-600">
+          The app is on us. But if you want to rep the herd... watch this space.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
