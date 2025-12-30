@@ -37,6 +37,7 @@ interface TreeNodeItemProps {
   onToggleSelect: (path: string[]) => void;
   searchResultsMap: Map<string, readonly [number, number][] | null>;
   focusedPath?: string;
+  onFocus?: (pathKey: string) => void;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -48,6 +49,7 @@ const TreeNodeItem = memo(({
   onToggleSelect,
   searchResultsMap,
   focusedPath,
+  onFocus,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
@@ -78,6 +80,10 @@ const TreeNodeItem = memo(({
     onToggleSelect(node.fullPath);
   }, [node.fullPath, onToggleSelect]);
 
+  const handleMouseEnter = useCallback(() => {
+    onFocus?.(pathKey);
+  }, [onFocus, pathKey]);
+
   return (
     <div className="relative">
       {/* Indent guide lines - with higher z-index to stay visible on hover */}
@@ -96,9 +102,10 @@ const TreeNodeItem = memo(({
       <div
         ref={nodeRef}
         className={`flex items-center py-0.5 pr-2 rounded-sm relative ${
-          isFocused ? 'bg-focus-active' : 'hover:bg-focus'
+          isFocused ? 'bg-focus' : ''
         }`}
         style={{ paddingLeft: `${node.level * 12 + 2}px` }}
+        onMouseEnter={handleMouseEnter}
       >
 
         {/* Expand/Collapse button OR Checkbox (mutually exclusive) */}
@@ -155,6 +162,7 @@ const TreeNodeItem = memo(({
               onToggleSelect={onToggleSelect}
               searchResultsMap={searchResultsMap}
               focusedPath={focusedPath}
+              onFocus={onFocus}
             />
           ))}
         </div>
@@ -199,6 +207,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
 
     // Keyboard navigation
     focusedPathKey,
+    setFocusedPath,
     navigateFocus,
     toggleFocused,
 
@@ -272,6 +281,8 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                     ? matchedPaths[currentMatchIndex]
                     : focusedPathKey ?? undefined
                 }
+                // Only enable mouse hover focus when not searching
+                onFocus={!debouncedQuery ? setFocusedPath : undefined}
               />
             ))}
           </div>
