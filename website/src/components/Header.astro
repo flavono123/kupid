@@ -1,0 +1,52 @@
+---
+import { Image } from 'astro:assets';
+import logoSvg from '../assets/logo.svg';
+import GitHubStars from './GitHubStars.astro';
+
+interface NavItem {
+  label: string;
+  href: string;
+  external?: boolean;
+  color?: string;
+}
+
+const navItems: NavItem[] = [
+  { label: 'Price-less', href: '/priceless', color: 'hover:text-kattle-chorong' },
+  { label: 'Changelog', href: '/changelog', color: 'hover:text-kattle-ari' },
+  { label: 'Blog', href: '/blog', color: 'hover:text-kattle-bada' },
+];
+---
+
+<header class="fixed top-0 left-0 right-0 z-50 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur-xl">
+  <nav class="container-narrow flex h-14 items-center justify-between">
+    <!-- Logo -->
+    <a href="/" class="flex items-center gap-2 font-display text-xl font-bold">
+      <Image src={logoSvg} alt="kattle logo" class="h-6 w-auto" loading="eager" />
+      <span class="kattle-gradient">kattle</span>
+    </a>
+
+    <!-- Navigation -->
+    <div class="flex items-center gap-6">
+      <ul class="flex items-center gap-6 text-sm font-medium">
+        {navItems.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              class={`text-neutral-400 transition-colors ${item.color}`}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener noreferrer' : undefined}
+            >
+              {item.label}
+              {item.external && (
+                <svg class="ml-1 inline-block h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <GitHubStars />
+    </div>
+  </nav>
+</header>

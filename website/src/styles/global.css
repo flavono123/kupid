@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-neutral-950 text-neutral-100 antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .container-narrow {
+    @apply mx-auto max-w-6xl px-6;
+  }
+
+  .container-wide {
+    @apply mx-auto max-w-7xl px-6;
+  }
+
+  /* kattle brand gradient text with flowing animation */
+  .kattle-gradient {
+    background: linear-gradient(
+      90deg,
+      hsl(109, 41%, 82%),   /* kattle-ari */
+      hsl(206, 47%, 70%),   /* kattle-bada */
+      hsl(121, 35%, 72%),   /* kattle-chorong */
+      hsl(109, 41%, 82%)    /* kattle-ari (repeat for smooth loop) */
+    );
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-flow 4s ease-in-out infinite;
+  }
+
+  @keyframes gradient-flow {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+}
+

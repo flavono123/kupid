@@ -1,0 +1,118 @@
+---
+import { Play } from '@lucide/astro';
+
+interface Feature {
+  id: string;
+  title: string;
+  usecase: string;
+  explanation: string;
+  videoPlaceholder: string;
+  color: 'ari' | 'bada' | 'chorong';
+}
+
+const features: Feature[] = [
+  {
+    id: 'multi-context',
+    title: 'Multi-Context Access',
+    usecase: 'Monitoring staging and production clusters side by side.',
+    explanation: 'Connect to multiple clusters at once and switch between them instantly.',
+    videoPlaceholder: 'Multi-context demo coming soon',
+    color: 'ari',
+  },
+  {
+    id: 'field-tree',
+    title: 'Dynamic Field Tree',
+    usecase: 'Finding .spec.containers[0].resources.limits across all pods.',
+    explanation: 'Select any path with a click, no matter how deep or verbose the field names.',
+    videoPlaceholder: 'Field tree demo coming soon',
+    color: 'bada',
+  },
+  {
+    id: 'result-table',
+    title: 'Realtime DIY Table',
+    usecase: 'Watching pod status changes during a deployment rollout.',
+    explanation: 'Quick value lookup, search, and real-time watch in a table.',
+    videoPlaceholder: 'Result table demo coming soon',
+    color: 'chorong',
+  },
+  {
+    id: 'favorite-views',
+    title: 'Favorite Views',
+    usecase: 'Checking resource limits every morning.',
+    explanation: 'Save your views and load them with a single click.',
+    videoPlaceholder: 'Favorite views demo coming soon',
+    color: 'ari',
+  },
+];
+
+const colorStyles = {
+  ari: {
+    text: 'text-kattle-ari',
+    border: 'border-kattle-ari/40',
+    bg: 'bg-kattle-ari/5',
+  },
+  bada: {
+    text: 'text-kattle-bada',
+    border: 'border-kattle-bada/40',
+    bg: 'bg-kattle-bada/5',
+  },
+  chorong: {
+    text: 'text-kattle-chorong',
+    border: 'border-kattle-chorong/40',
+    bg: 'bg-kattle-chorong/5',
+  },
+};
+---
+
+<section class="py-24">
+  <div class="container-narrow">
+    <div class="mb-16 text-center">
+      <h2 class="mb-4 text-3xl font-bold text-white sm:text-4xl">
+        Features
+      </h2>
+      <p class="mx-auto max-w-2xl text-lg text-neutral-300">
+        <code class="rounded bg-kattle-bada/20 px-2 py-0.5 text-kattle-bada">kubectl + jq</code> as a GUI.
+        <br />
+        Pick any field you want, no complex queries needed.
+      </p>
+    </div>
+
+    <div class="space-y-20">
+      {features.map((feature, index) => {
+        const style = colorStyles[feature.color];
+        const isReversed = index % 2 === 1;
+        return (
+          <div class={`relative flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12 ${isReversed ? 'lg:flex-row-reverse' : ''}`}>
+            {/* Background gradient - outside of video */}
+            <div class={`absolute top-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full ${style.bg.replace('/5', '/20')} blur-[120px] -z-10 ${isReversed ? '-right-32' : '-left-32'}`}></div>
+
+            {/* Video/Demo Container */}
+            <div class="flex-1">
+              <div class={`aspect-video overflow-hidden rounded-xl border-2 ${style.border} ${style.bg}`}>
+                <div class="flex h-full items-center justify-center p-8">
+                  <div class="text-center">
+                    <Play class="mx-auto mb-3 h-12 w-12 text-neutral-500" />
+                    <p class="text-neutral-400">{feature.videoPlaceholder}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Text Content */}
+            <div class="flex-1 lg:max-w-lg">
+              <h3 class={`mb-4 text-2xl font-bold ${style.text}`}>
+                {feature.title}
+              </h3>
+              <p class="mb-3 text-lg text-neutral-300 italic">
+                "{feature.usecase}"
+              </p>
+              <p class="text-neutral-400">
+                {feature.explanation}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { PenLine } from '@lucide/astro';
+---
+
+<BaseLayout title="Blog - kattle">
+  <Header />
+
+  <main class="min-h-screen pt-14">
+    <section class="py-24">
+      <div class="container-narrow">
+        <div class="mb-16 text-center">
+          <h1 class="mb-4 text-4xl font-bold text-neutral-100">Blog</h1>
+          <p class="text-lg text-neutral-400">
+            Kubernetes tips, tutorials, and kattle stories.
+          </p>
+        </div>
+
+        <div class="mx-auto max-w-2xl">
+          <div class="rounded-xl border border-neutral-800 bg-neutral-900/50 p-12 text-center">
+            <PenLine class="mx-auto mb-4 h-10 w-10 text-neutral-500" />
+            <h2 class="mb-2 text-xl font-semibold text-neutral-100">Coming Soon</h2>
+            <p class="text-neutral-500">
+              First post coming soon.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>

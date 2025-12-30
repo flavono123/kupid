@@ -1,0 +1,33 @@
+---
+import { GITHUB_REPO } from '../config';
+const currentYear = new Date().getFullYear();
+---
+
+<footer class="border-t border-neutral-800 bg-neutral-950 py-12">
+  <div class="container-narrow">
+    <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
+      <div class="flex items-center gap-2">
+        <span class="font-display font-bold text-kattle-ari">kattle</span>
+        <span class="text-neutral-600">·</span>
+        <span class="text-sm text-neutral-500">
+          © {currentYear} MIT License
+        </span>
+      </div>
+
+      <div class="flex items-center gap-6 text-sm text-neutral-400">
+        <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" class="hover:text-kattle-bada transition-colors">
+          GitHub
+        </a>
+        <a href="/priceless" class="hover:text-kattle-chorong transition-colors">
+          Price-less
+        </a>
+        <a href="/changelog" class="hover:text-kattle-ari transition-colors">
+          Changelog
+        </a>
+        <a href="/blog" class="hover:text-kattle-bada transition-colors">
+          Blog
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
