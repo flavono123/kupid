@@ -33,6 +33,9 @@ interface TreeState {
 
   // Selection
   selectedPaths: Set<string>;
+
+  // Keyboard navigation
+  focusedPathKey: string | null;
 }
 
 // Actions - includes future real-time update actions
@@ -65,7 +68,10 @@ type TreeAction =
   // Real-time tree structure updates (batched)
   // - additions: new array indices or map keys discovered from watch events
   // - removals: paths that no longer exist in any watched resource
-  | { type: 'MERGE_TREE_NODES'; additions: { parentPathKey: string; node: TreeNode }[]; removals: string[] };
+  | { type: 'MERGE_TREE_NODES'; additions: { parentPathKey: string; node: TreeNode }[]; removals: string[] }
+
+  // Keyboard navigation
+  | { type: 'SET_FOCUSED_PATH'; pathKey: string | null };
 
 // Initial state
 const initialState: TreeState = {
@@ -76,6 +82,7 @@ const initialState: TreeState = {
   debouncedQuery: '',
   manualExpandedPaths: new Set(),
   selectedPaths: new Set(),
+  focusedPathKey: null,
 };
 
 // Reducer
@@ -299,6 +306,12 @@ function treeReducer(state: TreeState, action: TreeAction): TreeState {
       return state;
     }
 
+    case 'SET_FOCUSED_PATH':
+      return {
+        ...state,
+        focusedPathKey: action.pathKey,
+      };
+
     default:
       return state;
   }
@@ -367,6 +380,7 @@ export function useTree({
     debouncedQuery,
     manualExpandedPaths,
     selectedPaths,
+    focusedPathKey,
   } = state;
 
   // Use ref for stable callback access
@@ -700,6 +714,63 @@ export function useTree({
     dispatch({ type: 'SET_SELECTIONS', paths, parentPathKeys });
   }, []);
 
+  // Get visible nodes in display order (considering expansion)
+  const getVisibleNodes = useCallback((): string[] => {
+    const visible: string[] = [];
+    const traverse = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        const pathKey = node.fullPath.join(PATH_DELIMITER);
+        visible.push(pathKey);
+        // Only traverse children if this node is expanded
+        if (node.children && node.children.length > 0 && expandedPaths.has(pathKey)) {
+          traverse(node.children);
+        }
+      }
+    };
+    traverse(filteredNodeTree);
+    return visible;
+  }, [filteredNodeTree, expandedPaths]);
+
+  // Keyboard navigation
+  const setFocusedPath = useCallback((pathKey: string | null) => {
+    dispatch({ type: 'SET_FOCUSED_PATH', pathKey });
+  }, []);
+
+  const navigateFocus = useCallback((direction: 'up' | 'down') => {
+    const visibleNodes = getVisibleNodes();
+    if (visibleNodes.length === 0) return;
+
+    const currentIndex = focusedPathKey ? visibleNodes.indexOf(focusedPathKey) : -1;
+    let newIndex: number;
+
+    if (direction === 'down') {
+      newIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, visibleNodes.length - 1);
+    } else {
+      newIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
+    }
+
+    dispatch({ type: 'SET_FOCUSED_PATH', pathKey: visibleNodes[newIndex] });
+  }, [focusedPathKey, getVisibleNodes]);
+
+  const toggleFocused = useCallback(() => {
+    if (!focusedPathKey) return;
+
+    const node = flatNodesMap.get(focusedPathKey);
+    if (!node) return;
+
+    const hasChildren = node.children && node.children.length > 0;
+    const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+    const isLeaf = !hasChildren && !isArrayOrMap;
+
+    if (isLeaf) {
+      // Toggle selection for leaf nodes
+      toggleSelect(node.fullPath);
+    } else {
+      // Toggle expansion for parent nodes
+      toggleExpand(node.fullPath);
+    }
+  }, [focusedPathKey, flatNodesMap, toggleSelect, toggleExpand]);
+
   const toggleSearch = useCallback(() => {
     if (searchVisibleRef.current) {
       dispatch({ type: 'CLOSE_SEARCH' });
@@ -718,18 +789,12 @@ export function useTree({
     dispatch({ type: 'NAVIGATE_MATCH', direction, totalMatches: matchedPaths.length });
   }, [matchedPaths.length]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (when search is visible)
+  // Note: Cmd+F is handled by MainView.tsx for panel-aware focus
   useEffect(() => {
+    if (!searchVisible) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+F / Ctrl+F: Toggle search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault();
-        toggleSearch();
-        return;
-      }
-
-      if (!searchVisible) return;
-
       // Esc: Close search
       if (e.key === 'Escape') {
         closeSearch();
@@ -746,7 +811,7 @@ export function useTree({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchVisible, query, navigateMatches, toggleSearch, closeSearch]);
+  }, [searchVisible, query, navigateMatches, closeSearch]);
 
   // Ensure currentMatchIndex is always valid (handles race between matchedPaths shrinking and RESET_MATCH_INDEX effect)
   const boundedMatchIndex = matchedPaths.length > 0
@@ -781,6 +846,12 @@ export function useTree({
     toggleSelect,
     clearAllSelections,
     setSelectionsFromPaths,
+
+    // Keyboard navigation
+    focusedPathKey,
+    setFocusedPath,
+    navigateFocus,
+    toggleFocused,
 
     // Filtered view
     filteredNodeTree,

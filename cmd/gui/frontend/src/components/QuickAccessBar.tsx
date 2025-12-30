@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Star, ChevronRight, ChevronDown, Pencil, Trash2, Check, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { Kbd } from "./ui/kbd";
 import {
   Collapsible,
   CollapsibleContent,
@@ -38,7 +39,11 @@ interface QuickAccessBarProps {
   onSaveFavorite: (name: string) => Promise<void>;
 }
 
-export function QuickAccessBar({
+export interface QuickAccessBarHandle {
+  openSavePopover: () => void;
+}
+
+export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarProps>(({
   favorites,
   activeFavoriteId,
   selectedGVK,
@@ -50,7 +55,7 @@ export function QuickAccessBar({
   onRename,
   onDelete,
   onSaveFavorite,
-}: QuickAccessBarProps) {
+}, ref) => {
   const [isOpen, setIsOpen] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -64,6 +69,16 @@ export function QuickAccessBar({
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
+
+  // Expose methods via ref
+  const canSave = selectedGVK && fieldCount > 0 && !isFavoriteSaved;
+  useImperativeHandle(ref, () => ({
+    openSavePopover: () => {
+      if (canSave) {
+        setSavePopoverOpen(true);
+      }
+    },
+  }), [canSave]);
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -318,9 +333,10 @@ export function QuickAccessBar({
 
         <CollapsibleContent>
           <div className="border-t border-border">
-            {favorites.map((fav) => {
+            {favorites.map((fav, index) => {
               const isActive = fav.id === activeFavoriteId;
               const isEditing = fav.id === editingId;
+              const shortcutNumber = index < 9 ? index + 1 : null;
 
               if (isEditing) {
                 return (
@@ -382,12 +398,18 @@ export function QuickAccessBar({
                     }
                   }}
                 >
-                  <Star
-                    className={cn(
-                      "h-3 w-3 shrink-0",
-                      isActive ? "text-accent fill-accent" : "text-accent/60"
-                    )}
-                  />
+                  {shortcutNumber ? (
+                    <Kbd className="text-[10px] w-4 h-4 flex items-center justify-center shrink-0">
+                      {shortcutNumber}
+                    </Kbd>
+                  ) : (
+                    <Star
+                      className={cn(
+                        "h-3 w-3 shrink-0",
+                        isActive ? "text-accent fill-accent" : "text-accent/60"
+                      )}
+                    />
+                  )}
 
                   {/* Name with minimum width guarantee */}
                   <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
@@ -496,4 +518,6 @@ export function QuickAccessBar({
       </AlertDialog>
     </>
   );
-}
+});
+
+QuickAccessBar.displayName = 'QuickAccessBar';

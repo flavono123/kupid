@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { Spinner } from './ui/spinner';
-import { FieldSearchBar } from './FieldSearchBar';
+import { FieldSearchBar, FieldSearchBarHandle } from './FieldSearchBar';
 import { main } from '../../wailsjs/go/models';
 import { useTree, TreeNode, PATH_DELIMITER } from '@/hooks/useTree';
 import { HighlightedText } from './HighlightedText';
@@ -22,6 +22,11 @@ export interface NavigationPanelHandle {
   getSelectedPaths: () => Set<string>;
   setSelectedPaths: (paths: Set<string>) => void;
   toggleSearch: () => void;
+  // Keyboard navigation
+  navigateUp: () => void;
+  navigateDown: () => void;
+  toggleFocused: () => void;
+  isSearchFocused: () => boolean;
 }
 
 interface TreeNodeItemProps {
@@ -32,6 +37,7 @@ interface TreeNodeItemProps {
   onToggleSelect: (path: string[]) => void;
   searchResultsMap: Map<string, readonly [number, number][] | null>;
   focusedPath?: string;
+  onFocus?: (pathKey: string) => void;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -43,6 +49,7 @@ const TreeNodeItem = memo(({
   onToggleSelect,
   searchResultsMap,
   focusedPath,
+  onFocus,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
@@ -73,6 +80,10 @@ const TreeNodeItem = memo(({
     onToggleSelect(node.fullPath);
   }, [node.fullPath, onToggleSelect]);
 
+  const handleMouseEnter = useCallback(() => {
+    onFocus?.(pathKey);
+  }, [onFocus, pathKey]);
+
   return (
     <div className="relative">
       {/* Indent guide lines - with higher z-index to stay visible on hover */}
@@ -91,9 +102,10 @@ const TreeNodeItem = memo(({
       <div
         ref={nodeRef}
         className={`flex items-center py-0.5 pr-2 rounded-sm relative ${
-          isFocused ? 'bg-focus-active' : 'hover:bg-focus'
+          isFocused ? 'bg-focus' : ''
         }`}
         style={{ paddingLeft: `${node.level * 12 + 2}px` }}
+        onMouseEnter={handleMouseEnter}
       >
 
         {/* Expand/Collapse button OR Checkbox (mutually exclusive) */}
@@ -150,6 +162,7 @@ const TreeNodeItem = memo(({
               onToggleSelect={onToggleSelect}
               searchResultsMap={searchResultsMap}
               focusedPath={focusedPath}
+              onFocus={onFocus}
             />
           ))}
         </div>
@@ -192,6 +205,12 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     clearAllSelections,
     setSelectionsFromPaths,
 
+    // Keyboard navigation
+    focusedPathKey,
+    setFocusedPath,
+    navigateFocus,
+    toggleFocused,
+
     // Filtered view
     filteredNodeTree,
   } = useTree({
@@ -202,13 +221,19 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     watch: true,  // Enable real-time tree updates
   });
 
+  const fieldSearchBarRef = useRef<FieldSearchBarHandle>(null);
+
   useImperativeHandle(ref, () => ({
     clearSelections: clearAllSelections,
     getSelectedCount: () => selectedPaths.size,
     getSelectedPaths: () => new Set(selectedPaths),
     setSelectedPaths: setSelectionsFromPaths,
     toggleSearch,
-  }), [clearAllSelections, selectedPaths, setSelectionsFromPaths, toggleSearch]);
+    navigateUp: () => navigateFocus('up'),
+    navigateDown: () => navigateFocus('down'),
+    toggleFocused,
+    isSearchFocused: () => fieldSearchBarRef.current?.isInputFocused() ?? false,
+  }), [clearAllSelections, selectedPaths, setSelectionsFromPaths, toggleSearch, navigateFocus, toggleFocused]);
 
   return (
     <div className="flex flex-col h-full relative">
@@ -216,6 +241,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
       {/* TODO: Add slide-down/slide-up animation when showing/hiding */}
       {searchVisible && (
         <FieldSearchBar
+          ref={fieldSearchBarRef}
           query={query}
           onQueryChange={setQuery}
           currentMatchIndex={currentMatchIndex}
@@ -249,7 +275,14 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                 onToggleExpand={toggleExpand}
                 onToggleSelect={toggleSelect}
                 searchResultsMap={searchResultsMap}
-                focusedPath={debouncedQuery && matchedPaths.length > 0 ? matchedPaths[currentMatchIndex] : undefined}
+                focusedPath={
+                  // Priority: search match focus > keyboard focus
+                  debouncedQuery && matchedPaths.length > 0
+                    ? matchedPaths[currentMatchIndex]
+                    : focusedPathKey ?? undefined
+                }
+                // Only enable mouse hover focus when not searching
+                onFocus={!debouncedQuery ? setFocusedPath : undefined}
               />
             ))}
           </div>

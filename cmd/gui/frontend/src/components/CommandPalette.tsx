@@ -145,7 +145,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, theme, onCl
         >
           <CommandInput
             ref={searchInputRef}
-            placeholder="Search resources..."
+            placeholder="Search ..."
             value={query}
             onValueChange={setQuery}
           />

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { CommandPalette } from "./CommandPalette";
 import { NavigationPanel, NavigationPanelHandle } from "./NavigationPanel";
-import { ResultTable } from "./ResultTable";
+import { ResultTable, ResultTableHandle } from "./ResultTable";
 import { NavHeader } from "./NavHeader";
-import { QuickAccessBar } from "./QuickAccessBar";
+import { QuickAccessBar, QuickAccessBarHandle } from "./QuickAccessBar";
+import { KeymapBar, FocusedPanel } from "./KeymapBar";
 import { Button } from "./ui/button";
 import { Kbd } from "./ui/kbd";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "./ui/resizable";
@@ -14,6 +15,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { useFavoriteViews } from "@/hooks/useFavoriteViews";
 import { useTheme } from "next-themes";
 import { toggleThemeWithAnimation } from "@/lib/theme-animation";
+import { isInputElementFocused } from "@/lib/dom-utils";
 
 interface MainViewProps {
   selectedContexts: string[];
@@ -35,7 +37,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const loadedRef = useRef(false);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const navigationPanelRef = useRef<NavigationPanelHandle>(null);
+  const resultTableRef = useRef<ResultTableHandle>(null);
+  const quickAccessBarRef = useRef<QuickAccessBarHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [focusedPanel, setFocusedPanel] = useState<FocusedPanel>(null);
   const { setTheme, resolvedTheme } = useTheme();
 
   // Handle theme toggle with animation
@@ -86,17 +91,14 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     loadGVKs();
   }, [connectedContexts]);
 
-  useEffect(() => {
-    // cmd+k to toggle CommandPalette
-    const handleKeydown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCommandPalette((prev) => !prev);
-      }
-    };
+  // Check if search is focused in nav panel
+  const isNavSearchFocused = useCallback(() => {
+    return navigationPanelRef.current?.isSearchFocused() ?? false;
+  }, []);
 
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
+  // Check if search is focused in result table
+  const isTableSearchFocused = useCallback(() => {
+    return resultTableRef.current?.isSearchFocused() ?? false;
   }, []);
 
   // Reset selectedFields when GVK changes
@@ -177,6 +179,133 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     }
   }, [gvks, selectedGVK, applyFavoriteById]);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      // Skip if CommandPalette is open
+      if (showCommandPalette) return;
+
+      // cmd+k to toggle CommandPalette
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette((prev) => !prev);
+        return;
+      }
+
+      // cmd+shift+a to clear all field selections
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        navigationPanelRef.current?.clearSelections();
+        return;
+      }
+
+      // cmd+shift+c to export to clipboard
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        resultTableRef.current?.exportToClipboard();
+        return;
+      }
+
+      // cmd+shift+s to download as file
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        resultTableRef.current?.exportToFile();
+        return;
+      }
+
+      // cmd+s to save as favorite (when not already saved)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        quickAccessBarRef.current?.openSavePopover();
+        return;
+      }
+
+      // cmd+1~9 to apply favorite (works regardless of panel focus)
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+        const index = parseInt(e.key) - 1;
+        if (index < allFavorites.length) {
+          e.preventDefault();
+          handleApplyFavorite(allFavorites[index]);
+        }
+        return;
+      }
+
+      // cmd+f to focus/toggle search in current panel
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        if (focusedPanel === 'nav') {
+          navigationPanelRef.current?.toggleSearch();
+        } else if (focusedPanel === 'table') {
+          resultTableRef.current?.focusSearch();
+        } else {
+          // Default to nav panel
+          setFocusedPanel('nav');
+          navigationPanelRef.current?.toggleSearch();
+        }
+        return;
+      }
+
+      // Tab to switch panel focus
+      if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        // Don't handle Tab if any search input is focused
+        if (isNavSearchFocused() || isTableSearchFocused()) return;
+
+        e.preventDefault();
+        setFocusedPanel((prev) => {
+          if (prev === 'nav') return 'table';
+          if (prev === 'table') return 'nav';
+          return 'nav'; // Default to nav if no panel is focused
+        });
+        return;
+      }
+
+      // Arrow keys for navigation
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        // Don't handle arrows if any input/textarea is focused
+        if (isInputElementFocused()) return;
+
+        if (focusedPanel === 'nav') {
+          e.preventDefault();
+          if (e.key === 'ArrowUp') {
+            navigationPanelRef.current?.navigateUp();
+          } else if (e.key === 'ArrowDown') {
+            navigationPanelRef.current?.navigateDown();
+          }
+        } else if (focusedPanel === 'table') {
+          e.preventDefault();
+          if (e.key === 'ArrowUp') {
+            resultTableRef.current?.navigateUp();
+          } else if (e.key === 'ArrowDown') {
+            resultTableRef.current?.navigateDown();
+          } else if (e.key === 'ArrowLeft') {
+            resultTableRef.current?.navigateLeft();
+          } else if (e.key === 'ArrowRight') {
+            resultTableRef.current?.navigateRight();
+          }
+        }
+        return;
+      }
+
+      // Space for toggle/select/copy
+      if (e.key === ' ') {
+        // Don't handle space if any input/textarea is focused
+        if (isInputElementFocused()) return;
+
+        if (focusedPanel === 'nav') {
+          e.preventDefault();
+          navigationPanelRef.current?.toggleFocused();
+        } else if (focusedPanel === 'table') {
+          e.preventDefault();
+          resultTableRef.current?.copyFocusedCell();
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [showCommandPalette, focusedPanel, isNavSearchFocused, isTableSearchFocused, allFavorites, handleApplyFavorite]);
+
   const handleClearFavorite = useCallback(() => {
     clearFavorite();
     // Also clear nav panel selections
@@ -188,8 +317,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     : "";
 
   return (
-    <div className="h-screen bg-background">
-      <ResizablePanelGroup direction="horizontal">
+    <div className="h-screen bg-background flex flex-col">
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Left Sidebar Navigation */}
         <ResizablePanel
           ref={sidebarPanelRef}
@@ -201,7 +330,12 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
           onCollapse={() => setIsSidebarCollapsed(true)}
           onExpand={() => setIsSidebarCollapsed(false)}
         >
-          <div className="flex flex-col h-full">
+          <div
+            className={`flex flex-col h-full transition-shadow ${
+              focusedPanel === 'nav' ? 'ring-2 ring-primary/50 ring-inset' : ''
+            }`}
+            onMouseDown={() => setFocusedPanel('nav')}
+          >
             {/* Nav Header */}
             <NavHeader
               selectedContexts={selectedContexts}
@@ -216,6 +350,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
             {/* Quick Access Bar for Favorites - always visible */}
             <QuickAccessBar
+              ref={quickAccessBarRef}
               favorites={allFavorites}
               activeFavoriteId={activeFavorite?.id ?? null}
               selectedGVK={selectedGVK}
@@ -258,13 +393,21 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
         {/* Right Panel - Main Content */}
         <ResizablePanel defaultSize={80}>
-          <div className="h-full relative">
+          <div
+            className={`h-full relative transition-shadow ${
+              focusedPanel === 'table' ? 'ring-2 ring-primary/50 ring-inset' : ''
+            }`}
+            onMouseDown={() => setFocusedPanel('table')}
+          >
             {/* Floating Expand Button (only when collapsed) */}
             {isSidebarCollapsed && (
               <Button
                 variant="outline"
                 size="icon"
-                onClick={toggleSidebar}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSidebar();
+                }}
                 className="absolute top-4 left-4 z-10 shadow-md"
               >
                 <PanelLeft className="w-4 h-4" />
@@ -274,6 +417,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
             {/* Table or Empty State */}
             {selectedGVK ? (
               <ResultTable
+                ref={resultTableRef}
                 selectedFields={selectedFields}
                 selectedGVK={selectedGVK}
                 connectedContexts={connectedContexts}
@@ -292,6 +436,14 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      {/* Keymap Bar - always visible */}
+      <KeymapBar
+        focusedPanel={focusedPanel}
+        selectedFieldCount={selectedFields.length}
+        isSearchFocused={isNavSearchFocused() || isTableSearchFocused()}
+        hasTableData={selectedFields.length > 0}
+      />
 
       {/* CommandPalette Modal */}
       {showCommandPalette && (

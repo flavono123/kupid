@@ -7,7 +7,8 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Download, Clipboard, FileDown, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, forwardRef, useRef, useImperativeHandle } from 'react';
+import { Kbd } from './ui/kbd';
 import { convertToCSV, copyToClipboard, downloadCSV } from '@/lib/csv-export';
 import { SaveFile } from '../../wailsjs/go/main/App';
 
@@ -22,7 +23,14 @@ interface ResultTableToolbarProps {
   resourceKind?: string; // For filename generation
 }
 
-export function ResultTableToolbar({
+export interface ResultTableToolbarHandle {
+  focusSearch: () => void;
+  isSearchFocused: () => boolean;
+  exportToClipboard: () => void;
+  exportToFile: () => void;
+}
+
+export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTableToolbarProps>(({
   globalFilter,
   onGlobalFilterChange,
   filteredRowCount,
@@ -30,9 +38,10 @@ export function ResultTableToolbar({
   headers,
   rows,
   resourceKind = 'resources',
-}: ResultTableToolbarProps) {
+}, ref) => {
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'downloaded' | 'error'>('idle');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportToClipboard = async () => {
     try {
@@ -82,13 +91,26 @@ export function ResultTableToolbar({
     }
   };
 
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    isSearchFocused: () => {
+      return document.activeElement === searchInputRef.current;
+    },
+    exportToClipboard: handleExportToClipboard,
+    exportToFile: handleExportToFile,
+  }), []);
+
   return (
     <div className="p-4 border-b border-border">
       <div className="flex items-center justify-between gap-4">
         {/* Left: Search input */}
         <div className="flex-1 max-w-sm">
           <Input
-            placeholder="Search all fields..."
+            ref={searchInputRef}
+            placeholder="Search ..."
             value={globalFilter}
             onChange={(e) => onGlobalFilterChange(e.target.value)}
           />
@@ -130,15 +152,23 @@ export function ResultTableToolbar({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={handleExportToClipboard}>
               <Clipboard className="mr-2 h-4 w-4" />
-              <span>Copy to Clipboard</span>
+              <span className="flex-1">Copy to Clipboard</span>
+              <span className="ml-4 flex items-center gap-0.5">
+                <Kbd>⌘</Kbd><Kbd>⇧</Kbd><Kbd>C</Kbd>
+              </span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleExportToFile}>
               <FileDown className="mr-2 h-4 w-4" />
-              <span>Download as File</span>
+              <span className="flex-1">Download as File</span>
+              <span className="ml-4 flex items-center gap-0.5">
+                <Kbd>⌘</Kbd><Kbd>⇧</Kbd><Kbd>S</Kbd>
+              </span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </div>
   );
-}
+});
+
+ResultTableToolbar.displayName = 'ResultTableToolbar';

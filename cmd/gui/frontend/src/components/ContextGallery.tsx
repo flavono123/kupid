@@ -273,7 +273,7 @@ export function ContextGallery({ onContextsConnected, onLogoClick }: ContextGall
                 <Input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search contexts..."
+                  placeholder="Search ..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => setIsSearchFocused(true)}

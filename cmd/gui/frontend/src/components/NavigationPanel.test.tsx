@@ -202,13 +202,15 @@ describe('NavigationPanel', () => {
       },
     ];
 
-    it('should toggle search bar with Cmd+F', async () => {
+    it('should toggle search bar via toggleSearch ref', async () => {
+      // Note: Cmd+F is handled by MainView, which calls toggleSearch via ref
       (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
 
-      const user = userEvent.setup();
+      const ref = { current: null as any };
 
       render(
         <NavigationPanel
+          ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -220,22 +222,28 @@ describe('NavigationPanel', () => {
       });
 
       // Search bar should not be visible initially
-      expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
 
-      // Press Cmd+F
-      await user.keyboard('{Meta>}f{/Meta}');
+      // Toggle search via ref (simulates what MainView does on Cmd+F)
+      act(() => {
+        ref.current.toggleSearch();
+      });
 
       // Search bar should now be visible
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
+      });
     });
 
     it('should close search with Escape', async () => {
       (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
 
       const user = userEvent.setup();
+      const ref = { current: null as any };
 
       render(
         <NavigationPanel
+          ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -246,16 +254,20 @@ describe('NavigationPanel', () => {
         expect(screen.getByText('metadata')).toBeInTheDocument();
       });
 
-      // Open search
-      await user.keyboard('{Meta>}f{/Meta}');
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      // Open search via ref
+      act(() => {
+        ref.current.toggleSearch();
+      });
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
+      });
 
       // Press Escape
       await user.keyboard('{Escape}');
 
       // Search bar should be closed
       await waitFor(() => {
-        expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
       });
     });
   });
@@ -750,9 +762,11 @@ describe('NavigationPanel', () => {
       (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
 
       const user = userEvent.setup();
+      const ref = { current: null as any };
 
       render(
         <NavigationPanel
+          ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -774,9 +788,14 @@ describe('NavigationPanel', () => {
       // spec should be collapsed
       expect(screen.queryByText('nodeName')).not.toBeInTheDocument();
 
-      // Open search and search for "nodeName"
-      await user.keyboard('{Meta>}f{/Meta}');
-      const searchInput = screen.getByPlaceholderText('Search...');
+      // Open search via ref
+      act(() => {
+        ref.current.toggleSearch();
+      });
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
+      });
+      const searchInput = screen.getByPlaceholderText('Search ...');
       await user.type(searchInput, 'nodeName');
 
       // Wait for search results - spec should auto-expand to show nodeName
@@ -802,9 +821,11 @@ describe('NavigationPanel', () => {
       (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
 
       const user = userEvent.setup();
+      const ref = { current: null as any };
 
       render(
         <NavigationPanel
+          ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -815,9 +836,14 @@ describe('NavigationPanel', () => {
         expect(screen.getByText('metadata')).toBeInTheDocument();
       });
 
-      // Open search and search for "namespace"
-      await user.keyboard('{Meta>}f{/Meta}');
-      const searchInput = screen.getByPlaceholderText('Search...');
+      // Open search via ref
+      act(() => {
+        ref.current.toggleSearch();
+      });
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
+      });
+      const searchInput = screen.getByPlaceholderText('Search ...');
       await user.type(searchInput, 'namespace');
 
       // metadata should auto-expand due to search
@@ -1050,7 +1076,7 @@ describe('NavigationPanel', () => {
       });
 
       // Search should not be visible initially
-      expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
 
       // Toggle search via ref
       act(() => {
@@ -1058,7 +1084,7 @@ describe('NavigationPanel', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
       });
 
       // Toggle again to close
@@ -1067,7 +1093,7 @@ describe('NavigationPanel', () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('Search ...')).not.toBeInTheDocument();
       });
     });
   });
