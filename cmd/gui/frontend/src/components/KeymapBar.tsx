@@ -16,7 +16,7 @@ export function KeymapBar({
   hasTableData,
 }: KeymapBarProps) {
   return (
-    <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-muted/30 flex gap-4 text-xs text-muted-foreground">
+    <div className="flex-shrink-0 px-4 py-2 border-t border-border flex gap-4 text-xs text-muted-foreground">
       {/* Common shortcuts */}
       <div className="flex items-center gap-1">
         <Kbd>⌘</Kbd>
