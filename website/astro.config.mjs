@@ -6,6 +6,6 @@ import react from '@astrojs/react';
 // https://astro.build/config
 export default defineConfig({
   site: 'https://flavono123.github.io',
-  base: '/kattle',
+  base: '/kupid',
   integrations: [tailwind(), react()],
 });
