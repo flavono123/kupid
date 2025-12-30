@@ -29,7 +29,7 @@ export function FieldSearchBar({
       md:p-1.5
     ">
       <Input
-        placeholder="Search..."
+        placeholder="Search ..."
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         className="flex-1 h-8 text-sm"

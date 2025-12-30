@@ -88,7 +88,7 @@ export function ResultTableToolbar({
         {/* Left: Search input */}
         <div className="flex-1 max-w-sm">
           <Input
-            placeholder="Search all fields..."
+            placeholder="Search ..."
             value={globalFilter}
             onChange={(e) => onGlobalFilterChange(e.target.value)}
           />
