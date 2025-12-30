@@ -2,7 +2,6 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import DownloadButtons from '../components/DownloadButtons.astro';
-import GitHubStars from '../components/GitHubStars.astro';
 import FeatureSection from '../components/FeatureSection.astro';
 import Footer from '../components/Footer.astro';
 import { Sparkles, Monitor } from '@lucide/astro';
@@ -41,11 +40,6 @@ import { Sparkles, Monitor } from '@lucide/astro';
           <br class="hidden sm:block" />
           No more writing <code class="rounded bg-kattle-bada/20 px-2 py-0.5 text-kattle-bada">kubectl + jq</code> every time. Just a few clicks.
         </p>
-
-        <!-- GitHub Stars -->
-        <div class="mb-10">
-          <GitHubStars />
-        </div>
 
         <!-- Download Buttons -->
         <DownloadButtons />
