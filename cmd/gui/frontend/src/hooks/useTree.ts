@@ -789,18 +789,12 @@ export function useTree({
     dispatch({ type: 'NAVIGATE_MATCH', direction, totalMatches: matchedPaths.length });
   }, [matchedPaths.length]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (when search is visible)
+  // Note: Cmd+F is handled by MainView.tsx for panel-aware focus
   useEffect(() => {
+    if (!searchVisible) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+F / Ctrl+F: Toggle search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault();
-        toggleSearch();
-        return;
-      }
-
-      if (!searchVisible) return;
-
       // Esc: Close search
       if (e.key === 'Escape') {
         closeSearch();
@@ -817,7 +811,7 @@ export function useTree({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchVisible, query, navigateMatches, toggleSearch, closeSearch]);
+  }, [searchVisible, query, navigateMatches, closeSearch]);
 
   // Ensure currentMatchIndex is always valid (handles race between matchedPaths shrinking and RESET_MATCH_INDEX effect)
   const boundedMatchIndex = matchedPaths.length > 0
