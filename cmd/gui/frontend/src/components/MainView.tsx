@@ -149,8 +149,12 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
       // Arrow keys for navigation
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        // Don't handle arrows if search is focused
-        if (isNavSearchFocused() || isTableSearchFocused()) return;
+        // Don't handle arrows if any input/textarea is focused
+        const activeEl = document.activeElement;
+        const isInputFocused = activeEl instanceof HTMLInputElement ||
+                               activeEl instanceof HTMLTextAreaElement ||
+                               activeEl?.getAttribute('contenteditable') === 'true';
+        if (isInputFocused) return;
 
         if (focusedPanel === 'nav') {
           e.preventDefault();
@@ -176,8 +180,12 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
       // Space for toggle/select/copy
       if (e.key === ' ') {
-        // Don't handle space if search is focused
-        if (isNavSearchFocused() || isTableSearchFocused()) return;
+        // Don't handle space if any input/textarea is focused
+        const activeEl = document.activeElement;
+        const isInputFocused = activeEl instanceof HTMLInputElement ||
+                               activeEl instanceof HTMLTextAreaElement ||
+                               activeEl?.getAttribute('contenteditable') === 'true';
+        if (isInputFocused) return;
 
         if (focusedPanel === 'nav') {
           e.preventDefault();
