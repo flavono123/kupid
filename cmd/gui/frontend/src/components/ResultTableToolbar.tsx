@@ -8,6 +8,7 @@ import {
 } from './ui/dropdown-menu';
 import { Download, Clipboard, FileDown, AlertCircle } from 'lucide-react';
 import { useState, forwardRef, useRef, useImperativeHandle } from 'react';
+import { Kbd } from './ui/kbd';
 import { convertToCSV, copyToClipboard, downloadCSV } from '@/lib/csv-export';
 import { SaveFile } from '../../wailsjs/go/main/App';
 
@@ -25,6 +26,8 @@ interface ResultTableToolbarProps {
 export interface ResultTableToolbarHandle {
   focusSearch: () => void;
   isSearchFocused: () => boolean;
+  exportToClipboard: () => void;
+  exportToFile: () => void;
 }
 
 export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTableToolbarProps>(({
@@ -39,15 +42,6 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'downloaded' | 'error'>('idle');
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useImperativeHandle(ref, () => ({
-    focusSearch: () => {
-      searchInputRef.current?.focus();
-    },
-    isSearchFocused: () => {
-      return document.activeElement === searchInputRef.current;
-    },
-  }), []);
 
   const handleExportToClipboard = async () => {
     try {
@@ -96,6 +90,18 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
       setExporting(false);
     }
   };
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    isSearchFocused: () => {
+      return document.activeElement === searchInputRef.current;
+    },
+    exportToClipboard: handleExportToClipboard,
+    exportToFile: handleExportToFile,
+  }), []);
 
   return (
     <div className="p-4 border-b border-border">
@@ -146,11 +152,17 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={handleExportToClipboard}>
               <Clipboard className="mr-2 h-4 w-4" />
-              <span>Copy to Clipboard</span>
+              <span className="flex-1">Copy to Clipboard</span>
+              <span className="ml-4 flex items-center gap-0.5">
+                <Kbd>⌘</Kbd><Kbd>⇧</Kbd><Kbd>C</Kbd>
+              </span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleExportToFile}>
               <FileDown className="mr-2 h-4 w-4" />
-              <span>Download as File</span>
+              <span className="flex-1">Download as File</span>
+              <span className="ml-4 flex items-center gap-0.5">
+                <Kbd>⌘</Kbd><Kbd>⇧</Kbd><Kbd>S</Kbd>
+              </span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

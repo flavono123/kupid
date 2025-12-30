@@ -31,6 +31,8 @@ export interface ResultTableHandle {
   navigateLeft: () => void;
   navigateRight: () => void;
   copyFocusedCell: () => void;
+  exportToClipboard: () => void;
+  exportToFile: () => void;
 }
 
 // Helper function to get nested value from object using path
@@ -280,6 +282,12 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
     navigateLeft,
     navigateRight,
     copyFocusedCell,
+    exportToClipboard: () => {
+      toolbarRef.current?.exportToClipboard();
+    },
+    exportToFile: () => {
+      toolbarRef.current?.exportToFile();
+    },
   }), [navigateUp, navigateDown, navigateLeft, navigateRight, copyFocusedCell]);
 
   // Get total width from table state (updates on resize)

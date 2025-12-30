@@ -197,6 +197,20 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         return;
       }
 
+      // cmd+shift+c to export to clipboard
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        resultTableRef.current?.exportToClipboard();
+        return;
+      }
+
+      // cmd+shift+s to download as file
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        resultTableRef.current?.exportToFile();
+        return;
+      }
+
       // cmd+1~9 to apply favorite (works regardless of panel focus)
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         const index = parseInt(e.key) - 1;
