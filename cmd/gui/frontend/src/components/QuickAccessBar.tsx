@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Star, ChevronRight, ChevronDown, Pencil, Trash2, Check, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -39,7 +39,11 @@ interface QuickAccessBarProps {
   onSaveFavorite: (name: string) => Promise<void>;
 }
 
-export function QuickAccessBar({
+export interface QuickAccessBarHandle {
+  openSavePopover: () => void;
+}
+
+export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarProps>(({
   favorites,
   activeFavoriteId,
   selectedGVK,
@@ -51,7 +55,7 @@ export function QuickAccessBar({
   onRename,
   onDelete,
   onSaveFavorite,
-}: QuickAccessBarProps) {
+}, ref) => {
   const [isOpen, setIsOpen] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -65,6 +69,16 @@ export function QuickAccessBar({
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
+
+  // Expose methods via ref
+  const canSave = selectedGVK && fieldCount > 0 && !isFavoriteSaved;
+  useImperativeHandle(ref, () => ({
+    openSavePopover: () => {
+      if (canSave) {
+        setSavePopoverOpen(true);
+      }
+    },
+  }), [canSave]);
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -504,4 +518,6 @@ export function QuickAccessBar({
       </AlertDialog>
     </>
   );
-}
+});
+
+QuickAccessBar.displayName = 'QuickAccessBar';

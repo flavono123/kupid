@@ -3,7 +3,7 @@ import { CommandPalette } from "./CommandPalette";
 import { NavigationPanel, NavigationPanelHandle } from "./NavigationPanel";
 import { ResultTable, ResultTableHandle } from "./ResultTable";
 import { NavHeader } from "./NavHeader";
-import { QuickAccessBar } from "./QuickAccessBar";
+import { QuickAccessBar, QuickAccessBarHandle } from "./QuickAccessBar";
 import { KeymapBar, FocusedPanel } from "./KeymapBar";
 import { Button } from "./ui/button";
 import { Kbd } from "./ui/kbd";
@@ -37,6 +37,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const navigationPanelRef = useRef<NavigationPanelHandle>(null);
   const resultTableRef = useRef<ResultTableHandle>(null);
+  const quickAccessBarRef = useRef<QuickAccessBarHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [focusedPanel, setFocusedPanel] = useState<FocusedPanel>(null);
   const { setTheme, resolvedTheme } = useTheme();
@@ -211,6 +212,13 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         return;
       }
 
+      // cmd+s to save as favorite (when not already saved)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        quickAccessBarRef.current?.openSavePopover();
+        return;
+      }
+
       // cmd+1~9 to apply favorite (works regardless of panel focus)
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         const index = parseInt(e.key) - 1;
@@ -349,6 +357,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
             {/* Quick Access Bar for Favorites - always visible */}
             <QuickAccessBar
+              ref={quickAccessBarRef}
               favorites={allFavorites}
               activeFavoriteId={activeFavorite?.id ?? null}
               selectedGVK={selectedGVK}
