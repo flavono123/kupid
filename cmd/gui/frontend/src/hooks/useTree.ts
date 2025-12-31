@@ -9,6 +9,9 @@ import type { ResourceEvent } from '../lib/resource-utils';
 // (e.g., Kubernetes annotations like "karpenter.sh/node-hash-version")
 export const PATH_DELIMITER = '\x00';
 
+// Debounce time for ignoring mouse hover after keyboard navigation
+const KEYBOARD_NAV_DEBOUNCE_MS = 300;
+
 // Types
 export interface TreeNode {
   name: string;
@@ -629,7 +632,7 @@ export function useTree({
         pathKey,
         parentPathKeys: getParentPathKeys(pathKey),
       });
-      // Parent is notified via the onFieldsSelected useEffect (line 681)
+      // Parent is notified via the onFieldsSelected useEffect
     } else {
       // Wildcard found - toggle all index nodes
       const arrayPath = path.slice(0, wildcardIndex);
@@ -758,10 +761,10 @@ export function useTree({
   // Note: setFocusedPath with 'mouse' trigger won't cause auto-scroll
   // Also ignores mouse hover shortly after keyboard navigation to prevent scroll interference
   const setFocusedPath = useCallback((pathKey: string | null) => {
-    // Ignore mouse hover within 300ms of keyboard navigation
+    // Ignore mouse hover within debounce period of keyboard navigation
     // This prevents scrollIntoView from triggering unwanted focus changes
     const timeSinceKeyboardNav = Date.now() - lastKeyboardNavTimeRef.current;
-    if (timeSinceKeyboardNav < 300) {
+    if (timeSinceKeyboardNav < KEYBOARD_NAV_DEBOUNCE_MS) {
       return;
     }
     dispatch({ type: 'SET_FOCUSED_PATH', pathKey, trigger: 'mouse' });
