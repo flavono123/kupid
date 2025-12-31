@@ -526,6 +526,60 @@ describe('useTree reducer', () => {
   });
 
   describe('REMOVE_STALE_PATHS (edge case handling)', () => {
+    it('should NOT remove valid paths that exist in the tree', () => {
+      // This test verifies the fix for the bug where selections were immediately
+      // removed after being made due to REMOVE_STALE_PATHS running on every state change
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['spec', 'containers', '0', 'image'].join(PATH_DELIMITER),
+          ['spec', 'containers', '*', 'image'].join(PATH_DELIMITER),  // wildcard selection
+        ]),
+        manualExpandedPaths: new Set([
+          ['spec'].join(PATH_DELIMITER),
+          ['spec', 'containers'].join(PATH_DELIMITER),
+          ['spec', 'containers', '0'].join(PATH_DELIMITER),
+        ]),
+      };
+
+      // Pass empty stalePaths - simulating when tree hasn't changed
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [],
+      });
+
+      // State should be unchanged (same reference)
+      expect(result).toBe(state);
+      // All selections should remain
+      expect(result.selectedPaths.has(['spec', 'containers', '0', 'image'].join(PATH_DELIMITER))).toBe(true);
+      expect(result.selectedPaths.has(['spec', 'containers', '*', 'image'].join(PATH_DELIMITER))).toBe(true);
+    });
+
+    it('should preserve wildcard selection when base path still exists', () => {
+      // Test that wildcard selections are not incorrectly removed
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['spec', 'containers', '*', 'image'].join(PATH_DELIMITER),  // wildcard
+          ['spec', 'containers', '0', 'image'].join(PATH_DELIMITER),  // concrete index
+          ['spec', 'containers', '1', 'image'].join(PATH_DELIMITER),  // another index
+        ]),
+      };
+
+      // Remove only a specific index path (simulating array shrinking by 1)
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['spec', 'containers', '1'].join(PATH_DELIMITER)],
+      });
+
+      // Wildcard should be preserved (base path still exists)
+      expect(result.selectedPaths.has(['spec', 'containers', '*', 'image'].join(PATH_DELIMITER))).toBe(true);
+      // Index 0 should be preserved
+      expect(result.selectedPaths.has(['spec', 'containers', '0', 'image'].join(PATH_DELIMITER))).toBe(true);
+      // Index 1 (and its children) should be removed
+      expect(result.selectedPaths.has(['spec', 'containers', '1', 'image'].join(PATH_DELIMITER))).toBe(false);
+    });
+
     it('should remove stale paths from selectedPaths', () => {
       const state = {
         ...initialState,

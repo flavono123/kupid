@@ -397,6 +397,15 @@ export function useTree({
   // Track last keyboard navigation time to ignore mouse hover during scroll
   const lastKeyboardNavTimeRef = useRef<number>(0);
 
+  // Track previous flatNodesMap to detect actual tree changes (not selection changes)
+  const prevFlatNodesMapRef = useRef<Map<string, TreeNode> | null>(null);
+
+  // Store state refs for useEffect that only depends on flatNodesMap
+  const selectedPathsRef = useRef(selectedPaths);
+  selectedPathsRef.current = selectedPaths;
+  const manualExpandedPathsRef = useRef(manualExpandedPaths);
+  manualExpandedPathsRef.current = manualExpandedPaths;
+
   // Store callbacks in refs to avoid stale closures
   const onFieldsSelectedRef = useRef(onFieldsSelected);
   onFieldsSelectedRef.current = onFieldsSelected;
@@ -620,14 +629,7 @@ export function useTree({
         pathKey,
         parentPathKeys: getParentPathKeys(pathKey),
       });
-
-      // Notify parent
-      setTimeout(() => {
-        if (onFieldsSelectedRef.current) {
-          // We need to get the updated selectedPaths from the next state
-          // This is a workaround since dispatch is async
-        }
-      }, 0);
+      // Parent is notified via the onFieldsSelected useEffect (line 681)
     } else {
       // Wildcard found - toggle all index nodes
       const arrayPath = path.slice(0, wildcardIndex);
@@ -680,14 +682,25 @@ export function useTree({
 
   // Cleanup stale paths when tree changes (e.g., field removed from all resources)
   // This handles both selectedPaths and manualExpandedPaths
+  // IMPORTANT: Only run when flatNodesMap actually changes (tree refresh), not on selection changes
   useEffect(() => {
+    // Skip if tree hasn't actually changed (prevents removing just-selected paths)
+    if (prevFlatNodesMapRef.current === flatNodesMap) {
+      return;
+    }
+    prevFlatNodesMapRef.current = flatNodesMap;
+
+    // Use refs to get current values without triggering on their changes
+    const currentSelectedPaths = selectedPathsRef.current;
+    const currentExpandedPaths = manualExpandedPathsRef.current;
+
     if (flatNodesMap.size === 0) return;
-    if (selectedPaths.size === 0 && manualExpandedPaths.size === 0) return;
+    if (currentSelectedPaths.size === 0 && currentExpandedPaths.size === 0) return;
 
     const stalePaths: string[] = [];
 
     // Check selectedPaths for stale entries
-    selectedPaths.forEach((pathKey) => {
+    currentSelectedPaths.forEach((pathKey) => {
       // Skip wildcard paths (they're virtual)
       if (pathKey.includes('*')) return;
       if (!flatNodesMap.has(pathKey)) {
@@ -696,7 +709,7 @@ export function useTree({
     });
 
     // Check manualExpandedPaths for stale entries
-    manualExpandedPaths.forEach((pathKey) => {
+    currentExpandedPaths.forEach((pathKey) => {
       if (!flatNodesMap.has(pathKey) && !stalePaths.includes(pathKey)) {
         stalePaths.push(pathKey);
       }
@@ -706,7 +719,7 @@ export function useTree({
       console.log('useTree: removing stale paths:', stalePaths);
       dispatch({ type: 'REMOVE_STALE_PATHS', stalePaths });
     }
-  }, [flatNodesMap, selectedPaths, manualExpandedPaths]);
+  }, [flatNodesMap]);
 
   const clearAllSelections = useCallback(() => {
     dispatch({ type: 'CLEAR_SELECTIONS' });
