@@ -18,6 +18,9 @@ export interface TreeNode {
   children: TreeNode[];
 }
 
+// Focus trigger type to distinguish keyboard navigation from mouse hover
+export type FocusTrigger = 'keyboard' | 'mouse' | 'search' | null;
+
 interface TreeState {
   // Data
   nodeTree: TreeNode[];
@@ -36,6 +39,7 @@ interface TreeState {
 
   // Keyboard navigation
   focusedPathKey: string | null;
+  focusTrigger: FocusTrigger;
 }
 
 // Actions - includes future real-time update actions
@@ -71,7 +75,7 @@ type TreeAction =
   | { type: 'MERGE_TREE_NODES'; additions: { parentPathKey: string; node: TreeNode }[]; removals: string[] }
 
   // Keyboard navigation
-  | { type: 'SET_FOCUSED_PATH'; pathKey: string | null };
+  | { type: 'SET_FOCUSED_PATH'; pathKey: string | null; trigger: FocusTrigger };
 
 // Initial state
 const initialState: TreeState = {
@@ -83,6 +87,7 @@ const initialState: TreeState = {
   manualExpandedPaths: new Set(),
   selectedPaths: new Set(),
   focusedPathKey: null,
+  focusTrigger: null,
 };
 
 // Reducer
@@ -310,6 +315,7 @@ function treeReducer(state: TreeState, action: TreeAction): TreeState {
       return {
         ...state,
         focusedPathKey: action.pathKey,
+        focusTrigger: action.trigger,
       };
 
     default:
@@ -381,11 +387,15 @@ export function useTree({
     manualExpandedPaths,
     selectedPaths,
     focusedPathKey,
+    focusTrigger,
   } = state;
 
   // Use ref for stable callback access
   const searchVisibleRef = useRef(searchVisible);
   searchVisibleRef.current = searchVisible;
+
+  // Track last keyboard navigation time to ignore mouse hover during scroll
+  const lastKeyboardNavTimeRef = useRef<number>(0);
 
   // Store callbacks in refs to avoid stale closures
   const onFieldsSelectedRef = useRef(onFieldsSelected);
@@ -732,8 +742,16 @@ export function useTree({
   }, [filteredNodeTree, expandedPaths]);
 
   // Keyboard navigation
+  // Note: setFocusedPath with 'mouse' trigger won't cause auto-scroll
+  // Also ignores mouse hover shortly after keyboard navigation to prevent scroll interference
   const setFocusedPath = useCallback((pathKey: string | null) => {
-    dispatch({ type: 'SET_FOCUSED_PATH', pathKey });
+    // Ignore mouse hover within 300ms of keyboard navigation
+    // This prevents scrollIntoView from triggering unwanted focus changes
+    const timeSinceKeyboardNav = Date.now() - lastKeyboardNavTimeRef.current;
+    if (timeSinceKeyboardNav < 300) {
+      return;
+    }
+    dispatch({ type: 'SET_FOCUSED_PATH', pathKey, trigger: 'mouse' });
   }, []);
 
   const navigateFocus = useCallback((direction: 'up' | 'down') => {
@@ -749,7 +767,11 @@ export function useTree({
       newIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
     }
 
-    dispatch({ type: 'SET_FOCUSED_PATH', pathKey: visibleNodes[newIndex] });
+    // Record keyboard navigation time to ignore mouse hover during scroll
+    lastKeyboardNavTimeRef.current = Date.now();
+
+    // Use 'keyboard' trigger to enable auto-scroll
+    dispatch({ type: 'SET_FOCUSED_PATH', pathKey: visibleNodes[newIndex], trigger: 'keyboard' });
   }, [focusedPathKey, getVisibleNodes]);
 
   const toggleFocused = useCallback(() => {
@@ -849,6 +871,7 @@ export function useTree({
 
     // Keyboard navigation
     focusedPathKey,
+    focusTrigger,
     setFocusedPath,
     navigateFocus,
     toggleFocused,

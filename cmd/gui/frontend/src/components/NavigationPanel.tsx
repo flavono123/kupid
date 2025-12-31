@@ -38,6 +38,8 @@ interface TreeNodeItemProps {
   searchResultsMap: Map<string, readonly [number, number][] | null>;
   focusedPath?: string;
   onFocus?: (pathKey: string) => void;
+  /** Whether to auto-scroll when focused (only for keyboard/search navigation) */
+  shouldAutoScroll?: boolean;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -50,6 +52,7 @@ const TreeNodeItem = memo(({
   searchResultsMap,
   focusedPath,
   onFocus,
+  shouldAutoScroll = false,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
@@ -62,15 +65,15 @@ const TreeNodeItem = memo(({
   const isFocused = focusedPath === pathKey;
   const nodeRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to focused node
+  // Auto-scroll to focused node (only for keyboard/search navigation, not mouse hover)
   useEffect(() => {
-    if (isFocused && nodeRef.current) {
+    if (isFocused && shouldAutoScroll && nodeRef.current) {
       nodeRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       });
     }
-  }, [isFocused]);
+  }, [isFocused, shouldAutoScroll]);
 
   const handleExpandClick = useCallback(() => {
     onToggleExpand(node.fullPath);
@@ -163,6 +166,7 @@ const TreeNodeItem = memo(({
               searchResultsMap={searchResultsMap}
               focusedPath={focusedPath}
               onFocus={onFocus}
+              shouldAutoScroll={shouldAutoScroll}
             />
           ))}
         </div>
@@ -207,6 +211,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
 
     // Keyboard navigation
     focusedPathKey,
+    focusTrigger,
     setFocusedPath,
     navigateFocus,
     toggleFocused,
@@ -283,6 +288,11 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                 }
                 // Only enable mouse hover focus when not searching
                 onFocus={!debouncedQuery ? setFocusedPath : undefined}
+                // Auto-scroll only for keyboard navigation or search navigation
+                shouldAutoScroll={
+                  focusTrigger === 'keyboard' ||
+                  (Boolean(debouncedQuery) && matchedPaths.length > 0)
+                }
               />
             ))}
           </div>
