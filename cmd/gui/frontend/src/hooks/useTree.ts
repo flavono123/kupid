@@ -9,6 +9,9 @@ import type { ResourceEvent } from '../lib/resource-utils';
 // (e.g., Kubernetes annotations like "karpenter.sh/node-hash-version")
 export const PATH_DELIMITER = '\x00';
 
+// Debounce time for ignoring mouse hover after keyboard navigation
+const KEYBOARD_NAV_DEBOUNCE_MS = 300;
+
 // Types
 export interface TreeNode {
   name: string;
@@ -17,6 +20,9 @@ export interface TreeNode {
   level: number;
   children: TreeNode[];
 }
+
+// Focus trigger type to distinguish keyboard navigation from mouse hover
+export type FocusTrigger = 'keyboard' | 'mouse' | 'search' | null;
 
 interface TreeState {
   // Data
@@ -36,6 +42,7 @@ interface TreeState {
 
   // Keyboard navigation
   focusedPathKey: string | null;
+  focusTrigger: FocusTrigger;
 }
 
 // Actions - includes future real-time update actions
@@ -71,7 +78,7 @@ type TreeAction =
   | { type: 'MERGE_TREE_NODES'; additions: { parentPathKey: string; node: TreeNode }[]; removals: string[] }
 
   // Keyboard navigation
-  | { type: 'SET_FOCUSED_PATH'; pathKey: string | null };
+  | { type: 'SET_FOCUSED_PATH'; pathKey: string | null; trigger: FocusTrigger };
 
 // Initial state
 const initialState: TreeState = {
@@ -83,6 +90,7 @@ const initialState: TreeState = {
   manualExpandedPaths: new Set(),
   selectedPaths: new Set(),
   focusedPathKey: null,
+  focusTrigger: null,
 };
 
 // Reducer
@@ -310,6 +318,7 @@ function treeReducer(state: TreeState, action: TreeAction): TreeState {
       return {
         ...state,
         focusedPathKey: action.pathKey,
+        focusTrigger: action.trigger,
       };
 
     default:
@@ -381,11 +390,24 @@ export function useTree({
     manualExpandedPaths,
     selectedPaths,
     focusedPathKey,
+    focusTrigger,
   } = state;
 
   // Use ref for stable callback access
   const searchVisibleRef = useRef(searchVisible);
   searchVisibleRef.current = searchVisible;
+
+  // Track last keyboard navigation time to ignore mouse hover during scroll
+  const lastKeyboardNavTimeRef = useRef<number>(0);
+
+  // Track previous flatNodesMap to detect actual tree changes (not selection changes)
+  const prevFlatNodesMapRef = useRef<Map<string, TreeNode> | null>(null);
+
+  // Store state refs for useEffect that only depends on flatNodesMap
+  const selectedPathsRef = useRef(selectedPaths);
+  selectedPathsRef.current = selectedPaths;
+  const manualExpandedPathsRef = useRef(manualExpandedPaths);
+  manualExpandedPathsRef.current = manualExpandedPaths;
 
   // Store callbacks in refs to avoid stale closures
   const onFieldsSelectedRef = useRef(onFieldsSelected);
@@ -610,14 +632,7 @@ export function useTree({
         pathKey,
         parentPathKeys: getParentPathKeys(pathKey),
       });
-
-      // Notify parent
-      setTimeout(() => {
-        if (onFieldsSelectedRef.current) {
-          // We need to get the updated selectedPaths from the next state
-          // This is a workaround since dispatch is async
-        }
-      }, 0);
+      // Parent is notified via the onFieldsSelected useEffect
     } else {
       // Wildcard found - toggle all index nodes
       const arrayPath = path.slice(0, wildcardIndex);
@@ -670,14 +685,25 @@ export function useTree({
 
   // Cleanup stale paths when tree changes (e.g., field removed from all resources)
   // This handles both selectedPaths and manualExpandedPaths
+  // IMPORTANT: Only run when flatNodesMap actually changes (tree refresh), not on selection changes
   useEffect(() => {
+    // Skip if tree hasn't actually changed (prevents removing just-selected paths)
+    if (prevFlatNodesMapRef.current === flatNodesMap) {
+      return;
+    }
+    prevFlatNodesMapRef.current = flatNodesMap;
+
+    // Use refs to get current values without triggering on their changes
+    const currentSelectedPaths = selectedPathsRef.current;
+    const currentExpandedPaths = manualExpandedPathsRef.current;
+
     if (flatNodesMap.size === 0) return;
-    if (selectedPaths.size === 0 && manualExpandedPaths.size === 0) return;
+    if (currentSelectedPaths.size === 0 && currentExpandedPaths.size === 0) return;
 
     const stalePaths: string[] = [];
 
     // Check selectedPaths for stale entries
-    selectedPaths.forEach((pathKey) => {
+    currentSelectedPaths.forEach((pathKey) => {
       // Skip wildcard paths (they're virtual)
       if (pathKey.includes('*')) return;
       if (!flatNodesMap.has(pathKey)) {
@@ -686,7 +712,7 @@ export function useTree({
     });
 
     // Check manualExpandedPaths for stale entries
-    manualExpandedPaths.forEach((pathKey) => {
+    currentExpandedPaths.forEach((pathKey) => {
       if (!flatNodesMap.has(pathKey) && !stalePaths.includes(pathKey)) {
         stalePaths.push(pathKey);
       }
@@ -696,7 +722,7 @@ export function useTree({
       console.log('useTree: removing stale paths:', stalePaths);
       dispatch({ type: 'REMOVE_STALE_PATHS', stalePaths });
     }
-  }, [flatNodesMap, selectedPaths, manualExpandedPaths]);
+  }, [flatNodesMap]);
 
   const clearAllSelections = useCallback(() => {
     dispatch({ type: 'CLEAR_SELECTIONS' });
@@ -732,8 +758,16 @@ export function useTree({
   }, [filteredNodeTree, expandedPaths]);
 
   // Keyboard navigation
+  // Note: setFocusedPath with 'mouse' trigger won't cause auto-scroll
+  // Also ignores mouse hover shortly after keyboard navigation to prevent scroll interference
   const setFocusedPath = useCallback((pathKey: string | null) => {
-    dispatch({ type: 'SET_FOCUSED_PATH', pathKey });
+    // Ignore mouse hover within debounce period of keyboard navigation
+    // This prevents scrollIntoView from triggering unwanted focus changes
+    const timeSinceKeyboardNav = Date.now() - lastKeyboardNavTimeRef.current;
+    if (timeSinceKeyboardNav < KEYBOARD_NAV_DEBOUNCE_MS) {
+      return;
+    }
+    dispatch({ type: 'SET_FOCUSED_PATH', pathKey, trigger: 'mouse' });
   }, []);
 
   const navigateFocus = useCallback((direction: 'up' | 'down') => {
@@ -749,7 +783,11 @@ export function useTree({
       newIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
     }
 
-    dispatch({ type: 'SET_FOCUSED_PATH', pathKey: visibleNodes[newIndex] });
+    // Record keyboard navigation time to ignore mouse hover during scroll
+    lastKeyboardNavTimeRef.current = Date.now();
+
+    // Use 'keyboard' trigger to enable auto-scroll
+    dispatch({ type: 'SET_FOCUSED_PATH', pathKey: visibleNodes[newIndex], trigger: 'keyboard' });
   }, [focusedPathKey, getVisibleNodes]);
 
   const toggleFocused = useCallback(() => {
@@ -849,6 +887,7 @@ export function useTree({
 
     // Keyboard navigation
     focusedPathKey,
+    focusTrigger,
     setFocusedPath,
     navigateFocus,
     toggleFocused,

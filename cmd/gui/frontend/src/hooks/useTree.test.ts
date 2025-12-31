@@ -4,6 +4,9 @@ import { PATH_DELIMITER } from './useTree';
 // Extract and test the reducer logic
 // We'll import the types and create a minimal reducer test
 
+// Focus trigger type to distinguish keyboard navigation from mouse hover
+type FocusTrigger = 'keyboard' | 'mouse' | 'search' | null;
+
 interface TreeState {
   nodeTree: TreeNode[];
   loading: boolean;
@@ -12,6 +15,8 @@ interface TreeState {
   debouncedQuery: string;
   manualExpandedPaths: Set<string>;
   selectedPaths: Set<string>;
+  focusedPathKey: string | null;
+  focusTrigger: FocusTrigger;
 }
 
 interface TreeNode {
@@ -38,7 +43,8 @@ type TreeAction =
   | { type: 'CLEAR_SELECTIONS' }
   | { type: 'SET_SELECTIONS'; paths: Set<string>; parentPathKeys: string[] }
   | { type: 'REMOVE_STALE_PATHS'; stalePaths: string[] }
-  | { type: 'MERGE_TREE_NODES'; additions: { parentPathKey: string; node: TreeNode }[]; removals: string[] };
+  | { type: 'MERGE_TREE_NODES'; additions: { parentPathKey: string; node: TreeNode }[]; removals: string[] }
+  | { type: 'SET_FOCUSED_PATH'; pathKey: string | null; trigger: FocusTrigger };
 
 const initialState: TreeState = {
   nodeTree: [],
@@ -48,6 +54,8 @@ const initialState: TreeState = {
   debouncedQuery: '',
   manualExpandedPaths: new Set(),
   selectedPaths: new Set(),
+  focusedPathKey: null,
+  focusTrigger: null,
 };
 
 // Replicate the reducer logic for testing
@@ -254,6 +262,13 @@ function treeReducer(state: TreeState, action: TreeAction): TreeState {
       return state;
     }
 
+    case 'SET_FOCUSED_PATH':
+      return {
+        ...state,
+        focusedPathKey: action.pathKey,
+        focusTrigger: action.trigger,
+      };
+
     default:
       return state;
   }
@@ -270,6 +285,8 @@ describe('useTree reducer', () => {
         debouncedQuery: 'test',
         manualExpandedPaths: new Set(['path1', 'path2']),
         selectedPaths: new Set(['selected1']),
+        focusedPathKey: 'some\x00path',
+        focusTrigger: 'keyboard',
       };
 
       const result = treeReducer(state, { type: 'RESET_FOR_GVK' });
@@ -281,6 +298,8 @@ describe('useTree reducer', () => {
       expect(result.debouncedQuery).toBe('');
       expect(result.manualExpandedPaths.size).toBe(0);
       expect(result.selectedPaths.size).toBe(0);
+      expect(result.focusedPathKey).toBe(null);
+      expect(result.focusTrigger).toBe(null);
     });
   });
 
@@ -507,6 +526,60 @@ describe('useTree reducer', () => {
   });
 
   describe('REMOVE_STALE_PATHS (edge case handling)', () => {
+    it('should NOT remove valid paths that exist in the tree', () => {
+      // This test verifies the fix for the bug where selections were immediately
+      // removed after being made due to REMOVE_STALE_PATHS running on every state change
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['spec', 'containers', '0', 'image'].join(PATH_DELIMITER),
+          ['spec', 'containers', '*', 'image'].join(PATH_DELIMITER),  // wildcard selection
+        ]),
+        manualExpandedPaths: new Set([
+          ['spec'].join(PATH_DELIMITER),
+          ['spec', 'containers'].join(PATH_DELIMITER),
+          ['spec', 'containers', '0'].join(PATH_DELIMITER),
+        ]),
+      };
+
+      // Pass empty stalePaths - simulating when tree hasn't changed
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [],
+      });
+
+      // State should be unchanged (same reference)
+      expect(result).toBe(state);
+      // All selections should remain
+      expect(result.selectedPaths.has(['spec', 'containers', '0', 'image'].join(PATH_DELIMITER))).toBe(true);
+      expect(result.selectedPaths.has(['spec', 'containers', '*', 'image'].join(PATH_DELIMITER))).toBe(true);
+    });
+
+    it('should preserve wildcard selection when base path still exists', () => {
+      // Test that wildcard selections are not incorrectly removed
+      const state = {
+        ...initialState,
+        selectedPaths: new Set([
+          ['spec', 'containers', '*', 'image'].join(PATH_DELIMITER),  // wildcard
+          ['spec', 'containers', '0', 'image'].join(PATH_DELIMITER),  // concrete index
+          ['spec', 'containers', '1', 'image'].join(PATH_DELIMITER),  // another index
+        ]),
+      };
+
+      // Remove only a specific index path (simulating array shrinking by 1)
+      const result = treeReducer(state, {
+        type: 'REMOVE_STALE_PATHS',
+        stalePaths: [['spec', 'containers', '1'].join(PATH_DELIMITER)],
+      });
+
+      // Wildcard should be preserved (base path still exists)
+      expect(result.selectedPaths.has(['spec', 'containers', '*', 'image'].join(PATH_DELIMITER))).toBe(true);
+      // Index 0 should be preserved
+      expect(result.selectedPaths.has(['spec', 'containers', '0', 'image'].join(PATH_DELIMITER))).toBe(true);
+      // Index 1 (and its children) should be removed
+      expect(result.selectedPaths.has(['spec', 'containers', '1', 'image'].join(PATH_DELIMITER))).toBe(false);
+    });
+
     it('should remove stale paths from selectedPaths', () => {
       const state = {
         ...initialState,
@@ -702,6 +775,78 @@ describe('useTree reducer', () => {
       // Original state should be unchanged (immutability check)
       expect(state.selectedPaths.size).toBe(0);
       expect(state.manualExpandedPaths.size).toBe(0);
+    });
+  });
+
+  describe('Keyboard navigation (SET_FOCUSED_PATH)', () => {
+    it('should set focusedPathKey and focusTrigger for keyboard navigation', () => {
+      const state = { ...initialState };
+      const pathKey = ['spec', 'containers', '0', 'name'].join(PATH_DELIMITER);
+
+      const result = treeReducer(state, {
+        type: 'SET_FOCUSED_PATH',
+        pathKey,
+        trigger: 'keyboard',
+      });
+
+      expect(result.focusedPathKey).toBe(pathKey);
+      expect(result.focusTrigger).toBe('keyboard');
+    });
+
+    it('should set focusedPathKey and focusTrigger for mouse hover', () => {
+      const state = { ...initialState };
+      const pathKey = ['metadata', 'name'].join(PATH_DELIMITER);
+
+      const result = treeReducer(state, {
+        type: 'SET_FOCUSED_PATH',
+        pathKey,
+        trigger: 'mouse',
+      });
+
+      expect(result.focusedPathKey).toBe(pathKey);
+      expect(result.focusTrigger).toBe('mouse');
+    });
+
+    it('should clear focus when pathKey is null', () => {
+      const state: TreeState = {
+        ...initialState,
+        focusedPathKey: ['some', 'path'].join(PATH_DELIMITER),
+        focusTrigger: 'keyboard',
+      };
+
+      const result = treeReducer(state, {
+        type: 'SET_FOCUSED_PATH',
+        pathKey: null,
+        trigger: null,
+      });
+
+      expect(result.focusedPathKey).toBe(null);
+      expect(result.focusTrigger).toBe(null);
+    });
+
+    it('should preserve other state when changing focus', () => {
+      const state: TreeState = {
+        ...initialState,
+        selectedPaths: new Set(['path1', 'path2']),
+        manualExpandedPaths: new Set(['expanded1']),
+        searchVisible: true,
+      };
+      const pathKey = ['metadata', 'labels'].join(PATH_DELIMITER);
+
+      const result = treeReducer(state, {
+        type: 'SET_FOCUSED_PATH',
+        pathKey,
+        trigger: 'keyboard',
+      });
+
+      // Focus updated
+      expect(result.focusedPathKey).toBe(pathKey);
+      expect(result.focusTrigger).toBe('keyboard');
+
+      // Other state preserved
+      expect(result.selectedPaths).toBe(state.selectedPaths);
+      expect(result.manualExpandedPaths).toBe(state.manualExpandedPaths);
+      expect(result.searchVisible).toBe(true);
     });
   });
 });

@@ -457,6 +457,55 @@ describe('NavigationPanel', () => {
       },
     ];
 
+    it('should persist selection after clicking (no blinking)', async () => {
+      // This test verifies the fix for the bug where selections would briefly appear
+      // then disappear due to REMOVE_STALE_PATHS running on every state change
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const user = userEvent.setup();
+      const ref = { current: null as any };
+
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Expand metadata
+      const expandButtons = screen.getAllByRole('button');
+      await user.click(expandButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      // Click the checkbox
+      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+        const parent = cb.closest('div');
+        return parent?.textContent?.includes('name');
+      });
+      await user.click(nameCheckbox!);
+
+      // Selection should persist - not blink and disappear
+      await waitFor(() => {
+        expect(ref.current.getSelectedCount()).toBe(1);
+      });
+
+      // Wait a bit more to ensure no cleanup removes it
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should still be selected
+      expect(ref.current.getSelectedCount()).toBe(1);
+      expect(nameCheckbox).toHaveAttribute('data-state', 'checked');
+    });
+
     it('should call onFieldsSelected when leaf node is selected', async () => {
       (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
 
@@ -714,6 +763,218 @@ describe('NavigationPanel', () => {
           ['metadata', 'annotations', 'eks.amazonaws.com/nodegroup'],
         ]);
       });
+    });
+
+    it('should persist wildcard selection (containers.*.image)', async () => {
+      // This test verifies the fix for the bug where clicking containers.*.image
+      // would cause the checkbox to briefly appear checked then disappear
+      const wildcardTreeData = [
+        {
+          name: 'spec',
+          type: 'PodSpec',
+          fullPath: ['spec'],
+          level: 0,
+          children: [
+            {
+              name: 'containers',
+              type: '[]Container',
+              fullPath: ['spec', 'containers'],
+              level: 1,
+              children: [
+                {
+                  name: '*',
+                  type: '',
+                  fullPath: ['spec', 'containers', '*'],
+                  level: 2,
+                  children: [
+                    {
+                      name: 'image',
+                      type: 'string',
+                      fullPath: ['spec', 'containers', '*', 'image'],
+                      level: 3,
+                      children: [],
+                    },
+                  ],
+                },
+                {
+                  name: '0',
+                  type: '',
+                  fullPath: ['spec', 'containers', '0'],
+                  level: 2,
+                  children: [
+                    {
+                      name: 'image',
+                      type: 'string',
+                      fullPath: ['spec', 'containers', '0', 'image'],
+                      level: 3,
+                      children: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      (App.GetNodeTree as any).mockResolvedValue(wildcardTreeData);
+
+      const user = userEvent.setup();
+      const ref = { current: null as any };
+
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('spec')).toBeInTheDocument();
+      });
+
+      // Expand spec > containers > *
+      const specExpandButton = screen.getAllByRole('button')[0];
+      await user.click(specExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('containers')).toBeInTheDocument();
+      });
+
+      const containersExpandButton = screen.getAllByRole('button')[1];
+      await user.click(containersExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('*')).toBeInTheDocument();
+      });
+
+      const wildcardExpandButton = screen.getAllByRole('button')[2];
+      await user.click(wildcardExpandButton);
+
+      await waitFor(() => {
+        // Find the image node under wildcard
+        const imageNodes = screen.getAllByText('image');
+        expect(imageNodes.length).toBeGreaterThan(0);
+      });
+
+      // Find and click the checkbox for wildcard image
+      const checkboxes = screen.getAllByRole('checkbox');
+      // The first checkbox should be for *.image
+      const wildcardImageCheckbox = checkboxes[0];
+      await user.click(wildcardImageCheckbox);
+
+      // Selection should persist
+      await waitFor(() => {
+        expect(ref.current.getSelectedCount()).toBeGreaterThan(0);
+      });
+
+      // Wait to ensure no cleanup removes it
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should still be selected (verify the checkbox is checked)
+      expect(wildcardImageCheckbox).toHaveAttribute('data-state', 'checked');
+    });
+
+    it('should persist index selection (containers.0.image)', async () => {
+      // This test verifies the fix for the bug where clicking containers.0.image
+      // would not result in any visible change
+      const indexTreeData = [
+        {
+          name: 'spec',
+          type: 'PodSpec',
+          fullPath: ['spec'],
+          level: 0,
+          children: [
+            {
+              name: 'containers',
+              type: '[]Container',
+              fullPath: ['spec', 'containers'],
+              level: 1,
+              children: [
+                {
+                  name: '0',
+                  type: '',
+                  fullPath: ['spec', 'containers', '0'],
+                  level: 2,
+                  children: [
+                    {
+                      name: 'image',
+                      type: 'string',
+                      fullPath: ['spec', 'containers', '0', 'image'],
+                      level: 3,
+                      children: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      (App.GetNodeTree as any).mockResolvedValue(indexTreeData);
+
+      const user = userEvent.setup();
+      const ref = { current: null as any };
+
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('spec')).toBeInTheDocument();
+      });
+
+      // Expand spec > containers > 0
+      const specExpandButton = screen.getAllByRole('button')[0];
+      await user.click(specExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('containers')).toBeInTheDocument();
+      });
+
+      const containersExpandButton = screen.getAllByRole('button')[1];
+      await user.click(containersExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('0')).toBeInTheDocument();
+      });
+
+      const indexExpandButton = screen.getAllByRole('button')[2];
+      await user.click(indexExpandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('image')).toBeInTheDocument();
+      });
+
+      // Find and click the checkbox for 0.image
+      const checkboxes = screen.getAllByRole('checkbox');
+      const indexImageCheckbox = checkboxes[0];
+      await user.click(indexImageCheckbox);
+
+      // Selection should persist
+      await waitFor(() => {
+        expect(ref.current.getSelectedCount()).toBe(1);
+      });
+
+      // Wait to ensure no cleanup removes it
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should still be selected
+      expect(ref.current.getSelectedCount()).toBe(1);
+      expect(indexImageCheckbox).toHaveAttribute('data-state', 'checked');
+
+      // onFieldsSelected should have been called with the correct path
+      expect(mockOnFieldsSelected).toHaveBeenCalledWith([
+        ['spec', 'containers', '0', 'image'],
+      ]);
     });
   });
 
