@@ -21,6 +21,7 @@ interface ResultTableToolbarProps {
   headers: string[];
   rows: any[][];
   resourceKind?: string; // For filename generation
+  onSearchFocusChange?: (focused: boolean) => void;
 }
 
 export interface ResultTableToolbarHandle {
@@ -38,6 +39,7 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
   headers,
   rows,
   resourceKind = 'resources',
+  onSearchFocusChange,
 }, ref) => {
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'downloaded' | 'error'>('idle');
@@ -113,6 +115,13 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
             placeholder="Search ..."
             value={globalFilter}
             onChange={(e) => onGlobalFilterChange(e.target.value)}
+            onKeyDown={(e) => {
+              // Prevent keydown events from propagating to MainView's global keymap
+              // This ensures typing in search doesn't trigger cell navigation or other shortcuts
+              e.stopPropagation();
+            }}
+            onFocus={() => onSearchFocusChange?.(true)}
+            onBlur={() => onSearchFocusChange?.(false)}
           />
           {globalFilter && (
             <p className="text-xs text-muted-foreground mt-2">

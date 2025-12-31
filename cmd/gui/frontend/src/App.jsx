@@ -5,6 +5,7 @@ import { ColorPalette } from './components/debug/ColorPalette';
 import { AboutModal } from './components/AboutModal';
 import { Toaster } from './components/ui/sonner';
 import { ThemeProvider } from 'next-themes';
+import { isInputElementFocused } from './lib/dom-utils';
 
 function App() {
     const [showColors, setShowColors] = useState(false);
@@ -60,6 +61,12 @@ function App() {
             if ((e.metaKey || e.ctrlKey) && e.key === ']') {
                 e.preventDefault();
                 window.history.forward();
+            }
+
+            // Prevent Backspace from triggering browser history navigation
+            // when not focused on an input element (Wails WebView default behavior)
+            if (e.key === 'Backspace' && !isInputElementFocused()) {
+                e.preventDefault();
             }
         };
 

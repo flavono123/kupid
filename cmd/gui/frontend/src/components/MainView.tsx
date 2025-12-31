@@ -245,11 +245,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         return;
       }
 
-      // Tab to switch panel focus
+      // Tab to switch panel focus (always works, even in search inputs)
       if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-        // Don't handle Tab if any search input is focused
-        if (isNavSearchFocused() || isTableSearchFocused()) return;
-
         e.preventDefault();
         setFocusedPanel((prev) => {
           if (prev === 'nav') return 'table';
@@ -331,11 +328,13 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
           onExpand={() => setIsSidebarCollapsed(false)}
         >
           <div
-            className={`flex flex-col h-full transition-shadow ${
-              focusedPanel === 'nav' ? 'ring-2 ring-primary/50 ring-inset' : ''
-            }`}
+            className="flex flex-col h-full relative"
             onMouseDown={() => setFocusedPanel('nav')}
           >
+            {/* Focus overlay - renders above all content including sticky headers */}
+            {focusedPanel === 'nav' && (
+              <div className="absolute inset-0 ring-2 ring-primary/50 ring-inset pointer-events-none z-50" />
+            )}
             {/* Nav Header */}
             <NavHeader
               selectedContexts={selectedContexts}
@@ -394,11 +393,13 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         {/* Right Panel - Main Content */}
         <ResizablePanel defaultSize={80}>
           <div
-            className={`h-full relative transition-shadow ${
-              focusedPanel === 'table' ? 'ring-2 ring-primary/50 ring-inset' : ''
-            }`}
+            className="h-full relative"
             onMouseDown={() => setFocusedPanel('table')}
           >
+            {/* Focus overlay - renders above all content including sticky headers */}
+            {focusedPanel === 'table' && (
+              <div className="absolute inset-0 ring-2 ring-primary/50 ring-inset pointer-events-none z-50" />
+            )}
             {/* Floating Expand Button (only when collapsed) */}
             {isSidebarCollapsed && (
               <Button
@@ -421,6 +422,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 selectedFields={selectedFields}
                 selectedGVK={selectedGVK}
                 connectedContexts={connectedContexts}
+                isTableFocused={focusedPanel === 'table'}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">
