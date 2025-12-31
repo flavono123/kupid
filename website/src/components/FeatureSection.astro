@@ -1,46 +1,46 @@
 ---
-import { Play } from '@lucide/astro';
-
 interface Feature {
   id: string;
   title: string;
   usecase: string;
   explanation: string;
-  videoPlaceholder: string;
+  video: string;
   color: 'ari' | 'bada' | 'chorong';
 }
+
+const base = import.meta.env.BASE_URL;
 
 const features: Feature[] = [
   {
     id: 'multi-context',
     title: 'Multi-Context Access',
-    usecase: 'Monitoring staging and production clusters side by side.',
-    explanation: 'Connect to multiple clusters at once and switch between them instantly.',
-    videoPlaceholder: 'Multi-context demo coming soon',
+    usecase: 'Comparing staging and production deployments at a glance.',
+    explanation: 'Connect to multiple clusters simultaneously and switch between contexts instantly. No more juggling terminal windows or re-running kubectl commands.',
+    video: `${base}assets/kattle-multi-context.mp4`,
     color: 'ari',
   },
   {
     id: 'field-tree',
     title: 'Dynamic Field Tree',
-    usecase: 'Finding .spec.containers[0].resources.limits across all pods.',
-    explanation: 'Select any path with a click, no matter how deep or verbose the field names.',
-    videoPlaceholder: 'Field tree demo coming soon',
+    usecase: 'Selecting deep and verbose fields without typos.',
+    explanation: 'Select any path with a click, no matter how deep or verbose the field names. Forget about jq queries like <code>.spec.containers[0].image</code> or <code>.metadata.annotations["kubernetes.io/config.hash"]</code> from now on.',
+    video: `${base}assets/kattle-dynamic-field-tree.mp4`,
     color: 'bada',
   },
   {
     id: 'result-table',
     title: 'Realtime DIY Table',
-    usecase: 'Watching pod status changes during a deployment rollout.',
-    explanation: 'Quick value lookup, search, and real-time watch in a table.',
-    videoPlaceholder: 'Result table demo coming soon',
+    usecase: 'Tracking deployment replicas during a rolling update.',
+    explanation: 'Build your own table with any fields you need — readyReplicas, availableReplicas, updatedReplicas, and more. Watch values update in real-time as your rollout progresses.',
+    video: `${base}assets/kattle-realtime-diy-table.mp4`,
     color: 'chorong',
   },
   {
     id: 'favorite-views',
     title: 'Favorite Views',
-    usecase: 'Checking resource limits every morning.',
-    explanation: 'Save your views and load them with a single click.',
-    videoPlaceholder: 'Favorite views demo coming soon',
+    usecase: 'Reusing the same field selections across clusters.',
+    explanation: 'Save your carefully crafted field selections as named views. Load them on any cluster with a single click — your monitoring setup is always ready wherever you go.',
+    video: `${base}assets/kattle-favorite-views.mp4`,
     color: 'ari',
   },
 ];
@@ -87,27 +87,28 @@ const colorStyles = {
             <div class={`absolute top-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full ${style.bg.replace('/5', '/20')} blur-[120px] -z-10 ${isReversed ? '-right-32' : '-left-32'}`}></div>
 
             {/* Video/Demo Container */}
-            <div class="flex-1">
-              <div class={`aspect-video overflow-hidden rounded-xl border-2 ${style.border} ${style.bg}`}>
-                <div class="flex h-full items-center justify-center p-8">
-                  <div class="text-center">
-                    <Play class="mx-auto mb-3 h-12 w-12 text-neutral-500" />
-                    <p class="text-neutral-400">{feature.videoPlaceholder}</p>
-                  </div>
-                </div>
+            <div class="flex-[3]">
+              <div class={`aspect-video overflow-hidden rounded-xl border-2 transition-transform duration-300 hover:scale-[1.2] ${style.border} ${style.bg}`}>
+                <video
+                  class="h-full w-full object-cover"
+                  src={feature.video}
+                  autoplay
+                  loop
+                  muted
+                  playsinline
+                />
               </div>
             </div>
 
             {/* Text Content */}
-            <div class="flex-1 lg:max-w-lg">
+            <div class={`flex-[2] ${isReversed ? 'lg:pr-8' : 'lg:pl-8'}`}>
               <h3 class={`mb-4 text-2xl font-bold ${style.text}`}>
                 {feature.title}
               </h3>
               <p class="mb-3 text-lg text-neutral-300 italic">
                 "{feature.usecase}"
               </p>
-              <p class="text-neutral-400">
-                {feature.explanation}
+              <p class="text-neutral-400 [&>code]:rounded [&>code]:bg-kattle-bada/20 [&>code]:px-1.5 [&>code]:py-0.5 [&>code]:text-kattle-bada [&>code]:text-sm" set:html={feature.explanation}>
               </p>
             </div>
           </div>

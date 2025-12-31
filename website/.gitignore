@@ -21,3 +21,9 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Image/Video assets (source files)
+assets/
+
+# But keep public assets for deployment
+!public/assets/
