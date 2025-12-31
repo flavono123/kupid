@@ -1,4 +1,6 @@
 ---
+import { GITHUB_RELEASES } from '../config';
+
 interface Platform {
   name: string;
   href: string;
@@ -9,7 +11,7 @@ interface Platform {
 const platforms: Platform[] = [
   {
     name: 'macOS',
-    href: 'https://github.com/pubg/kattle-alpha/releases',
+    href: GITHUB_RELEASES,
     disabled: false,
     colorClass: 'bg-kattle-ari hover:bg-kattle-ari/80'
   },

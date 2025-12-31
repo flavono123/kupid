@@ -4,7 +4,7 @@ import Header from '../components/Header.astro';
 import DownloadButtons from '../components/DownloadButtons.astro';
 import FeatureSection from '../components/FeatureSection.astro';
 import Footer from '../components/Footer.astro';
-import { Sparkles, Monitor } from '@lucide/astro';
+import { Sparkles } from '@lucide/astro';
 
 const base = import.meta.env.BASE_URL;
 ---
@@ -46,14 +46,13 @@ const base = import.meta.env.BASE_URL;
         <!-- Download Buttons -->
         <DownloadButtons />
 
-        <!-- Product Screenshot Placeholder -->
-        <div class="mt-16 overflow-hidden rounded-xl border-2 border-neutral-700 bg-neutral-900/80 shadow-2xl shadow-kattle-ari/5">
-          <div class="aspect-video flex items-center justify-center p-8">
-            <div class="text-center">
-              <Monitor class="mx-auto mb-4 h-16 w-16 text-neutral-500" />
-              <p class="text-lg text-neutral-400">Product screenshot coming soon</p>
-            </div>
-          </div>
+        <!-- Product Screenshot -->
+        <div class="mt-16 overflow-hidden rounded-xl border-2 border-neutral-700 bg-neutral-900/80 shadow-2xl shadow-kattle-ari/5 transition-transform duration-300 hover:scale-110">
+          <img
+            src={`${base}assets/kattle-hero.png`}
+            alt="kattle - Pick any field from your Kubernetes clusters"
+            class="w-full"
+          />
         </div>
       </div>
     </section>
