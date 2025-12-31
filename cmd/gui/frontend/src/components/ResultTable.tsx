@@ -21,6 +21,7 @@ interface ResultTableProps {
   selectedFields: string[][];  // From NavigationPanel
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
+  isTableFocused?: boolean;  // Whether the table panel is focused (from MainView)
 }
 
 export interface ResultTableHandle {
@@ -56,6 +57,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   selectedFields,
   selectedGVK,
   connectedContexts,
+  isTableFocused = true,
 }, ref) => {
   // Use extracted hook for data fetching (watch enabled for real-time updates)
   const { data, loading, getRowId, changedCells } = useResourceData(
@@ -85,6 +87,22 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
     setFocusedRowIndex(null);
     setFocusedColIndex(null);
   }, [selectedGVK]);
+
+  // Clear cell focus when search input is focused
+  const handleSearchFocusChange = useCallback((focused: boolean) => {
+    if (focused) {
+      setFocusedRowIndex(null);
+      setFocusedColIndex(null);
+    }
+  }, []);
+
+  // Clear cell focus when table panel loses focus (e.g., Tab to nav panel)
+  useEffect(() => {
+    if (!isTableFocused) {
+      setFocusedRowIndex(null);
+      setFocusedColIndex(null);
+    }
+  }, [isTableFocused]);
 
   // Calculate column width based on field name and data
   // Returns { size: initial display width, maxSize: max possible width }
@@ -343,10 +361,19 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
         headers={exportData.headers}
         rows={exportData.rows}
         resourceKind={selectedGVK?.kind || 'resources'}
+        onSearchFocusChange={handleSearchFocusChange}
       />
 
       {/* Table Content with Virtual Scrolling */}
-      <div ref={tableContainerRef} className="flex-1 overflow-auto">
+      <div
+        ref={tableContainerRef}
+        className="flex-1 overflow-auto"
+        onMouseLeave={() => {
+          // Clear cell focus when mouse leaves the table area
+          setFocusedRowIndex(null);
+          setFocusedColIndex(null);
+        }}
+      >
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <Spinner className="w-8 h-8" />

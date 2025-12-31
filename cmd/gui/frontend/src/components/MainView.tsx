@@ -421,6 +421,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 selectedFields={selectedFields}
                 selectedGVK={selectedGVK}
                 connectedContexts={connectedContexts}
+                isTableFocused={focusedPanel === 'table'}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">
