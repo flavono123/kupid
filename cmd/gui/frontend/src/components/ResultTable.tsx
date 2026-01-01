@@ -5,9 +5,11 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   type ColumnDef,
+  type SortingState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { rankItem } from '@tanstack/match-sorter-utils';
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
@@ -46,10 +48,10 @@ function getNestedValue(obj: any, path: string[]): any {
   return value;
 }
 
-// Fuzzy filter function for TanStack Table
-const fuzzyFilter = (row: any, columnId: string, value: any, addMeta: any) => {
-  const itemRank = rankItem(row.getValue(columnId), value);
-  addMeta({ itemRank });
+// Fuzzy filter without score-based sorting (allows column sorting to work)
+const fuzzyFilter = (row: any, columnId: string, filterValue: string) => {
+  const itemRank = rankItem(row.getValue(columnId), filterValue);
+  // Don't call addMeta - this prevents score-based sorting
   return itemRank.passed;
 };
 
@@ -70,6 +72,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   const { isFlashing } = useFlashingCells(changedCells);
 
   const [globalFilter, setGlobalFilter] = useState('');
+  const [sorting, setSorting] = useState<SortingState>([]);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<ResultTableToolbarHandle>(null);
 
@@ -209,14 +212,13 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
     columns,
     getRowId,  // Stable row identity for real-time updates
     columnResizeMode: 'onChange',  // Enable column resizing
-    filterFns: {
-      fuzzy: fuzzyFilter,
-    },
-    globalFilterFn: fuzzyFilter,  // Use the function directly instead of string reference
+    globalFilterFn: fuzzyFilter,
     state: {
       globalFilter,
+      sorting,
     },
     onGlobalFilterChange: setGlobalFilter,
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -398,17 +400,32 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                     const headerText = typeof header.column.columnDef.header === 'string'
                       ? header.column.columnDef.header
                       : String(header.column.columnDef.header);
+                    const sortDirection = header.column.getIsSorted();
 
                     return (
                       <div
                         key={header.id}
-                        className="relative px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground"
+                        className="relative px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group"
                         style={{
                           width: `${header.getSize()}px`,
                           minWidth: `${header.column.columnDef.minSize || 80}px`,
                         }}
                       >
-                        <CellContent value={headerText} />
+                        <div
+                          className="flex items-center gap-1 cursor-pointer select-none hover:text-foreground transition-colors"
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          <span className="truncate">{headerText}</span>
+                          <span className="flex-shrink-0">
+                            {sortDirection === 'asc' ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : sortDirection === 'desc' ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+                            )}
+                          </span>
+                        </div>
                         {/* Column resize handle */}
                         <div
                           onMouseDown={header.getResizeHandler()}

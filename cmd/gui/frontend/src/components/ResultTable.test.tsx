@@ -6,7 +6,7 @@
  * - Cell focus cleared when mouse leaves table area
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ResultTable } from './ResultTable';
 
@@ -78,10 +78,6 @@ const getFocusedCellCount = () => {
   return document.querySelectorAll('[class*="underline"][class*="bg-accent"]').length;
 };
 
-// Helper to find open popovers (CellContent popover opens when isFocused=true)
-const getOpenPopoverCount = () => {
-  return document.querySelectorAll('[data-state="open"]').length;
-};
 
 describe('ResultTable - Cell Focus Clear on Panel Switch', () => {
   it('should clear cell focus when isTableFocused becomes false', async () => {

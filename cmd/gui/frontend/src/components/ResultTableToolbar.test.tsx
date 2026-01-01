@@ -77,7 +77,7 @@ describe('ResultTableToolbar - Keyboard Event Propagation', () => {
   it('should stop keydown event propagation from search input', async () => {
     const parentKeydownHandler = vi.fn();
 
-    const { container } = render(
+    render(
       <div onKeyDown={parentKeydownHandler}>
         <ResultTableToolbar {...defaultProps} />
       </div>
