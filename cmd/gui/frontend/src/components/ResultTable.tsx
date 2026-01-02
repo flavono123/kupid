@@ -9,7 +9,24 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { rankItem } from '@tanstack/match-sorter-utils';
-import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { ChevronUp, ChevronDown, ChevronsUpDown, GripVertical } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
@@ -24,6 +41,7 @@ interface ResultTableProps {
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
   isTableFocused?: boolean;  // Whether the table panel is focused (from MainView)
+  onFieldsReorder?: (newFields: string[][]) => void;  // Callback when columns are reordered
 }
 
 export interface ResultTableHandle {
@@ -55,11 +73,105 @@ const fuzzyFilter = (row: any, columnId: string, filterValue: string) => {
   return itemRank.passed;
 };
 
+// Sortable header component for drag-and-drop reordering
+interface SortableHeaderProps {
+  id: string;
+  headerText: string;
+  sortDirection: false | 'asc' | 'desc';
+  onSort: ((event: unknown) => void) | undefined;
+  width: number;
+  minWidth: number;
+  onResize: ((e: React.MouseEvent | React.TouchEvent) => void) | undefined;
+  isResizing: boolean;
+  isDraggable: boolean;  // false for fixed columns (context, name)
+}
+
+function SortableHeader({
+  id,
+  headerText,
+  sortDirection,
+  onSort,
+  width,
+  minWidth,
+  onResize,
+  isResizing,
+  isDraggable,
+}: SortableHeaderProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: !isDraggable });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    width: `${width}px`,
+    minWidth: `${minWidth}px`,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 20 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "relative px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group",
+        isDragging && "bg-accent"
+      )}
+    >
+      <div className="flex items-center gap-1">
+        {/* Drag handle (only for draggable columns) */}
+        {isDraggable && (
+          <span
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing flex-shrink-0 opacity-0 group-hover:opacity-50 hover:opacity-100 transition-opacity"
+          >
+            <GripVertical className="h-4 w-4" />
+          </span>
+        )}
+        {/* Sort button */}
+        <div
+          className="flex items-center gap-1 cursor-pointer select-none hover:text-foreground transition-colors flex-1 min-w-0"
+          onClick={(e) => onSort?.(e)}
+        >
+          <span className="truncate">{headerText}</span>
+          <span className="flex-shrink-0">
+            {sortDirection === 'asc' ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : sortDirection === 'desc' ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+            )}
+          </span>
+        </div>
+      </div>
+      {/* Column resize handle */}
+      <div
+        onMouseDown={(e) => onResize?.(e)}
+        onTouchStart={(e) => onResize?.(e)}
+        className={cn(
+          "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
+          "hover:bg-primary/50",
+          isResizing && "bg-primary"
+        )}
+      />
+    </div>
+  );
+}
+
 export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   selectedFields,
   selectedGVK,
   connectedContexts,
   isTableFocused = true,
+  onFieldsReorder,
 }, ref) => {
   // Use extracted hook for data fetching (watch enabled for real-time updates)
   const { data, loading, getRowId, changedCells } = useResourceData(
@@ -75,6 +187,34 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   const [sorting, setSorting] = useState<SortingState>([]);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<ResultTableToolbarHandle>(null);
+
+  // DnD sensors for column reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },  // 5px movement before drag starts
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Calculate fixed column count (context + name or just name)
+  const fixedColumnCount = connectedContexts.length === 1 ? 1 : 2;
+
+  // Handle drag end for column reordering
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onFieldsReorder) return;
+
+    // Find indices in selectedFields (not including fixed columns)
+    const oldIndex = selectedFields.findIndex(f => f.join('.') === active.id);
+    const newIndex = selectedFields.findIndex(f => f.join('.') === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newFields = arrayMove(selectedFields, oldIndex, newIndex);
+      onFieldsReorder(newFields);
+    }
+  }, [selectedFields, onFieldsReorder]);
 
   // Unified focus state (keyboard navigation + mouse hover)
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
@@ -392,56 +532,47 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
           </div>
         ) : (
           <div style={{ minWidth: `${totalColumnsWidth}px` }}>
-            {/* Header (sticky) */}
-            <div className="sticky top-0 bg-background z-10 border-b border-border">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <div key={headerGroup.id} className="flex">
-                  {headerGroup.headers.map((header) => {
-                    const headerText = typeof header.column.columnDef.header === 'string'
-                      ? header.column.columnDef.header
-                      : String(header.column.columnDef.header);
-                    const sortDirection = header.column.getIsSorted();
+            {/* Header (sticky) with DnD for column reordering */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="sticky top-0 bg-background z-10 border-b border-border">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <SortableContext
+                    key={headerGroup.id}
+                    items={selectedFields.map(f => f.join('.'))}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    <div className="flex">
+                      {headerGroup.headers.map((header, headerIndex) => {
+                        const headerText = typeof header.column.columnDef.header === 'string'
+                          ? header.column.columnDef.header
+                          : String(header.column.columnDef.header);
+                        const sortDirection = header.column.getIsSorted();
+                        const isDraggable = headerIndex >= fixedColumnCount;
 
-                    return (
-                      <div
-                        key={header.id}
-                        className="relative px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group"
-                        style={{
-                          width: `${header.getSize()}px`,
-                          minWidth: `${header.column.columnDef.minSize || 80}px`,
-                        }}
-                      >
-                        <div
-                          className="flex items-center gap-1 cursor-pointer select-none hover:text-foreground transition-colors"
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          <span className="truncate">{headerText}</span>
-                          <span className="flex-shrink-0">
-                            {sortDirection === 'asc' ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : sortDirection === 'desc' ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
-                            )}
-                          </span>
-                        </div>
-                        {/* Column resize handle */}
-                        <div
-                          onMouseDown={header.getResizeHandler()}
-                          onTouchStart={header.getResizeHandler()}
-                          className={cn(
-                            "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
-                            "hover:bg-primary/50",
-                            header.column.getIsResizing() && "bg-primary"
-                          )}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+                        return (
+                          <SortableHeader
+                            key={header.id}
+                            id={header.column.id}
+                            headerText={headerText}
+                            sortDirection={sortDirection}
+                            onSort={header.column.getToggleSortingHandler()}
+                            width={header.getSize()}
+                            minWidth={header.column.columnDef.minSize || 80}
+                            onResize={header.getResizeHandler()}
+                            isResizing={header.column.getIsResizing()}
+                            isDraggable={isDraggable}
+                          />
+                        );
+                      })}
+                    </div>
+                  </SortableContext>
+                ))}
+              </div>
+            </DndContext>
 
             {/* Body (virtualized) */}
             <div
