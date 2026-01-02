@@ -219,7 +219,7 @@ describe('ResultTable - Column Hover Sync (RT → NP)', () => {
 });
 
 describe('ResultTable - Column Highlight from NP (NP → RT)', () => {
-  it('should apply highlight style when highlightedColumnPath matches a column', async () => {
+  it('should apply highlight style to entire column when highlightedColumnPath matches', async () => {
     render(
       <ResultTable
         {...defaultProps}
@@ -235,6 +235,14 @@ describe('ResultTable - Column Highlight from NP (NP → RT)', () => {
     const namespaceHeader = screen.getByText('namespace');
     const headerCell = namespaceHeader.closest('div[class*="cursor-grab"]');
     expect(headerCell?.className).toContain('bg-focus');
+
+    // Data cells in the namespace column should also have highlight style
+    // 'default' and 'kube-system' are namespace values from mockData
+    const defaultCells = screen.getAllByText('default');
+    expect(defaultCells.length).toBeGreaterThan(0);
+    // Find the cell container (parent div with px-1 class)
+    const cellContainer = defaultCells[0].closest('div[class*="px-1"]');
+    expect(cellContainer?.className).toContain('bg-focus');
   });
 
   it('should not highlight columns when highlightedColumnPath is undefined', async () => {

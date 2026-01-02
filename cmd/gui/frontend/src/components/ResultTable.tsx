@@ -705,6 +705,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                       const cellKey = `${row.id}-${cell.column.id}`;
                       const showCopied = copiedCellKey === cellKey;
                       const isPreviewCell = cell.column.id.startsWith('_preview.');
+                      const isColumnHighlighted = highlightedColumnPath && cell.column.id === highlightedColumnPath.join('.');
 
                       // Get cell value and highlight indices for direct rendering
                       const value = cell.getValue();
@@ -719,7 +720,8 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                           className={cn(
                             "px-1 py-1 text-sm flex-shrink-0",
                             isFlashing(row.id, cell.column.id) && "animate-cell-flash",
-                            isPreviewCell && "opacity-50 border-l border-dashed border-border"
+                            isPreviewCell && "opacity-50 border-l border-dashed border-border",
+                            isColumnHighlighted && "bg-focus"
                           )}
                           style={{
                             width: `${cell.column.getSize()}px`,
