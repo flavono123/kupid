@@ -26,7 +26,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronUp, ChevronDown, ChevronsUpDown, GripVertical } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
@@ -115,47 +115,46 @@ function SortableHeader({
     zIndex: isDragging ? 20 : undefined,
   };
 
+  // Draggable columns: entire header is draggable (click = sort, drag 5px+ = reorder)
+  const dragProps = isDraggable ? { ...attributes, ...listeners } : {};
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
         "relative px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group",
-        isDragging && "bg-accent"
+        isDragging && "bg-accent",
+        isDraggable && "cursor-grab active:cursor-grabbing"
       )}
+      {...dragProps}
     >
-      <div className="flex items-center gap-1">
-        {/* Drag handle (only for draggable columns) */}
-        {isDraggable && (
-          <span
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing flex-shrink-0 opacity-0 group-hover:opacity-50 hover:opacity-100 transition-opacity"
-          >
-            <GripVertical className="h-4 w-4" />
-          </span>
-        )}
-        {/* Sort button */}
-        <div
-          className="flex items-center gap-1 cursor-pointer select-none hover:text-foreground transition-colors flex-1 min-w-0"
-          onClick={(e) => onSort?.(e)}
-        >
-          <span className="truncate">{headerText}</span>
-          <span className="flex-shrink-0">
-            {sortDirection === 'asc' ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : sortDirection === 'desc' ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
-            )}
-          </span>
-        </div>
+      {/* Sort button - click handled by dnd-kit (clicks <5px don't trigger drag) */}
+      <div
+        className="flex items-center gap-1 select-none hover:text-foreground transition-colors"
+        onClick={(e) => onSort?.(e)}
+      >
+        <span className="truncate">{headerText}</span>
+        <span className="flex-shrink-0">
+          {sortDirection === 'asc' ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : sortDirection === 'desc' ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+          )}
+        </span>
       </div>
       {/* Column resize handle */}
       <div
-        onMouseDown={(e) => onResize?.(e)}
-        onTouchStart={(e) => onResize?.(e)}
+        onMouseDown={(e) => {
+          e.stopPropagation();  // Prevent drag when resizing
+          onResize?.(e);
+        }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          onResize?.(e);
+        }}
         className={cn(
           "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
           "hover:bg-primary/50",
