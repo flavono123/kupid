@@ -287,6 +287,13 @@ describe('NavigationPanel', () => {
             level: 1,
             children: [],
           },
+          {
+            name: 'namespace',
+            type: 'string',
+            fullPath: ['metadata', 'namespace'],
+            level: 1,
+            children: [],
+          },
         ],
       },
     ];
@@ -379,19 +386,19 @@ describe('NavigationPanel', () => {
       await user.click(expandButtons[0]);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      // Select name field
+      // Select namespace field (not name - it's a default column)
       const checkboxes = screen.getAllByRole('checkbox');
-      const nameCheckbox = checkboxes.find((cb) => {
+      const namespaceCheckbox = checkboxes.find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       await waitFor(() => {
-        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'name']]);
+        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'namespace']]);
       });
 
       // Change to Deployment GVK
@@ -453,6 +460,13 @@ describe('NavigationPanel', () => {
             level: 1,
             children: [],
           },
+          {
+            name: 'namespace',
+            type: 'string',
+            fullPath: ['metadata', 'namespace'],
+            level: 1,
+            children: [],
+          },
         ],
       },
     ];
@@ -483,15 +497,15 @@ describe('NavigationPanel', () => {
       await user.click(expandButtons[0]);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      // Click the checkbox
-      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+      // Click the checkbox for namespace (not name - it's a default column)
+      const namespaceCheckbox = screen.getAllByRole('checkbox').find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       // Selection should persist - not blink and disappear
       await waitFor(() => {
@@ -503,7 +517,7 @@ describe('NavigationPanel', () => {
 
       // Should still be selected
       expect(ref.current.getSelectedCount()).toBe(1);
-      expect(nameCheckbox).toHaveAttribute('data-state', 'checked');
+      expect(namespaceCheckbox).toHaveAttribute('data-state', 'checked');
     });
 
     it('should call onFieldsSelected when leaf node is selected', async () => {
@@ -528,22 +542,22 @@ describe('NavigationPanel', () => {
       await user.click(expandButtons[0]);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      // Find and click the checkbox for "name" node
+      // Find and click the checkbox for "namespace" node (not name - it's a default column)
       const checkboxes = screen.getAllByRole('checkbox');
-      const nameCheckbox = checkboxes.find((cb) => {
+      const namespaceCheckbox = checkboxes.find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
 
-      expect(nameCheckbox).toBeDefined();
-      await user.click(nameCheckbox!);
+      expect(namespaceCheckbox).toBeDefined();
+      await user.click(namespaceCheckbox!);
 
       // Should call onFieldsSelected with the selected path
       await waitFor(() => {
-        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'name']]);
+        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'namespace']]);
       });
     });
 
@@ -1516,19 +1530,19 @@ describe('NavigationPanel', () => {
         expect(screen.getByText('metadata')).toBeInTheDocument();
       });
 
-      // Expand and select a field
+      // Expand and select a field (use namespace, not name - it's a default column)
       const expandButton = screen.getAllByRole('button')[0];
       await user.click(expandButton);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+      const namespaceCheckbox = screen.getAllByRole('checkbox').find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       // Verify selection
       expect(ref.current.getSelectedCount()).toBe(1);
@@ -1570,19 +1584,19 @@ describe('NavigationPanel', () => {
       expect(ref.current.getSelectedCount()).toBe(0);
       expect(ref.current.getSelectedPaths().size).toBe(0);
 
-      // Expand metadata and select name
+      // Expand metadata and select namespace (not name - it's a default column)
       const expandButton = screen.getAllByRole('button')[0];
       await user.click(expandButton);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+      const namespaceCheckbox = screen.getAllByRole('checkbox').find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       await waitFor(() => {
         expect(ref.current.getSelectedCount()).toBe(1);
@@ -1593,7 +1607,7 @@ describe('NavigationPanel', () => {
 
       // The path should use PATH_DELIMITER (null character)
       const PATH_DELIMITER = '\x00';
-      expect(selectedPaths.has(['metadata', 'name'].join(PATH_DELIMITER))).toBe(true);
+      expect(selectedPaths.has(['metadata', 'namespace'].join(PATH_DELIMITER))).toBe(true);
     });
 
     it('should toggle search via toggleSearch', async () => {

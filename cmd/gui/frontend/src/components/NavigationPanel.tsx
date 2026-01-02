@@ -65,6 +65,8 @@ const TreeNodeItem = memo(({
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
   const isLeaf = !hasChildren && !isArrayOrMap;
   const pathKey = node.fullPath.join(PATH_DELIMITER);
+  // Default columns (always shown in ResultTable) - disable selection
+  const isDefaultColumn = node.fullPath.join('.') === 'metadata.name';
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
   const matchIndices = searchResultsMap.get(pathKey);
@@ -137,9 +139,11 @@ const TreeNodeItem = memo(({
           </Button>
         ) : isLeaf ? (
           <Checkbox
-            checked={selected}
+            checked={isDefaultColumn || selected}
             onCheckedChange={handleSelectChange}
+            disabled={isDefaultColumn}
             className="mr-1.5 h-3.5 w-3.5 shrink-0"
+            title={isDefaultColumn ? 'Default column (always visible)' : undefined}
           />
         ) : (
           <span className="w-4 mr-1.5 shrink-0" />
