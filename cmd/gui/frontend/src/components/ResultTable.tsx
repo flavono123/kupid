@@ -26,7 +26,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
@@ -42,6 +42,10 @@ interface ResultTableProps {
   connectedContexts: string[];
   isTableFocused?: boolean;  // Whether the table panel is focused (from MainView)
   onFieldsReorder?: (newFields: string[][]) => void;  // Callback when columns are reordered
+  onFieldRemove?: (field: string[]) => void;  // Callback when a column is removed
+  onColumnHover?: (path: string[] | null) => void;  // Callback when column header is hovered
+  highlightedColumnPath?: string[];  // Column to highlight (from NavigationPanel hover)
+  previewField?: string[];  // Unchecked field to preview as muted column at the end
 }
 
 export interface ResultTableHandle {
@@ -101,6 +105,11 @@ interface SortableHeaderProps {
   onResize: ((e: React.MouseEvent | React.TouchEvent) => void) | undefined;
   isResizing: boolean;
   isDraggable: boolean;  // false for fixed columns (context, name)
+  onRemove?: () => void;  // callback to remove this column
+  onHover?: () => void;  // callback when header is hovered
+  onHoverEnd?: () => void;  // callback when hover ends
+  isHighlighted?: boolean;  // whether this column is highlighted (from NP hover)
+  isPreview?: boolean;  // whether this is a preview column (muted styling)
 }
 
 function SortableHeader({
@@ -113,6 +122,11 @@ function SortableHeader({
   onResize,
   isResizing,
   isDraggable,
+  onRemove,
+  onHover,
+  onHoverEnd,
+  isHighlighted,
+  isPreview,
 }: SortableHeaderProps) {
   const {
     attributes,
@@ -142,8 +156,12 @@ function SortableHeader({
       className={cn(
         "relative px-2 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group",
         isDragging && "bg-accent",
-        isDraggable && "cursor-grab active:cursor-grabbing"
+        isDraggable && "cursor-grab active:cursor-grabbing",
+        isHighlighted && "bg-focus",
+        isPreview && "opacity-50 border-l border-dashed border-border"
       )}
+      onMouseEnter={onHover}
+      onMouseLeave={onHoverEnd}
       {...dragProps}
     >
       {/* Sort button - click handled by dnd-kit (clicks <5px don't trigger drag) */}
@@ -152,16 +170,32 @@ function SortableHeader({
         onClick={(e) => onSort?.(e)}
       >
         <span className="truncate">{headerText}</span>
-        <span className="flex-shrink-0">
-          {sortDirection === 'asc' ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : sortDirection === 'desc' ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : (
-            <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
-          )}
-        </span>
+        {/* Hide sort icons for preview columns */}
+        {!isPreview && (
+          <span className="flex-shrink-0">
+            {sortDirection === 'asc' ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : sortDirection === 'desc' ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+            )}
+          </span>
+        )}
       </div>
+      {/* Remove column button - only for draggable (non-fixed) columns */}
+      {isDraggable && onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/20 hover:text-destructive transition-opacity"
+          title="Remove column"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
       {/* Column resize handle */}
       <div
         data-resize-handle
@@ -183,6 +217,10 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   connectedContexts,
   isTableFocused = true,
   onFieldsReorder,
+  onFieldRemove,
+  onColumnHover,
+  highlightedColumnPath,
+  previewField,
 }, ref) => {
   // Use extracted hook for data fetching (watch enabled for real-time updates)
   const { data, loading, getRowId, changedCells } = useResourceData(
@@ -310,6 +348,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   }, [selectedFields, connectedContexts, data]);
 
   // Create dynamic columns from selectedFields with default columns prepended
+  // Also includes preview column at the end if previewField is set
   const columns = useMemo<ColumnDef<any>[]>(() => {
     // Always add default columns at the beginning
     let fieldsToUse: string[][];
@@ -322,7 +361,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
       fieldsToUse = [['_context'], ['metadata', 'name'], ...selectedFields];
     }
 
-    return fieldsToUse.map((fieldPath) => {
+    const cols: ColumnDef<any>[] = fieldsToUse.map((fieldPath) => {
       const fieldName = fieldPath[fieldPath.length - 1];
       const columnId = fieldPath.join('.');
       const widths = columnWidths[columnId] || { size: 100, maxSize: 300 };
@@ -355,7 +394,40 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
         },
       };
     });
-  }, [selectedFields, connectedContexts, columnWidths, getHighlightIndices]);
+
+    // Add preview column at the end if previewField is set
+    if (previewField) {
+      const previewFieldName = previewField[previewField.length - 1];
+      const previewColumnId = `_preview.${previewField.join('.')}`;
+      const previewWidths = columnWidths[previewField.join('.')] || { size: 150, maxSize: 300 };
+
+      cols.push({
+        id: previewColumnId,
+        header: previewFieldName,
+        accessorFn: (row) => getNestedValue(row, previewField),
+        size: previewWidths.size,
+        minSize: 80,
+        maxSize: previewWidths.maxSize,
+        meta: { isPreview: true },  // Mark as preview column
+        cell: (info) => {
+          const value = info.getValue();
+          const fullText = typeof value === 'object' && value !== null
+            ? JSON.stringify(value)
+            : String(value ?? '');
+          const indices = getHighlightIndices(fullText);
+
+          return (
+            <CellContent
+              value={value}
+              highlightIndices={indices}
+            />
+          );
+        },
+      });
+    }
+
+    return cols;
+  }, [selectedFields, connectedContexts, columnWidths, getHighlightIndices, previewField]);
 
   // Create table instance
   const table = useReactTable({
@@ -563,20 +635,39 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                           ? header.column.columnDef.header
                           : String(header.column.columnDef.header);
                         const sortDirection = header.column.getIsSorted();
-                        const isDraggable = headerIndex >= fixedColumnCount;
+
+                        // Check if this is a preview column (id starts with _preview.)
+                        const isPreviewColumn = header.column.id.startsWith('_preview.');
+
+                        // Draggable: not fixed columns and not preview column
+                        const isDraggable = headerIndex >= fixedColumnCount && !isPreviewColumn;
+
+                        // Get the field for this column (for removal and hover sync)
+                        const fieldIndex = headerIndex - fixedColumnCount;
+                        const field = isDraggable ? selectedFields[fieldIndex] : undefined;
+
+                        // Check if this column is highlighted from NavigationPanel hover
+                        const isHighlighted = field && highlightedColumnPath
+                          ? field.join('.') === highlightedColumnPath.join('.')
+                          : false;
 
                         return (
                           <SortableHeader
                             key={header.id}
                             id={header.column.id}
                             headerText={headerText}
-                            sortDirection={sortDirection}
-                            onSort={header.column.getToggleSortingHandler()}
+                            sortDirection={isPreviewColumn ? false : sortDirection}
+                            onSort={isPreviewColumn ? undefined : header.column.getToggleSortingHandler()}
                             width={header.getSize()}
                             minWidth={header.column.columnDef.minSize || 80}
-                            onResize={header.getResizeHandler()}
+                            onResize={isPreviewColumn ? undefined : header.getResizeHandler()}
                             isResizing={header.column.getIsResizing()}
                             isDraggable={isDraggable}
+                            onRemove={field && onFieldRemove ? () => onFieldRemove(field) : undefined}
+                            onHover={field && onColumnHover ? () => onColumnHover(field) : undefined}
+                            onHoverEnd={onColumnHover ? () => onColumnHover(null) : undefined}
+                            isHighlighted={isHighlighted}
+                            isPreview={isPreviewColumn}
                           />
                         );
                       })}
@@ -613,6 +704,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                       const isCellFocused = isRowFocused && focusedColIndex === cellIndex;
                       const cellKey = `${row.id}-${cell.column.id}`;
                       const showCopied = copiedCellKey === cellKey;
+                      const isPreviewCell = cell.column.id.startsWith('_preview.');
 
                       // Get cell value and highlight indices for direct rendering
                       const value = cell.getValue();
@@ -626,7 +718,8 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                           key={cell.id}
                           className={cn(
                             "px-1 py-1 text-sm flex-shrink-0",
-                            isFlashing(row.id, cell.column.id) && "animate-cell-flash"
+                            isFlashing(row.id, cell.column.id) && "animate-cell-flash",
+                            isPreviewCell && "opacity-50 border-l border-dashed border-border"
                           )}
                           style={{
                             width: `${cell.column.getSize()}px`,

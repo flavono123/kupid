@@ -32,6 +32,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const [loading, setLoading] = useState(true);
   const [selectedGVK, setSelectedGVK] = useState<main.MultiClusterGVK | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[][]>([]);
+  // Hover sync state between NavigationPanel and ResultTable
+  const [hoveredFieldPath, setHoveredFieldPath] = useState<string[] | null>(null);
   // Pending favorite ID to apply after GVK switch (use ref to avoid stale closure)
   const pendingFavoriteIdRef = useRef<string | null>(null);
   const loadedRef = useRef(false);
@@ -52,6 +54,15 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const selectedPaths = useMemo(() => {
     return new Set(selectedFields.map((f) => JSON.stringify(f)));
   }, [selectedFields]);
+
+  // Preview field: hoveredFieldPath if not in selectedFields (for muted preview column)
+  const previewField = useMemo(() => {
+    if (!hoveredFieldPath) return undefined;
+    const isSelected = selectedFields.some(
+      (f) => f.join('.') === hoveredFieldPath.join('.')
+    );
+    return isSelected ? undefined : hoveredFieldPath;
+  }, [hoveredFieldPath, selectedFields]);
 
   // Favorite views hook
   const {
@@ -315,6 +326,18 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     clearFavorite();
   }, [clearFavorite]);
 
+  // Handle column removal from ResultTable header
+  const handleFieldRemove = useCallback((field: string[]) => {
+    const pathKey = field.join(PATH_DELIMITER);
+    const currentPaths = navigationPanelRef.current?.getSelectedPaths();
+    if (currentPaths) {
+      const newPaths = new Set(currentPaths);
+      newPaths.delete(pathKey);
+      navigationPanelRef.current?.setSelectedPaths(newPaths);
+    }
+    clearFavorite();
+  }, [clearFavorite]);
+
   const gvkLabel = selectedGVK
     ? `${selectedGVK.kind.toLowerCase()} (${selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version})`
     : "";
@@ -378,6 +401,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                   connectedContexts={connectedContexts}
                   onReady={handleNavigationReady}
                   onFieldsSelected={setSelectedFields}
+                  onFieldHover={setHoveredFieldPath}
+                  highlightedFieldPath={hoveredFieldPath ?? undefined}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
@@ -430,6 +455,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 connectedContexts={connectedContexts}
                 isTableFocused={focusedPanel === 'table'}
                 onFieldsReorder={handleFieldsReorder}
+                onFieldRemove={handleFieldRemove}
+                onColumnHover={setHoveredFieldPath}
+                highlightedColumnPath={hoveredFieldPath ?? undefined}
+                previewField={previewField}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">
