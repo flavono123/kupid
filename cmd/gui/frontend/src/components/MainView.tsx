@@ -13,6 +13,7 @@ import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { useFavoriteViews } from "@/hooks/useFavoriteViews";
+import { DEFAULT_COLUMNS } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import { toggleThemeWithAnimation } from "@/lib/theme-animation";
 import { isInputElementFocused } from "@/lib/dom-utils";
@@ -62,7 +63,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
     // Default columns should not show as preview (they're always visible)
     const focusedPath = focusedFieldPath.join('.');
-    const isDefaultColumn = focusedPath === '_context' || focusedPath === 'metadata.name';
+    const isDefaultColumn = DEFAULT_COLUMNS.includes(focusedPath as typeof DEFAULT_COLUMNS[number]);
     if (isDefaultColumn) return undefined;
 
     const isSelected = selectedFields.some((f) => f.join('.') === focusedPath);

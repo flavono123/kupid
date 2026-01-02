@@ -7,6 +7,7 @@ import { FieldSearchBar, FieldSearchBarHandle } from './FieldSearchBar';
 import { main } from '../../wailsjs/go/models';
 import { useTree, TreeNode, PATH_DELIMITER } from '@/hooks/useTree';
 import { HighlightedText } from './HighlightedText';
+import { DEFAULT_SCHEMA_FIELDS } from '@/lib/constants';
 
 interface NavigationPanelProps {
   selectedGVK: main.MultiClusterGVK;
@@ -66,7 +67,7 @@ const TreeNodeItem = memo(({
   const isLeaf = !hasChildren && !isArrayOrMap;
   const pathKey = node.fullPath.join(PATH_DELIMITER);
   // Default columns (always shown in ResultTable) - disable selection
-  const isDefaultColumn = node.fullPath.join('.') === 'metadata.name';
+  const isDefaultColumn = DEFAULT_SCHEMA_FIELDS.includes(node.fullPath.join('.') as typeof DEFAULT_SCHEMA_FIELDS[number]);
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
   const matchIndices = searchResultsMap.get(pathKey);
