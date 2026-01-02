@@ -73,6 +73,23 @@ const fuzzyFilter = (row: any, columnId: string, filterValue: string) => {
   return itemRank.passed;
 };
 
+// Custom PointerSensor that ignores resize handle
+class ResizeAwarePointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: 'onPointerDown' as const,
+      handler: ({ nativeEvent }: { nativeEvent: PointerEvent }) => {
+        const target = nativeEvent.target as HTMLElement;
+        // Don't start drag if clicking on resize handle
+        if (target.closest('[data-resize-handle]')) {
+          return false;
+        }
+        return true;
+      },
+    },
+  ];
+}
+
 // Sortable header component for drag-and-drop reordering
 interface SortableHeaderProps {
   id: string;
@@ -123,7 +140,7 @@ function SortableHeader({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative px-4 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group",
+        "relative px-2 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group",
         isDragging && "bg-accent",
         isDraggable && "cursor-grab active:cursor-grabbing"
       )}
@@ -147,16 +164,11 @@ function SortableHeader({
       </div>
       {/* Column resize handle */}
       <div
-        onMouseDown={(e) => {
-          e.stopPropagation();  // Prevent drag when resizing
-          onResize?.(e);
-        }}
-        onTouchStart={(e) => {
-          e.stopPropagation();
-          onResize?.(e);
-        }}
+        data-resize-handle
+        onMouseDown={(e) => onResize?.(e)}
+        onTouchStart={(e) => onResize?.(e)}
         className={cn(
-          "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
+          "absolute right-0 top-0 h-full w-0.5 cursor-col-resize select-none touch-none",
           "hover:bg-primary/50",
           isResizing && "bg-primary"
         )}
@@ -189,7 +201,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
 
   // DnD sensors for column reordering
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(ResizeAwarePointerSensor, {
       activationConstraint: { distance: 5 },  // 5px movement before drag starts
     }),
     useSensor(KeyboardSensor, {
@@ -613,7 +625,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                         <div
                           key={cell.id}
                           className={cn(
-                            "px-4 py-1 text-sm flex-shrink-0",
+                            "px-1 py-1 text-sm flex-shrink-0",
                             isFlashing(row.id, cell.column.id) && "animate-cell-flash"
                           )}
                           style={{
