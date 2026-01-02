@@ -43,7 +43,7 @@ interface ResultTableProps {
   isTableFocused?: boolean;  // Whether the table panel is focused (from MainView)
   onFieldsReorder?: (newFields: string[][]) => void;  // Callback when columns are reordered
   onFieldRemove?: (field: string[]) => void;  // Callback when a column is removed
-  onColumnHover?: (path: string[] | null) => void;  // Callback when column header is hovered
+  onColumnFocus?: (path: string[] | null) => void;  // Callback when column header is focused
   highlightedColumnPath?: string[];  // Column to highlight (from NavigationPanel hover)
   previewField?: string[];  // Unchecked field to preview as muted column at the end
 }
@@ -218,7 +218,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   isTableFocused = true,
   onFieldsReorder,
   onFieldRemove,
-  onColumnHover,
+  onColumnFocus,
   highlightedColumnPath,
   previewField,
 }, ref) => {
@@ -664,8 +664,8 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                             isResizing={header.column.getIsResizing()}
                             isDraggable={isDraggable}
                             onRemove={field && onFieldRemove ? () => onFieldRemove(field) : undefined}
-                            onHover={field && onColumnHover ? () => onColumnHover(field) : undefined}
-                            onHoverEnd={onColumnHover ? () => onColumnHover(null) : undefined}
+                            onHover={field && onColumnFocus ? () => onColumnFocus(field) : undefined}
+                            onHoverEnd={onColumnFocus ? () => onColumnFocus(null) : undefined}
                             isHighlighted={isHighlighted}
                             isPreview={isPreviewColumn}
                           />

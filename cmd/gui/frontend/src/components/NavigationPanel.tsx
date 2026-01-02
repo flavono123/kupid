@@ -14,8 +14,8 @@ interface NavigationPanelProps {
   onFieldsSelected?: (fields: string[][]) => void;
   /** Called when schema loading completes and component is ready */
   onReady?: () => void;
-  /** Called when a field is hovered (for sync with ResultTable) */
-  onFieldHover?: (path: string[] | null) => void;
+  /** Called when a field is focused (for sync with ResultTable) */
+  onFieldFocus?: (path: string[] | null) => void;
   /** Field path to highlight (from ResultTable hover) */
   highlightedFieldPath?: string[];
 }
@@ -92,7 +92,7 @@ const TreeNodeItem = memo(({
   }, [node.fullPath, onToggleSelect]);
 
   const handleMouseEnter = useCallback(() => {
-    // Only update internal focus - onFieldHover is handled via useEffect
+    // Only update internal focus - onFieldFocus is handled via useEffect
     // This ensures debounce protection from setFocusedPath is respected
     onFocus?.(pathKey);
   }, [onFocus, pathKey]);
@@ -193,7 +193,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
   connectedContexts,
   onFieldsSelected,
   onReady,
-  onFieldHover,
+  onFieldFocus,
   highlightedFieldPath,
 }, ref) => {
   const {
@@ -247,19 +247,19 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     return highlightedFieldPath?.join(PATH_DELIMITER);
   }, [highlightedFieldPath]);
 
-  // Sync focus to parent's hoveredFieldPath for preview (unified for keyboard & mouse)
+  // Sync focus to parent's focusedFieldPath for preview (unified for keyboard & mouse)
   // This ensures debounce protection from setFocusedPath is respected for both triggers
   useEffect(() => {
-    if (!onFieldHover) return;
+    if (!onFieldFocus) return;
 
     if (!focusedPathKey) {
-      onFieldHover(null);
+      onFieldFocus(null);
       return;
     }
 
     const node = flatNodesMap.get(focusedPathKey);
     if (!node) {
-      onFieldHover(null);
+      onFieldFocus(null);
       return;
     }
 
@@ -269,8 +269,8 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     const isLeaf = !hasChildren && !isArrayOrMap;
 
     // For leaf nodes, notify for preview; for non-leaf, clear preview
-    onFieldHover(isLeaf ? node.fullPath : null);
-  }, [focusedPathKey, flatNodesMap, onFieldHover]);
+    onFieldFocus(isLeaf ? node.fullPath : null);
+  }, [focusedPathKey, flatNodesMap, onFieldFocus]);
 
   useImperativeHandle(ref, () => ({
     clearSelections: clearAllSelections,

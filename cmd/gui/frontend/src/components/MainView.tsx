@@ -32,8 +32,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const [loading, setLoading] = useState(true);
   const [selectedGVK, setSelectedGVK] = useState<main.MultiClusterGVK | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[][]>([]);
-  // Hover sync state between NavigationPanel and ResultTable
-  const [hoveredFieldPath, setHoveredFieldPath] = useState<string[] | null>(null);
+  // Focus sync state between NavigationPanel and ResultTable
+  const [focusedFieldPath, setFocusedFieldPath] = useState<string[] | null>(null);
   // Pending favorite ID to apply after GVK switch (use ref to avoid stale closure)
   const pendingFavoriteIdRef = useRef<string | null>(null);
   const loadedRef = useRef(false);
@@ -55,14 +55,14 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     return new Set(selectedFields.map((f) => JSON.stringify(f)));
   }, [selectedFields]);
 
-  // Preview field: hoveredFieldPath if not in selectedFields (for muted preview column)
+  // Preview field: focusedFieldPath if not in selectedFields (for muted preview column)
   const previewField = useMemo(() => {
-    if (!hoveredFieldPath) return undefined;
+    if (!focusedFieldPath) return undefined;
     const isSelected = selectedFields.some(
-      (f) => f.join('.') === hoveredFieldPath.join('.')
+      (f) => f.join('.') === focusedFieldPath.join('.')
     );
-    return isSelected ? undefined : hoveredFieldPath;
-  }, [hoveredFieldPath, selectedFields]);
+    return isSelected ? undefined : focusedFieldPath;
+  }, [focusedFieldPath, selectedFields]);
 
   // Favorite views hook
   const {
@@ -401,8 +401,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                   connectedContexts={connectedContexts}
                   onReady={handleNavigationReady}
                   onFieldsSelected={setSelectedFields}
-                  onFieldHover={setHoveredFieldPath}
-                  highlightedFieldPath={hoveredFieldPath ?? undefined}
+                  onFieldFocus={setFocusedFieldPath}
+                  highlightedFieldPath={focusedFieldPath ?? undefined}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
@@ -456,8 +456,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 isTableFocused={focusedPanel === 'table'}
                 onFieldsReorder={handleFieldsReorder}
                 onFieldRemove={handleFieldRemove}
-                onColumnHover={setHoveredFieldPath}
-                highlightedColumnPath={hoveredFieldPath ?? undefined}
+                onColumnFocus={setFocusedFieldPath}
+                highlightedColumnPath={focusedFieldPath ?? undefined}
                 previewField={previewField}
               />
             ) : (
