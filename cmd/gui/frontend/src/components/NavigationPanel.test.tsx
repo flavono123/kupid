@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { NavigationPanel } from './NavigationPanel';
 import { main } from '../../wailsjs/go/models';
@@ -287,6 +287,13 @@ describe('NavigationPanel', () => {
             level: 1,
             children: [],
           },
+          {
+            name: 'namespace',
+            type: 'string',
+            fullPath: ['metadata', 'namespace'],
+            level: 1,
+            children: [],
+          },
         ],
       },
     ];
@@ -379,19 +386,19 @@ describe('NavigationPanel', () => {
       await user.click(expandButtons[0]);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      // Select name field
+      // Select namespace field (not name - it's a default column)
       const checkboxes = screen.getAllByRole('checkbox');
-      const nameCheckbox = checkboxes.find((cb) => {
+      const namespaceCheckbox = checkboxes.find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       await waitFor(() => {
-        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'name']]);
+        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'namespace']]);
       });
 
       // Change to Deployment GVK
@@ -453,6 +460,13 @@ describe('NavigationPanel', () => {
             level: 1,
             children: [],
           },
+          {
+            name: 'namespace',
+            type: 'string',
+            fullPath: ['metadata', 'namespace'],
+            level: 1,
+            children: [],
+          },
         ],
       },
     ];
@@ -483,15 +497,15 @@ describe('NavigationPanel', () => {
       await user.click(expandButtons[0]);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      // Click the checkbox
-      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+      // Click the checkbox for namespace (not name - it's a default column)
+      const namespaceCheckbox = screen.getAllByRole('checkbox').find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       // Selection should persist - not blink and disappear
       await waitFor(() => {
@@ -503,7 +517,7 @@ describe('NavigationPanel', () => {
 
       // Should still be selected
       expect(ref.current.getSelectedCount()).toBe(1);
-      expect(nameCheckbox).toHaveAttribute('data-state', 'checked');
+      expect(namespaceCheckbox).toHaveAttribute('data-state', 'checked');
     });
 
     it('should call onFieldsSelected when leaf node is selected', async () => {
@@ -528,22 +542,22 @@ describe('NavigationPanel', () => {
       await user.click(expandButtons[0]);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      // Find and click the checkbox for "name" node
+      // Find and click the checkbox for "namespace" node (not name - it's a default column)
       const checkboxes = screen.getAllByRole('checkbox');
-      const nameCheckbox = checkboxes.find((cb) => {
+      const namespaceCheckbox = checkboxes.find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
 
-      expect(nameCheckbox).toBeDefined();
-      await user.click(nameCheckbox!);
+      expect(namespaceCheckbox).toBeDefined();
+      await user.click(namespaceCheckbox!);
 
       // Should call onFieldsSelected with the selected path
       await waitFor(() => {
-        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'name']]);
+        expect(mockOnFieldsSelected).toHaveBeenCalledWith([['metadata', 'namespace']]);
       });
     });
 
@@ -1130,6 +1144,284 @@ describe('NavigationPanel', () => {
     });
   });
 
+  describe('Field Hover Sync (NP → RT)', () => {
+    const mockTreeData = [
+      {
+        name: 'metadata',
+        type: 'ObjectMeta',
+        fullPath: ['metadata'],
+        level: 0,
+        children: [
+          {
+            name: 'name',
+            type: 'string',
+            fullPath: ['metadata', 'name'],
+            level: 1,
+            children: [],
+          },
+          {
+            name: 'namespace',
+            type: 'string',
+            fullPath: ['metadata', 'namespace'],
+            level: 1,
+            children: [],
+          },
+        ],
+      },
+      {
+        name: 'spec',
+        type: 'PodSpec',
+        fullPath: ['spec'],
+        level: 0,
+        children: [
+          {
+            name: 'containers',
+            type: '[]Container',
+            fullPath: ['spec', 'containers'],
+            level: 1,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    it('should call onFieldFocus with path when hovering a leaf field', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const mockOnFieldFocus = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+          onFieldFocus={mockOnFieldFocus}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Expand metadata
+      const expandButton = screen.getAllByRole('button')[0];
+      await user.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      // Hover over the 'name' leaf field
+      const nameElement = screen.getByText('name');
+      const nameRow = nameElement.closest('div[class*="flex items-center"]');
+      fireEvent.mouseEnter(nameRow!);
+
+      // onFieldFocus should be called with the field path
+      await waitFor(() => {
+        expect(mockOnFieldFocus).toHaveBeenCalledWith(['metadata', 'name']);
+      });
+    });
+
+    it('should call onFieldFocus with null when hovering a non-leaf field', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const mockOnFieldFocus = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+          onFieldFocus={mockOnFieldFocus}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // First expand metadata and hover on a leaf field
+      const expandButton = screen.getAllByRole('button')[0];
+      await user.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      const nameElement = screen.getByText('name');
+      const nameRow = nameElement.closest('div[class*="flex items-center"]');
+      fireEvent.mouseEnter(nameRow!);
+
+      await waitFor(() => {
+        expect(mockOnFieldFocus).toHaveBeenCalledWith(['metadata', 'name']);
+      });
+
+      // Now hover over 'metadata' (non-leaf with children)
+      const metadataElement = screen.getByText('metadata');
+      const metadataRow = metadataElement.closest('div[class*="flex items-center"]');
+      fireEvent.mouseEnter(metadataRow!);
+
+      // onFieldFocus should be called with null for non-leaf
+      await waitFor(() => {
+        expect(mockOnFieldFocus).toHaveBeenLastCalledWith(null);
+      });
+    });
+
+    it('should call onFieldFocus with null when hovering array/map type field', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const mockOnFieldFocus = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+          onFieldFocus={mockOnFieldFocus}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('spec')).toBeInTheDocument();
+      });
+
+      // Expand spec to see containers (array type)
+      const specElement = screen.getByText('spec');
+      const specRow = specElement.closest('div[class*="flex items-center"]');
+      const specExpandButton = specRow?.querySelector('button');
+      await user.click(specExpandButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText('containers')).toBeInTheDocument();
+      });
+
+      // Hover over containers (type: '[]Container' - array type without children)
+      const containersElement = screen.getByText('containers');
+      const containersRow = containersElement.closest('div[class*="flex items-center"]');
+      fireEvent.mouseEnter(containersRow!);
+
+      // onFieldFocus should be called with null for array type
+      await waitFor(() => {
+        expect(mockOnFieldFocus).toHaveBeenLastCalledWith(null);
+      });
+    });
+
+    it('should trigger onFieldFocus via keyboard navigation to leaf field', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const mockOnFieldFocus = vi.fn();
+      const user = userEvent.setup();
+      const ref = { current: null as any };
+
+      render(
+        <NavigationPanel
+          ref={ref}
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+          onFieldFocus={mockOnFieldFocus}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Expand metadata to expose leaf nodes
+      const expandButton = screen.getAllByRole('button')[0];
+      await user.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      // Clear mock calls from initial render and mouse interactions
+      mockOnFieldFocus.mockClear();
+
+      // Navigate to first node (metadata), then to 'name' (leaf field)
+      act(() => {
+        ref.current.navigateDown(); // Focus on metadata
+        ref.current.navigateDown(); // Focus on name (leaf)
+      });
+
+      // name is a leaf, so should eventually call with path
+      await waitFor(() => {
+        expect(mockOnFieldFocus).toHaveBeenCalledWith(['metadata', 'name']);
+      }, { timeout: 1000 });
+    });
+  });
+
+  describe('Field Highlight from RT (RT → NP)', () => {
+    const mockTreeData = [
+      {
+        name: 'metadata',
+        type: 'ObjectMeta',
+        fullPath: ['metadata'],
+        level: 0,
+        children: [
+          {
+            name: 'name',
+            type: 'string',
+            fullPath: ['metadata', 'name'],
+            level: 1,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    it('should apply highlight style when highlightedFieldPath matches a field', async () => {
+      (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
+
+      const user = userEvent.setup();
+
+      const { rerender } = render(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('metadata')).toBeInTheDocument();
+      });
+
+      // Expand metadata
+      const expandButton = screen.getAllByRole('button')[0];
+      await user.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('name')).toBeInTheDocument();
+      });
+
+      // Initially no highlight
+      const nameElement = screen.getByText('name');
+      const nameRow = nameElement.closest('div[class*="flex items-center"]');
+      expect(nameRow?.className).not.toContain('bg-focus');
+
+      // Rerender with highlightedFieldPath
+      rerender(
+        <NavigationPanel
+          selectedGVK={mockGVK}
+          connectedContexts={mockContexts}
+          onFieldsSelected={mockOnFieldsSelected}
+          highlightedFieldPath={['metadata', 'name']}
+        />
+      );
+
+      // Now the field should have highlight style
+      await waitFor(() => {
+        const updatedNameElement = screen.getByText('name');
+        const updatedNameRow = updatedNameElement.closest('div[class*="flex items-center"]');
+        expect(updatedNameRow?.className).toContain('bg-focus');
+      });
+    });
+  });
+
   describe('Ref Methods (Imperative Handle)', () => {
     const mockTreeData = [
       {
@@ -1238,19 +1530,19 @@ describe('NavigationPanel', () => {
         expect(screen.getByText('metadata')).toBeInTheDocument();
       });
 
-      // Expand and select a field
+      // Expand and select a field (use namespace, not name - it's a default column)
       const expandButton = screen.getAllByRole('button')[0];
       await user.click(expandButton);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+      const namespaceCheckbox = screen.getAllByRole('checkbox').find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       // Verify selection
       expect(ref.current.getSelectedCount()).toBe(1);
@@ -1292,19 +1584,19 @@ describe('NavigationPanel', () => {
       expect(ref.current.getSelectedCount()).toBe(0);
       expect(ref.current.getSelectedPaths().size).toBe(0);
 
-      // Expand metadata and select name
+      // Expand metadata and select namespace (not name - it's a default column)
       const expandButton = screen.getAllByRole('button')[0];
       await user.click(expandButton);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('namespace')).toBeInTheDocument();
       });
 
-      const nameCheckbox = screen.getAllByRole('checkbox').find((cb) => {
+      const namespaceCheckbox = screen.getAllByRole('checkbox').find((cb) => {
         const parent = cb.closest('div');
-        return parent?.textContent?.includes('name');
+        return parent?.textContent?.includes('namespace');
       });
-      await user.click(nameCheckbox!);
+      await user.click(namespaceCheckbox!);
 
       await waitFor(() => {
         expect(ref.current.getSelectedCount()).toBe(1);
@@ -1315,7 +1607,7 @@ describe('NavigationPanel', () => {
 
       // The path should use PATH_DELIMITER (null character)
       const PATH_DELIMITER = '\x00';
-      expect(selectedPaths.has(['metadata', 'name'].join(PATH_DELIMITER))).toBe(true);
+      expect(selectedPaths.has(['metadata', 'namespace'].join(PATH_DELIMITER))).toBe(true);
     });
 
     it('should toggle search via toggleSearch', async () => {

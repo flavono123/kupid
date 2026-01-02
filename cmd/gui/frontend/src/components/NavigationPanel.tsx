@@ -1,4 +1,4 @@
-import { memo, useRef, forwardRef, useImperativeHandle, useEffect, useCallback } from 'react';
+import { memo, useRef, forwardRef, useImperativeHandle, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
@@ -7,6 +7,7 @@ import { FieldSearchBar, FieldSearchBarHandle } from './FieldSearchBar';
 import { main } from '../../wailsjs/go/models';
 import { useTree, TreeNode, PATH_DELIMITER } from '@/hooks/useTree';
 import { HighlightedText } from './HighlightedText';
+import { DEFAULT_SCHEMA_FIELDS } from '@/lib/constants';
 
 interface NavigationPanelProps {
   selectedGVK: main.MultiClusterGVK;
@@ -14,6 +15,10 @@ interface NavigationPanelProps {
   onFieldsSelected?: (fields: string[][]) => void;
   /** Called when schema loading completes and component is ready */
   onReady?: () => void;
+  /** Called when a field is focused (for sync with ResultTable) */
+  onFieldFocus?: (path: string[] | null) => void;
+  /** Field path to highlight (from ResultTable hover) */
+  highlightedFieldPath?: string[];
 }
 
 export interface NavigationPanelHandle {
@@ -40,6 +45,8 @@ interface TreeNodeItemProps {
   onFocus?: (pathKey: string) => void;
   /** Whether to auto-scroll when focused (only for keyboard/search navigation) */
   shouldAutoScroll?: boolean;
+  /** Path highlighted from ResultTable hover */
+  highlightedFieldPathKey?: string;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -53,16 +60,20 @@ const TreeNodeItem = memo(({
   focusedPath,
   onFocus,
   shouldAutoScroll = false,
+  highlightedFieldPathKey,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
   const isLeaf = !hasChildren && !isArrayOrMap;
   const pathKey = node.fullPath.join(PATH_DELIMITER);
+  // Default columns (always shown in ResultTable) - disable selection
+  const isDefaultColumn = DEFAULT_SCHEMA_FIELDS.includes(node.fullPath.join('.') as typeof DEFAULT_SCHEMA_FIELDS[number]);
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
   const matchIndices = searchResultsMap.get(pathKey);
   const hasHighlight = matchIndices !== undefined && matchIndices !== null && matchIndices.length > 0;
   const isFocused = focusedPath === pathKey;
+  const isHighlightedFromRT = highlightedFieldPathKey === pathKey;
   const nodeRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to focused node (only for keyboard/search navigation, not mouse hover)
@@ -84,6 +95,8 @@ const TreeNodeItem = memo(({
   }, [node.fullPath, onToggleSelect]);
 
   const handleMouseEnter = useCallback(() => {
+    // Only update internal focus - onFieldFocus is handled via useEffect
+    // This ensures debounce protection from setFocusedPath is respected
     onFocus?.(pathKey);
   }, [onFocus, pathKey]);
 
@@ -105,7 +118,7 @@ const TreeNodeItem = memo(({
       <div
         ref={nodeRef}
         className={`flex items-center py-0.5 pr-2 rounded-sm relative ${
-          isFocused ? 'bg-focus' : ''
+          isHighlightedFromRT || isFocused ? 'bg-focus' : ''
         }`}
         style={{ paddingLeft: `${node.level * 12 + 2}px` }}
         onMouseEnter={handleMouseEnter}
@@ -127,9 +140,11 @@ const TreeNodeItem = memo(({
           </Button>
         ) : isLeaf ? (
           <Checkbox
-            checked={selected}
+            checked={isDefaultColumn || selected}
             onCheckedChange={handleSelectChange}
+            disabled={isDefaultColumn}
             className="mr-1.5 h-3.5 w-3.5 shrink-0"
+            title={isDefaultColumn ? 'Default column (always visible)' : undefined}
           />
         ) : (
           <span className="w-4 mr-1.5 shrink-0" />
@@ -167,6 +182,7 @@ const TreeNodeItem = memo(({
               focusedPath={focusedPath}
               onFocus={onFocus}
               shouldAutoScroll={shouldAutoScroll}
+              highlightedFieldPathKey={highlightedFieldPathKey}
             />
           ))}
         </div>
@@ -182,10 +198,13 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
   connectedContexts,
   onFieldsSelected,
   onReady,
+  onFieldFocus,
+  highlightedFieldPath,
 }, ref) => {
   const {
     // State
     loading,
+    flatNodesMap,
 
     // Search
     query,
@@ -227,6 +246,36 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
   });
 
   const fieldSearchBarRef = useRef<FieldSearchBarHandle>(null);
+
+  // Convert highlightedFieldPath to pathKey for comparison
+  const highlightedFieldPathKey = useMemo(() => {
+    return highlightedFieldPath?.join(PATH_DELIMITER);
+  }, [highlightedFieldPath]);
+
+  // Sync focus to parent's focusedFieldPath for preview (unified for keyboard & mouse)
+  // This ensures debounce protection from setFocusedPath is respected for both triggers
+  useEffect(() => {
+    if (!onFieldFocus) return;
+
+    if (!focusedPathKey) {
+      onFieldFocus(null);
+      return;
+    }
+
+    const node = flatNodesMap.get(focusedPathKey);
+    if (!node) {
+      onFieldFocus(null);
+      return;
+    }
+
+    // Check if leaf node (same logic as TreeNodeItem)
+    const hasChildren = node.children && node.children.length > 0;
+    const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+    const isLeaf = !hasChildren && !isArrayOrMap;
+
+    // For leaf nodes, notify for preview; for non-leaf, clear preview
+    onFieldFocus(isLeaf ? node.fullPath : null);
+  }, [focusedPathKey, flatNodesMap, onFieldFocus]);
 
   useImperativeHandle(ref, () => ({
     clearSelections: clearAllSelections,
@@ -293,6 +342,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                   focusTrigger === 'keyboard' ||
                   (Boolean(debouncedQuery) && matchedPaths.length > 0)
                 }
+                highlightedFieldPathKey={highlightedFieldPathKey}
               />
             ))}
           </div>

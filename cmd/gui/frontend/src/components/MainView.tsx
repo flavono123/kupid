@@ -13,6 +13,7 @@ import { GetGVKs } from "../../wailsjs/go/main/App";
 import { main } from "../../wailsjs/go/models";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { useFavoriteViews } from "@/hooks/useFavoriteViews";
+import { DEFAULT_COLUMNS } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import { toggleThemeWithAnimation } from "@/lib/theme-animation";
 import { isInputElementFocused } from "@/lib/dom-utils";
@@ -32,6 +33,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const [loading, setLoading] = useState(true);
   const [selectedGVK, setSelectedGVK] = useState<main.MultiClusterGVK | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[][]>([]);
+  // Focus sync state between NavigationPanel and ResultTable
+  const [focusedFieldPath, setFocusedFieldPath] = useState<string[] | null>(null);
   // Pending favorite ID to apply after GVK switch (use ref to avoid stale closure)
   const pendingFavoriteIdRef = useRef<string | null>(null);
   const loadedRef = useRef(false);
@@ -52,6 +55,20 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const selectedPaths = useMemo(() => {
     return new Set(selectedFields.map((f) => JSON.stringify(f)));
   }, [selectedFields]);
+
+  // Preview field: focusedFieldPath if not in selectedFields (for muted preview column)
+  // Excludes default columns (_context, metadata.name) as they're always visible
+  const previewField = useMemo(() => {
+    if (!focusedFieldPath) return undefined;
+
+    // Default columns should not show as preview (they're always visible)
+    const focusedPath = focusedFieldPath.join('.');
+    const isDefaultColumn = DEFAULT_COLUMNS.includes(focusedPath as typeof DEFAULT_COLUMNS[number]);
+    if (isDefaultColumn) return undefined;
+
+    const isSelected = selectedFields.some((f) => f.join('.') === focusedPath);
+    return isSelected ? undefined : focusedFieldPath;
+  }, [focusedFieldPath, selectedFields]);
 
   // Favorite views hook
   const {
@@ -315,6 +332,18 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     clearFavorite();
   }, [clearFavorite]);
 
+  // Handle column removal from ResultTable header
+  const handleFieldRemove = useCallback((field: string[]) => {
+    const pathKey = field.join(PATH_DELIMITER);
+    const currentPaths = navigationPanelRef.current?.getSelectedPaths();
+    if (currentPaths) {
+      const newPaths = new Set(currentPaths);
+      newPaths.delete(pathKey);
+      navigationPanelRef.current?.setSelectedPaths(newPaths);
+    }
+    clearFavorite();
+  }, [clearFavorite]);
+
   const gvkLabel = selectedGVK
     ? `${selectedGVK.kind.toLowerCase()} (${selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version})`
     : "";
@@ -378,6 +407,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                   connectedContexts={connectedContexts}
                   onReady={handleNavigationReady}
                   onFieldsSelected={setSelectedFields}
+                  onFieldFocus={setFocusedFieldPath}
+                  highlightedFieldPath={focusedFieldPath ?? undefined}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
@@ -430,6 +461,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 connectedContexts={connectedContexts}
                 isTableFocused={focusedPanel === 'table'}
                 onFieldsReorder={handleFieldsReorder}
+                onFieldRemove={handleFieldRemove}
+                onColumnFocus={setFocusedFieldPath}
+                highlightedColumnPath={focusedFieldPath ?? undefined}
+                previewField={previewField}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">

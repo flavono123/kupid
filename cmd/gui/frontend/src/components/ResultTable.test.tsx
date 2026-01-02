@@ -165,6 +165,167 @@ describe('ResultTable - Search Focus Clear', () => {
   });
 });
 
+describe('ResultTable - Column Hover Sync (RT → NP)', () => {
+  it('should call onColumnFocus with path when hovering a column header', async () => {
+    const mockOnColumnFocus = vi.fn();
+
+    render(
+      <ResultTable
+        {...defaultProps}
+        onColumnFocus={mockOnColumnFocus}
+      />
+    );
+
+    await waitFor(() => {
+      // Use getAllByText since there are multiple cells with same value
+      expect(screen.getAllByText('pod-1').length).toBeGreaterThan(0);
+    });
+
+    // Find the 'namespace' column header (from defaultProps.selectedFields)
+    const namespaceHeader = screen.getByText('namespace');
+    const headerCell = namespaceHeader.closest('div[class*="cursor-grab"]');
+
+    // Hover over the column header
+    fireEvent.mouseEnter(headerCell!);
+
+    // onColumnFocus should be called with the field path
+    expect(mockOnColumnFocus).toHaveBeenCalledWith(['metadata', 'namespace']);
+  });
+
+  it('should call onColumnFocus with null when mouse leaves column header', async () => {
+    const mockOnColumnFocus = vi.fn();
+
+    render(
+      <ResultTable
+        {...defaultProps}
+        onColumnFocus={mockOnColumnFocus}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('pod-1').length).toBeGreaterThan(0);
+    });
+
+    const namespaceHeader = screen.getByText('namespace');
+    const headerCell = namespaceHeader.closest('div[class*="cursor-grab"]');
+
+    // Hover then leave
+    fireEvent.mouseEnter(headerCell!);
+    expect(mockOnColumnFocus).toHaveBeenCalledWith(['metadata', 'namespace']);
+
+    fireEvent.mouseLeave(headerCell!);
+    expect(mockOnColumnFocus).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe('ResultTable - Column Highlight from NP (NP → RT)', () => {
+  it('should apply highlight style to entire column when highlightedColumnPath matches', async () => {
+    render(
+      <ResultTable
+        {...defaultProps}
+        highlightedColumnPath={['metadata', 'namespace']}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('pod-1').length).toBeGreaterThan(0);
+    });
+
+    // The 'namespace' column header should have highlight style
+    const namespaceHeader = screen.getByText('namespace');
+    const headerCell = namespaceHeader.closest('div[class*="cursor-grab"]');
+    expect(headerCell?.className).toContain('bg-focus');
+
+    // Data cells in the namespace column should also have highlight style
+    // 'default' and 'kube-system' are namespace values from mockData
+    const defaultCells = screen.getAllByText('default');
+    expect(defaultCells.length).toBeGreaterThan(0);
+    // Find the cell container (parent div with px-1 class)
+    const cellContainer = defaultCells[0].closest('div[class*="px-1"]');
+    expect(cellContainer?.className).toContain('bg-focus');
+  });
+
+  it('should not highlight columns when highlightedColumnPath is undefined', async () => {
+    render(
+      <ResultTable
+        {...defaultProps}
+        highlightedColumnPath={undefined}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('pod-1').length).toBeGreaterThan(0);
+    });
+
+    // No column should have highlight style
+    const namespaceHeader = screen.getByText('namespace');
+    const headerCell = namespaceHeader.closest('div[class*="cursor-grab"]');
+    expect(headerCell?.className).not.toContain('bg-focus');
+  });
+});
+
+describe('ResultTable - Preview Column', () => {
+  it('should render preview column with muted style when previewField is provided', async () => {
+    render(
+      <ResultTable
+        {...defaultProps}
+        previewField={['metadata', 'name']}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('pod-1').length).toBeGreaterThan(0);
+    });
+
+    // Should render the preview column header ('name' from previewField)
+    const nameHeaders = screen.getAllByText('name');
+    expect(nameHeaders.length).toBeGreaterThan(0);
+
+    // Preview column header has opacity-50 and border-dashed (not cursor-grab since not draggable)
+    const previewHeaderCell = document.querySelector('div[class*="opacity-50"][class*="border-dashed"]');
+    expect(previewHeaderCell).not.toBeNull();
+  });
+
+  it('should render preview column data with muted style', async () => {
+    render(
+      <ResultTable
+        {...defaultProps}
+        previewField={['metadata', 'name']}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('pod-1').length).toBeGreaterThan(0);
+    });
+
+    // Preview column cells also have opacity-50 and border-dashed
+    const previewCells = document.querySelectorAll('div[class*="opacity-50"][class*="border-dashed"]');
+    // Should have at least header + data cells
+    expect(previewCells.length).toBeGreaterThan(1);
+  });
+
+  it('should not show sort icons on preview column header', async () => {
+    render(
+      <ResultTable
+        {...defaultProps}
+        previewField={['metadata', 'name']}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('pod-1').length).toBeGreaterThan(0);
+    });
+
+    // Find preview column header (has opacity-50 and border-dashed, contains "name" text)
+    const previewHeaderCell = document.querySelector('div[class*="opacity-50"][class*="border-dashed"]');
+    expect(previewHeaderCell).not.toBeNull();
+
+    // Preview header should not have sort chevron icons
+    const sortIcons = previewHeaderCell?.querySelectorAll('svg');
+    expect(sortIcons?.length ?? 0).toBe(0);
+  });
+});
+
 describe('ResultTable - Basic Rendering', () => {
   it('should render table with data', async () => {
     render(<ResultTable {...defaultProps} />);
