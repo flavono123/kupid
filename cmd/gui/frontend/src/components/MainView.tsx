@@ -344,6 +344,11 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     clearFavorite();
   }, [clearFavorite]);
 
+  // Clear preview field before export
+  const handlePreviewClear = useCallback(() => {
+    setFocusedFieldPath(null);
+  }, []);
+
   const gvkLabel = selectedGVK
     ? `${selectedGVK.kind.toLowerCase()} (${selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version})`
     : "";
@@ -465,6 +470,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 onColumnFocus={setFocusedFieldPath}
                 highlightedColumnPath={focusedFieldPath ?? undefined}
                 previewField={previewField}
+                onPreviewClear={handlePreviewClear}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">

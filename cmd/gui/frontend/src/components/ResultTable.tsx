@@ -46,6 +46,7 @@ interface ResultTableProps {
   onColumnFocus?: (path: string[] | null) => void;  // Callback when column header is focused
   highlightedColumnPath?: string[];  // Column to highlight (from NavigationPanel hover)
   previewField?: string[];  // Unchecked field to preview as muted column at the end
+  onPreviewClear?: () => void;  // Callback to clear preview before export
 }
 
 export interface ResultTableHandle {
@@ -221,6 +222,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   onColumnFocus,
   highlightedColumnPath,
   previewField,
+  onPreviewClear,
 }, ref) => {
   // Use extracted hook for data fetching (watch enabled for real-time updates)
   const { data, loading, getRowId, changedCells } = useResourceData(
@@ -553,15 +555,23 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   }, [focusedRowIndex, rowVirtualizer]);
 
   // Prepare export data (headers and rows for CSV)
+  // Excludes preview columns - only exports selected fields
   const exportData = useMemo(() => {
-    const headers = table.getHeaderGroups()[0]?.headers.map((header) => {
+    const allHeaders = table.getHeaderGroups()[0]?.headers || [];
+    // Filter out preview columns (id starts with _preview.)
+    const exportHeaders = allHeaders.filter(h => !h.column.id.startsWith('_preview.'));
+
+    const headers = exportHeaders.map((header) => {
       return typeof header.column.columnDef.header === 'string'
         ? header.column.columnDef.header
         : String(header.column.columnDef.header);
-    }) || [];
+    });
 
     const exportRows = rows.map((row) => {
-      return row.getVisibleCells().map((cell) => {
+      const allCells = row.getVisibleCells();
+      // Filter out preview columns
+      const exportCells = allCells.filter(cell => !cell.column.id.startsWith('_preview.'));
+      return exportCells.map((cell) => {
         const value = cell.getValue();
         // Handle objects/arrays - convert to JSON string for CSV
         if (typeof value === 'object' && value !== null) {
@@ -571,9 +581,8 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
       });
     });
 
-    console.log('Export data prepared:', { headers, rowCount: exportRows.length, sampleRow: exportRows[0] });
     return { headers, rows: exportRows };
-  }, [table, rows]);
+  }, [table, rows, selectedFields, connectedContexts]);
 
   return (
     <div className="flex flex-col h-full">
@@ -588,6 +597,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
         rows={exportData.rows}
         resourceKind={selectedGVK?.kind || 'resources'}
         onSearchFocusChange={handleSearchFocusChange}
+        onBeforeExport={onPreviewClear}
       />
 
       {/* Table Content with Virtual Scrolling */}

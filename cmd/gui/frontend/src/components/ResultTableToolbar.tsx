@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Download, Clipboard, FileDown, AlertCircle } from 'lucide-react';
-import { useState, forwardRef, useRef, useImperativeHandle } from 'react';
+import { useState, forwardRef, useRef, useImperativeHandle, useCallback } from 'react';
 import { Kbd } from './ui/kbd';
 import { convertToCSV, copyToClipboard, downloadCSV } from '@/lib/csv-export';
 import { SaveFile } from '../../wailsjs/go/main/App';
@@ -22,6 +22,7 @@ interface ResultTableToolbarProps {
   rows: any[][];
   resourceKind?: string; // For filename generation
   onSearchFocusChange?: (focused: boolean) => void;
+  onBeforeExport?: () => void; // Called before export (e.g., to clear preview)
 }
 
 export interface ResultTableToolbarHandle {
@@ -40,12 +41,14 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
   rows,
   resourceKind = 'resources',
   onSearchFocusChange,
+  onBeforeExport,
 }, ref) => {
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'downloaded' | 'error'>('idle');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExportToClipboard = async () => {
+  const handleExportToClipboard = useCallback(async () => {
+    onBeforeExport?.();
     try {
       setExporting(true);
       const csvContent = convertToCSV(headers, rows);
@@ -59,9 +62,10 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
     } finally {
       setExporting(false);
     }
-  };
+  }, [headers, rows, onBeforeExport]);
 
-  const handleExportToFile = async () => {
+  const handleExportToFile = useCallback(async () => {
+    onBeforeExport?.();
     try {
       setExporting(true);
       const csvContent = convertToCSV(headers, rows);
@@ -91,7 +95,7 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
     } finally {
       setExporting(false);
     }
-  };
+  }, [headers, rows, resourceKind, onBeforeExport]);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -103,7 +107,7 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
     },
     exportToClipboard: handleExportToClipboard,
     exportToFile: handleExportToFile,
-  }), []);
+  }), [handleExportToClipboard, handleExportToFile]);
 
   return (
     <div className="p-4 border-b border-border">
