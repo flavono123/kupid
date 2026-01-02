@@ -309,6 +309,12 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     navigationPanelRef.current?.clearSelections();
   }, [clearFavorite]);
 
+  // Handle column reorder - update fields and clear active favorite
+  const handleFieldsReorder = useCallback((newFields: string[][]) => {
+    setSelectedFields(newFields);
+    clearFavorite();
+  }, [clearFavorite]);
+
   const gvkLabel = selectedGVK
     ? `${selectedGVK.kind.toLowerCase()} (${selectedGVK.group ? `${selectedGVK.group}/${selectedGVK.version}` : selectedGVK.version})`
     : "";
@@ -423,6 +429,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 selectedGVK={selectedGVK}
                 connectedContexts={connectedContexts}
                 isTableFocused={focusedPanel === 'table'}
+                onFieldsReorder={handleFieldsReorder}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">

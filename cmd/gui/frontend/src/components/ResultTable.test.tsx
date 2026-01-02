@@ -6,7 +6,7 @@
  * - Cell focus cleared when mouse leaves table area
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ResultTable } from './ResultTable';
 
@@ -78,10 +78,6 @@ const getFocusedCellCount = () => {
   return document.querySelectorAll('[class*="underline"][class*="bg-accent"]').length;
 };
 
-// Helper to find open popovers (CellContent popover opens when isFocused=true)
-const getOpenPopoverCount = () => {
-  return document.querySelectorAll('[data-state="open"]').length;
-};
 
 describe('ResultTable - Cell Focus Clear on Panel Switch', () => {
   it('should clear cell focus when isTableFocused becomes false', async () => {
@@ -94,7 +90,7 @@ describe('ResultTable - Cell Focus Clear on Panel Switch', () => {
 
     // Hover over a cell to create focus
     const cell = screen.getByText('pod-1');
-    fireEvent.mouseEnter(cell.closest('div[class*="px-4"]')!);
+    fireEvent.mouseEnter(cell.closest('div[class*="px-1"]')!);
 
     // The cell should show focused state (underline class)
     expect(getFocusedCellCount()).toBeGreaterThan(0);
@@ -132,7 +128,7 @@ describe('ResultTable - Cell Focus Clear on Mouse Leave', () => {
 
     // Hover over a cell to create focus
     const cell = screen.getByText('pod-1');
-    fireEvent.mouseEnter(cell.closest('div[class*="px-4"]')!);
+    fireEvent.mouseEnter(cell.closest('div[class*="px-1"]')!);
 
     // Verify cell is focused
     expect(getFocusedCellCount()).toBeGreaterThan(0);
@@ -155,7 +151,7 @@ describe('ResultTable - Search Focus Clear', () => {
 
     // Hover over a cell to create focus
     const cell = screen.getByText('pod-1');
-    fireEvent.mouseEnter(cell.closest('div[class*="px-4"]')!);
+    fireEvent.mouseEnter(cell.closest('div[class*="px-1"]')!);
 
     // Verify cell is focused
     expect(getFocusedCellCount()).toBeGreaterThan(0);
