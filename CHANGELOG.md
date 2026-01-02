@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.0.11-alpha](https://github.com/flavono123/kupid/compare/v0.0.10-alpha...v0.0.11-alpha) (2026-01-02)
+
+
+### Features
+
+* **gui:** add column sorting & reordering by drags to ResultTable ([#44](https://github.com/flavono123/kupid/issues/44)) ([49d85bb](https://github.com/flavono123/kupid/commit/49d85bb455bb9b60464f9bc23bc448bf53fc15f8))
+* **gui:** add pulse animation to CTA buttons for better visibility ([#33](https://github.com/flavono123/kupid/issues/33)) ([26b2035](https://github.com/flavono123/kupid/commit/26b203594f746eb856df7b27100a721e60d8c54e))
+* **gui:** bidirectional focus sync between NavigationPanel and ResultTable ([#45](https://github.com/flavono123/kupid/issues/45)) ([32d521e](https://github.com/flavono123/kupid/commit/32d521e601250059f3fe223a061bed9e77a7cc9c))
+* **gui:** comprehensive keyboard navigation support ([#40](https://github.com/flavono123/kupid/issues/40)) ([9ec8740](https://github.com/flavono123/kupid/commit/9ec8740c734876de0b168e5344d5aba3170cac8d))
+* **ui:** add resizable table columns and improve cell styling ([#32](https://github.com/flavono123/kupid/issues/32)) ([5bea584](https://github.com/flavono123/kupid/commit/5bea584c20587412f0792a239dc044fb9392ead4))
+
+
+### Bug Fixes
+
+* **ci:** update GitHub Actions to latest versions ([#38](https://github.com/flavono123/kupid/issues/38)) ([f87e4db](https://github.com/flavono123/kupid/commit/f87e4db0baaa00deb9f11a59a3d4517c5388da58))
+* **gui:** prevent selection from being immediately removed in NavigationPanel ([#42](https://github.com/flavono123/kupid/issues/42)) ([17c9411](https://github.com/flavono123/kupid/commit/17c94110bfd3dca6e025891dc09216f885635b8b))
+* **gui:** resolve search input keyboard issues and improve focus management ([#41](https://github.com/flavono123/kupid/issues/41)) ([9d92d47](https://github.com/flavono123/kupid/commit/9d92d472d2309dbd4fe2fbb2866335505723e874))
+* **gui:** sync CSV export with selected fields only ([#46](https://github.com/flavono123/kupid/issues/46)) ([5ee9589](https://github.com/flavono123/kupid/commit/5ee9589d27bd58c1ab33d05a1c436022e5865c8f))
+* **gui:** use resolvedTheme for correct theme toggle behavior ([#34](https://github.com/flavono123/kupid/issues/34)) ([d023e56](https://github.com/flavono123/kupid/commit/d023e563d06fdeb8a100f168e20ca718f4bc6b14))
+* **kube:** prevent object array items from being pickable ([#26](https://github.com/flavono123/kupid/issues/26)) ([8c5744d](https://github.com/flavono123/kupid/commit/8c5744d3241bc9ad76e18a6b0360617c574efd81))
+* **ui:** cap column width and truncate long values ([#27](https://github.com/flavono123/kupid/issues/27)) ([9cf91ba](https://github.com/flavono123/kupid/commit/9cf91bae198c01f07f0978d7dc0b91f094824917))
+* **website:** add trailing slash to base path ([#39](https://github.com/flavono123/kupid/issues/39)) ([627603b](https://github.com/flavono123/kupid/commit/627603b64c6aa262a0772389d59df3d3de7e7f63))
+* **website:** add trailing slash to base path for correct URL generation ([627603b](https://github.com/flavono123/kupid/commit/627603b64c6aa262a0772389d59df3d3de7e7f63))
+* **website:** change base path to /kupid to match repo name ([8fed254](https://github.com/flavono123/kupid/commit/8fed254bbb7b096c09b56eb546a2054e49b2e40a))
+
 ## [0.0.10-alpha](https://github.com/flavono123/kupid/compare/v0.0.9-alpha...v0.0.10-alpha) (2025-01-30)
 
 
