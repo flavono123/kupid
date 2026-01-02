@@ -353,6 +353,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
     getRowId,  // Stable row identity for real-time updates
     columnResizeMode: 'onChange',  // Enable column resizing
     globalFilterFn: fuzzyFilter,
+    enableSortingRemoval: false,  // Toggle between asc/desc only (no "none" state)
     state: {
       globalFilter,
       sorting,
