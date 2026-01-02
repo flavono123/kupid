@@ -21,6 +21,7 @@ import {
   ListFavoriteViews,
   SaveFavoriteView,
 } from '../../wailsjs/go/main/App';
+import { main } from '../../wailsjs/go/models';
 
 const mockGVK = {
   group: '',
@@ -28,14 +29,16 @@ const mockGVK = {
   kind: 'Pod',
 };
 
-const createFavorite = (id: string, name: string, fields: string[][]) => ({
-  id,
-  name,
-  gvk: mockGVK,
-  fields,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
+const createFavorite = (id: string, name: string, fields: string[][]): main.FavoriteViewResponse => {
+  return main.FavoriteViewResponse.createFrom({
+    id,
+    name,
+    gvk: mockGVK,
+    fields,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+};
 
 describe('useFavoriteViews - Order-Sensitive Matching', () => {
   beforeEach(() => {
