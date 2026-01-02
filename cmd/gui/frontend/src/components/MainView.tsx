@@ -56,11 +56,16 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   }, [selectedFields]);
 
   // Preview field: focusedFieldPath if not in selectedFields (for muted preview column)
+  // Excludes default columns (_context, metadata.name) as they're always visible
   const previewField = useMemo(() => {
     if (!focusedFieldPath) return undefined;
-    const isSelected = selectedFields.some(
-      (f) => f.join('.') === focusedFieldPath.join('.')
-    );
+
+    // Default columns should not show as preview (they're always visible)
+    const focusedPath = focusedFieldPath.join('.');
+    const isDefaultColumn = focusedPath === '_context' || focusedPath === 'metadata.name';
+    if (isDefaultColumn) return undefined;
+
+    const isSelected = selectedFields.some((f) => f.join('.') === focusedPath);
     return isSelected ? undefined : focusedFieldPath;
   }, [focusedFieldPath, selectedFields]);
 
