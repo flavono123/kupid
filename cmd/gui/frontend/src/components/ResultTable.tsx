@@ -646,9 +646,12 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                         const fieldIndex = headerIndex - fixedColumnCount;
                         const field = isDraggable ? selectedFields[fieldIndex] : undefined;
 
+                        // Get field path from column ID (for default columns too)
+                        const columnFieldPath = header.column.id.split('.');
+
                         // Check if this column is highlighted from NavigationPanel hover
-                        const isHighlighted = field && highlightedColumnPath
-                          ? field.join('.') === highlightedColumnPath.join('.')
+                        const isHighlighted = highlightedColumnPath && !isPreviewColumn
+                          ? header.column.id === highlightedColumnPath.join('.')
                           : false;
 
                         return (
@@ -664,8 +667,8 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                             isResizing={header.column.getIsResizing()}
                             isDraggable={isDraggable}
                             onRemove={field && onFieldRemove ? () => onFieldRemove(field) : undefined}
-                            onHover={field && onColumnFocus ? () => onColumnFocus(field) : undefined}
-                            onHoverEnd={onColumnFocus ? () => onColumnFocus(null) : undefined}
+                            onHover={onColumnFocus && !isPreviewColumn ? () => onColumnFocus(columnFieldPath) : undefined}
+                            onHoverEnd={onColumnFocus && !isPreviewColumn ? () => onColumnFocus(null) : undefined}
                             isHighlighted={isHighlighted}
                             isPreview={isPreviewColumn}
                           />
