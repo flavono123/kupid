@@ -22,6 +22,7 @@ interface ResultTableToolbarProps {
   rows: any[][];
   resourceKind?: string; // For filename generation
   onSearchFocusChange?: (focused: boolean) => void;
+  onBeforeExport?: () => void; // Called before export (e.g., to clear preview)
 }
 
 export interface ResultTableToolbarHandle {
@@ -40,12 +41,14 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
   rows,
   resourceKind = 'resources',
   onSearchFocusChange,
+  onBeforeExport,
 }, ref) => {
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'downloaded' | 'error'>('idle');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportToClipboard = async () => {
+    onBeforeExport?.();
     try {
       setExporting(true);
       const csvContent = convertToCSV(headers, rows);
@@ -62,6 +65,7 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
   };
 
   const handleExportToFile = async () => {
+    onBeforeExport?.();
     try {
       setExporting(true);
       const csvContent = convertToCSV(headers, rows);

@@ -465,6 +465,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 onColumnFocus={setFocusedFieldPath}
                 highlightedColumnPath={focusedFieldPath ?? undefined}
                 previewField={previewField}
+                onPreviewClear={() => setFocusedFieldPath(null)}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">
