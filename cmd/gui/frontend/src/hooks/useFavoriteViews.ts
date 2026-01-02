@@ -19,11 +19,8 @@ function gvkMatches(a: GVK, b: GVK): boolean {
 
 function pathsEqual(a: string[][], b: string[][]): boolean {
   if (a.length !== b.length) return false;
-  const aSet = new Set(a.map((p) => JSON.stringify(p)));
-  const bSet = new Set(b.map((p) => JSON.stringify(p)));
-  if (aSet.size !== bSet.size) return false;
-  for (const item of aSet) {
-    if (!bSet.has(item)) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (JSON.stringify(a[i]) !== JSON.stringify(b[i])) return false;
   }
   return true;
 }

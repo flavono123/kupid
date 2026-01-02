@@ -90,7 +90,7 @@ describe('ResultTable - Cell Focus Clear on Panel Switch', () => {
 
     // Hover over a cell to create focus
     const cell = screen.getByText('pod-1');
-    fireEvent.mouseEnter(cell.closest('div[class*="px-4"]')!);
+    fireEvent.mouseEnter(cell.closest('div[class*="px-1"]')!);
 
     // The cell should show focused state (underline class)
     expect(getFocusedCellCount()).toBeGreaterThan(0);
@@ -128,7 +128,7 @@ describe('ResultTable - Cell Focus Clear on Mouse Leave', () => {
 
     // Hover over a cell to create focus
     const cell = screen.getByText('pod-1');
-    fireEvent.mouseEnter(cell.closest('div[class*="px-4"]')!);
+    fireEvent.mouseEnter(cell.closest('div[class*="px-1"]')!);
 
     // Verify cell is focused
     expect(getFocusedCellCount()).toBeGreaterThan(0);
@@ -151,7 +151,7 @@ describe('ResultTable - Search Focus Clear', () => {
 
     // Hover over a cell to create focus
     const cell = screen.getByText('pod-1');
-    fireEvent.mouseEnter(cell.closest('div[class*="px-4"]')!);
+    fireEvent.mouseEnter(cell.closest('div[class*="px-1"]')!);
 
     // Verify cell is focused
     expect(getFocusedCellCount()).toBeGreaterThan(0);
