@@ -3,7 +3,7 @@ package table
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kattle/internal/kube"
 )
 
 type SetCandidateMsg struct {

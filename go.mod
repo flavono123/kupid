@@ -1,4 +1,4 @@
-module github.com/flavono123/kupid
+module github.com/flavono123/kattle
 
 go 1.25.4
 

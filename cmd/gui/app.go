@@ -16,8 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/store"
+	"github.com/flavono123/kattle/internal/kube"
+	"github.com/flavono123/kattle/internal/store"
 )
 
 // App struct
