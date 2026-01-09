@@ -12,9 +12,9 @@ import (
 	"github.com/sahilm/fuzzy"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/ui/event"
-	"github.com/flavono123/kupid/internal/ui/theme"
+	"github.com/flavono123/kattle/internal/kube"
+	"github.com/flavono123/kattle/internal/ui/event"
+	"github.com/flavono123/kattle/internal/ui/theme"
 )
 
 const (

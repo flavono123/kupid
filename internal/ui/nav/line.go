@@ -7,8 +7,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/ui/theme"
+	"github.com/flavono123/kattle/internal/kube"
+	"github.com/flavono123/kattle/internal/ui/theme"
 )
 
 // TODO: function args node(s) under ui should be line and get the node from getter

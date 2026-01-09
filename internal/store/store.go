@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/flavono123/kupid/internal/config"
+	"github.com/flavono123/kattle/internal/config"
 )
 
 var (

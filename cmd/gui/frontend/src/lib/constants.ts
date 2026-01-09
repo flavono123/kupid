@@ -9,7 +9,7 @@ export const APP_VERSION = "0.1.0";
 export const APP_TAGLINE = "Deep dive into your cattle";
 export const APP_DESCRIPTION = "Kubernetes Resource Explorer";
 
-export const GITHUB_URL = "https://github.com/flavono123/kupid";
+export const GITHUB_URL = "https://github.com/flavono123/kattle";
 
 /**
  * Default columns always shown in ResultTable (not removable by user).

@@ -11,10 +11,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/ui/event"
-	"github.com/flavono123/kupid/internal/ui/result"
-	"github.com/flavono123/kupid/internal/ui/theme"
+	"github.com/flavono123/kattle/internal/kube"
+	"github.com/flavono123/kattle/internal/ui/event"
+	"github.com/flavono123/kattle/internal/ui/result"
+	"github.com/flavono123/kattle/internal/ui/theme"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"

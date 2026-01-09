@@ -3,7 +3,7 @@ package kbar
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/flavono123/kupid/internal/ui/event"
+	"github.com/flavono123/kattle/internal/ui/event"
 )
 
 type ShowMsg struct{}
