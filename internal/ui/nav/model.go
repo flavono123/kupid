@@ -8,12 +8,13 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -106,7 +107,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > SCHEMA_CURSOR_TOP {
 				m.cursor--
 			} else {
-				m.vp.LineUp(SCHEMA_SCROLL_STEP)
+				m.vp.ScrollUp(SCHEMA_SCROLL_STEP)
 			}
 
 			if m.curIsPickable() {
@@ -122,7 +123,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < min(m.vp.Height-1, m.curLineNo-1) {
 				m.cursor++
 			} else {
-				m.vp.LineDown(SCHEMA_SCROLL_STEP)
+				m.vp.ScrollDown(SCHEMA_SCROLL_STEP)
 			}
 
 			if m.curIsPickable() {

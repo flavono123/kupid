@@ -9,11 +9,12 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/sahilm/fuzzy"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/theme"
-	"github.com/sahilm/fuzzy"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -105,13 +106,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.isCursorTop() {
 				m.cursor--
 			} else {
-				m.rowsView.LineUp(TABLE_SCROLL_STEP)
+				m.rowsView.ScrollUp(TABLE_SCROLL_STEP)
 			}
 		case key.Matches(msg, m.keys.down):
 			if m.isCursorBottom() {
 				m.cursor++
 			} else {
-				m.rowsView.LineDown(TABLE_SCROLL_STEP)
+				m.rowsView.ScrollDown(TABLE_SCROLL_STEP)
 			}
 		}
 	}

@@ -8,32 +8,32 @@ import (
 // for schema discovery based on MultiClusterGVK.Contexts
 func TestGetNodeTree_ContextSelection(t *testing.T) {
 	tests := []struct {
-		name             string
-		gvkContexts      []string
+		name              string
+		gvkContexts       []string
 		connectedContexts []string
-		expectedContext  string
-		description      string
+		expectedContext   string
+		description       string
 	}{
 		{
-			name:             "use first context from GVK.Contexts",
-			gvkContexts:      []string{"cluster-3", "cluster-1"},
+			name:              "use first context from GVK.Contexts",
+			gvkContexts:       []string{"cluster-3", "cluster-1"},
 			connectedContexts: []string{"cluster-1", "cluster-2", "cluster-3"},
-			expectedContext:  "cluster-3",
-			description:      "Should use cluster-3 (first in GVK.Contexts) not cluster-1 (first in connectedContexts)",
+			expectedContext:   "cluster-3",
+			description:       "Should use cluster-3 (first in GVK.Contexts) not cluster-1 (first in connectedContexts)",
 		},
 		{
-			name:             "single context in GVK",
-			gvkContexts:      []string{"cluster-2"},
+			name:              "single context in GVK",
+			gvkContexts:       []string{"cluster-2"},
 			connectedContexts: []string{"cluster-1", "cluster-2", "cluster-3"},
-			expectedContext:  "cluster-2",
-			description:      "Should use the only available context cluster-2",
+			expectedContext:   "cluster-2",
+			description:       "Should use the only available context cluster-2",
 		},
 		{
-			name:             "GVK available in subset of contexts",
-			gvkContexts:      []string{"cluster-b", "cluster-c"},
+			name:              "GVK available in subset of contexts",
+			gvkContexts:       []string{"cluster-b", "cluster-c"},
 			connectedContexts: []string{"cluster-a", "cluster-b", "cluster-c"},
-			expectedContext:  "cluster-b",
-			description:      "Should use cluster-b even though cluster-a is connected",
+			expectedContext:   "cluster-b",
+			description:       "Should use cluster-b even though cluster-a is connected",
 		},
 	}
 

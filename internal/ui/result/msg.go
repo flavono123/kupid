@@ -1,8 +1,9 @@
 package result
 
 import (
-	"github.com/flavono123/kupid/internal/kube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/flavono123/kupid/internal/kube"
 )
 
 type SetResultMsg struct {
