@@ -25,6 +25,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          install-mode: goinstall
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
