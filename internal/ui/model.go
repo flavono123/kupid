@@ -11,14 +11,15 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/kbar"
 	"github.com/flavono123/kupid/internal/ui/nav"
 	"github.com/flavono123/kupid/internal/ui/result"
 	"github.com/flavono123/kupid/internal/ui/theme"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type sessionState uint
@@ -28,8 +29,6 @@ const (
 	resultView
 	kbarView
 )
-
-const statusDuration = time.Millisecond * 1060
 
 type Model struct {
 	session        sessionState
@@ -61,7 +60,9 @@ func NewModel() *Model {
 		log.Fatalf("failed to get gvr: %v", err)
 	}
 	controller := kube.NewResourceController(gvr)
-	controller.Inform()
+	if _, err := controller.Inform(); err != nil {
+		log.Fatalf("failed to start informer: %v", err)
+	}
 
 	helpKeyStyle := lipgloss.NewStyle().Foreground(theme.Lavender())
 	helpDescStyle := lipgloss.NewStyle().Foreground(theme.Subtext0())
@@ -375,7 +376,7 @@ func (m *Model) inform() tea.Cmd {
 
 func (m *Model) listenController() tea.Cmd {
 	return func() tea.Msg {
-		match, ok := <-m.controller.EventEmitted()
+		match, ok := <-m.controller.WatchEvents()
 		if !ok || match.Obj == nil {
 			return nil
 		}

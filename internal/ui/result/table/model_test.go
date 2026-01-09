@@ -1,10 +1,11 @@
 package table
 
 import (
-	"github.com/flavono123/kupid/internal/kube"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/flavono123/kupid/internal/kube"
 )
 
 var _ = Describe("Table", func() {

@@ -9,11 +9,12 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/sahilm/fuzzy"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/flavono123/kupid/internal/kube"
 	"github.com/flavono123/kupid/internal/ui/event"
 	"github.com/flavono123/kupid/internal/ui/theme"
-	"github.com/sahilm/fuzzy"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -103,14 +104,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor > 0 {
 					m.cursor--
 				} else {
-					m.srViewport.LineUp(KBAR_SCROLL_STEP)
+					m.srViewport.ScrollUp(KBAR_SCROLL_STEP)
 				}
 				m.setSearchResults(filtered)
 			case key.Matches(msg, m.keys.down):
 				if m.cursor < min(len(filtered)-1, KBAR_SEARCH_RESULTS_MAX_HEIGHT-1) {
 					m.cursor++
 				} else {
-					m.srViewport.LineDown(KBAR_SCROLL_STEP)
+					m.srViewport.ScrollDown(KBAR_SCROLL_STEP)
 				}
 				m.setSearchResults(filtered)
 			case key.Matches(msg, m.keys.pick):
@@ -173,10 +174,6 @@ func (m *Model) setSearchResults(items kbarItems) {
 func (m *Model) moveCursorTop(items kbarItems) {
 	m.cursor = 0
 	m.setSearchResults(items)
-}
-
-func (m *Model) actualItemIndex() int {
-	return m.cursor + m.srViewport.YOffset
 }
 
 // subcomponents(not model)

@@ -12,11 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flavono123/kupid/internal/kube"
-	"github.com/flavono123/kupid/internal/store"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/flavono123/kupid/internal/kube"
+	"github.com/flavono123/kupid/internal/store"
 )
 
 // App struct
@@ -603,7 +604,6 @@ func (a *App) SaveFile(defaultFilename string, content string) (string, error) {
 
 	return filePath, nil
 }
-
 
 // FavoriteView types for frontend binding
 type FavoriteViewGVK struct {

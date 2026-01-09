@@ -62,7 +62,7 @@ func (n *Node) allNil(objs []*unstructured.Unstructured) bool {
 }
 
 func (n *Node) hasChildren() bool {
-	return n.children != nil && len(n.children) > 0
+	return len(n.children) > 0
 }
 
 // line things end
