@@ -22,3 +22,8 @@ cmd/gui/frontend/context-gallery-preview.html
 # Local scripts
 /scripts
 assets/releases/
+
+# Memory profiling dumps
+*.pb.gz
+*_goroutine.txt
+*_heap.*
