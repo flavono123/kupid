@@ -3,7 +3,7 @@ import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetNodeTree } from '../../wailsjs/go/main/App';
 import { main } from '../../wailsjs/go/models';
 import { useFuzzySearch } from './useFuzzySearch';
-import type { ResourceEvent } from '../lib/resource-utils';
+import type { ResourceEventMeta } from '../lib/resource-utils';
 
 // Use null character as path delimiter to avoid conflicts with field names containing '/'
 // (e.g., Kubernetes annotations like "karpenter.sh/node-hash-version")
@@ -454,7 +454,7 @@ export function useTree({
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingRefresh = false;
 
-    const handleEvent = (_event: ResourceEvent) => {
+    const handleEvent = (_event: ResourceEventMeta) => {
       // Refresh tree on any event type:
       // - ADDED/MODIFIED: may add new keys/indices to tree
       // - DELETED: may remove nodes if field only existed in deleted resource

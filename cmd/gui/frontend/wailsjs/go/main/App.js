@@ -30,6 +30,10 @@ export function GetResources(arg1, arg2) {
   return window['go']['main']['App']['GetResources'](arg1, arg2);
 }
 
+export function GetResourcesByKeys(arg1) {
+  return window['go']['main']['App']['GetResourcesByKeys'](arg1);
+}
+
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }

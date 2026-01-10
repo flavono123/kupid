@@ -3,22 +3,17 @@
  *
  * Provides helper functions for:
  * - Generating stable resource keys
- * - Batch processing of watch events
+ * - Diffing resource fields for change tracking
  */
 
-// Types for resource events (matches backend ResourceEvent struct)
+// Types for resource events
 export type ResourceEventType = 'ADDED' | 'MODIFIED' | 'DELETED';
 
-export interface ResourceEvent {
+// Pull Model: lightweight event with only type and key (no full object)
+export interface ResourceEventMeta {
   type: ResourceEventType;
-  /** Kubernetes context name (optional, also in object._context) */
-  context?: string;
-  /** Resource namespace (optional, also in object.metadata.namespace) */
-  namespace?: string;
-  /** Resource name (optional, also in object.metadata.name) */
-  name?: string;
-  /** Full resource object */
-  object: Record<string, unknown>;
+  /** Unique key: "context/namespace/name" */
+  key: string;
 }
 
 /**
@@ -95,105 +90,4 @@ export function diffFields(prev: any, next: any, path: string[] = []): string[] 
   }
 
   return changes;
-}
-
-/**
- * Apply a batch of resource events to the current data array
- *
- * Uses Map for O(1) lookups, making it efficient for large datasets:
- * - ADDED: Insert new resource
- * - MODIFIED: Update existing resource
- * - DELETED: Remove resource
- *
- * @param data Current resource data array
- * @param events Array of resource events to apply
- * @returns New data array with events applied
- */
-export function applyBatchEvents(data: any[], events: ResourceEvent[]): any[] {
-  if (events.length === 0) {
-    return data;
-  }
-
-  // Convert to Map for O(1) lookups
-  const dataMap = new Map(
-    data.map((item) => [getResourceKey(item), item])
-  );
-
-  // Apply all events
-  for (const event of events) {
-    const key = getResourceKey(event.object);
-
-    switch (event.type) {
-      case 'ADDED':
-      case 'MODIFIED':
-        dataMap.set(key, event.object);
-        break;
-      case 'DELETED':
-        dataMap.delete(key);
-        break;
-    }
-  }
-
-  return Array.from(dataMap.values());
-}
-
-/** Result of applying batch events with change tracking */
-export interface BatchResult {
-  data: any[];
-  changes: CellChange[];
-}
-
-/**
- * Apply batch events and track which cells changed
- *
- * @param data Current resource data array
- * @param events Array of resource events to apply
- * @returns New data array and list of changed cells
- */
-export function applyBatchEventsWithChanges(
-  data: any[],
-  events: ResourceEvent[]
-): BatchResult {
-  if (events.length === 0) {
-    return { data, changes: [] };
-  }
-
-  const now = Date.now();
-  const changes: CellChange[] = [];
-
-  // Convert to Map for O(1) lookups
-  const dataMap = new Map(
-    data.map((item) => [getResourceKey(item), item])
-  );
-
-  // Apply all events and track changes
-  for (const event of events) {
-    const rowId = getResourceKey(event.object);
-
-    switch (event.type) {
-      case 'MODIFIED': {
-        const prev = dataMap.get(rowId);
-        if (prev) {
-          // Find which fields changed
-          const changedPaths = diffFields(prev, event.object);
-          for (const columnId of changedPaths) {
-            changes.push({ rowId, columnId, timestamp: now });
-          }
-        }
-        dataMap.set(rowId, event.object);
-        break;
-      }
-      case 'ADDED':
-        dataMap.set(rowId, event.object);
-        break;
-      case 'DELETED':
-        dataMap.delete(rowId);
-        break;
-    }
-  }
-
-  return {
-    data: Array.from(dataMap.values()),
-    changes,
-  };
 }

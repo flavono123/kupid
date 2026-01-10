@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"sync/atomic"
 
@@ -15,6 +16,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+// Event metrics for debugging memory leaks
+var (
+	eventsEmitted atomic.Int64
+	eventsDropped atomic.Int64
+)
+
+// GetEventMetrics returns the current event metrics (emitted, dropped)
+func GetEventMetrics() (emitted, dropped int64) {
+	return eventsEmitted.Load(), eventsDropped.Load()
+}
+
+// ResetEventMetrics resets the event counters to zero
+func ResetEventMetrics() {
+	eventsEmitted.Store(0)
+	eventsDropped.Store(0)
+}
 
 // EventType represents the type of watch event
 type EventType string
@@ -170,8 +188,14 @@ func (i *ResourceController) trySend(msg emitMsg) {
 	}
 	select {
 	case i.emitCh <- msg:
+		eventsEmitted.Add(1)
 	default:
 		// buffer full, drop event (next event will have latest state)
+		dropped := eventsDropped.Add(1)
+		if dropped%100 == 1 { // Log every 100 drops to avoid spam
+			log.Printf("[WARN] Event dropped (total: %d, buffer full for %s/%s)",
+				dropped, i.contextName, i.gvr.Resource)
+		}
 	}
 }
 

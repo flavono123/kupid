@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
-import { StartWatch, StopWatch } from '../../wailsjs/go/main/App';
+import { StartWatch, StopWatch, GetResourcesByKeys } from '../../wailsjs/go/main/App';
 import type { main } from '../../wailsjs/go/models';
-import { getResourceKey, type ResourceEvent, type CellChange } from '../lib/resource-utils';
-import { useBatchProcessor } from './useBatchProcessor';
+import { getResourceKey, type ResourceEventMeta, type CellChange, diffFields } from '../lib/resource-utils';
 
 // Watch connection status
 export type WatchStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -11,7 +10,7 @@ export type WatchStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 export interface UseResourceDataOptions {
   /** Enable real-time updates via watch (default: true) */
   watch?: boolean;
-  /** Batch interval in ms (default: 100) */
+  /** Batch interval in ms for fetching resources (default: 100) */
   batchInterval?: number;
 }
 
@@ -33,10 +32,12 @@ export interface UseResourceDataResult {
 }
 
 /**
- * Hook for fetching and managing Kubernetes resource data via watch
+ * Hook for fetching and managing Kubernetes resource data via watch (Pull Model)
  *
- * Uses Kubernetes watch for both initial data (via ADDED events) and real-time updates.
- * This eliminates duplicate List API calls that occurred with separate GetResources + StartWatch.
+ * Pull Model:
+ * 1. Backend emits lightweight events (type + key only) via EventsEmit
+ * 2. Frontend collects keys and fetches full objects via GetResourcesByKeys
+ * 3. This avoids WebView memory leaks caused by eval() with large objects
  *
  * @param gvk The Group/Version/Kind to fetch
  * @param contexts Array of Kubernetes contexts to query
@@ -47,21 +48,24 @@ export function useResourceData(
   contexts: string[],
   options: UseResourceDataOptions = {}
 ): UseResourceDataResult {
-  // TODO: [CONFIG] Move to YAML config. Must sync with useBatchProcessor.ts intervalMs default
   const { watch = true, batchInterval = 100 } = options;
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [watchStatus, setWatchStatus] = useState<WatchStatus>('disconnected');
+  const [changedCells, setChangedCells] = useState<CellChange[]>([]);
 
   // Track watch generation to avoid stale operations
   const watchGenRef = useRef(0);
 
-  // Pending events for batch processing
-  const pendingEvents = useRef<ResourceEvent[]>([]);
+  // Pending keys for ADDED/MODIFIED events (Pull Model)
+  const pendingKeys = useRef<Set<string>>(new Set());
 
-  // Watch subscription - provides both initial data (ADDED events) and real-time updates
+  // Pending deletes - keys to remove
+  const pendingDeletes = useRef<Set<string>>(new Set());
+
+  // Watch subscription
   useEffect(() => {
     if (!watch || !gvk || contexts.length === 0) {
       setData([]);
@@ -74,61 +78,124 @@ export function useResourceData(
     const watchGen = ++watchGenRef.current;
     setLoading(true);
     setError(null);
-    setData([]); // Clear previous data
+    setData([]);
     setWatchStatus('connecting');
+    pendingKeys.current.clear();
+    pendingDeletes.current.clear();
 
-    // Start watch - backend will emit ADDED events for all initial resources
+    // Start watch
     StartWatch(gvk, contexts)
       .then(() => {
-        // Ignore if this watch was superseded
         if (watchGen !== watchGenRef.current) return;
-
         console.log(`useResourceData: watch connected for ${gvk.kind}`);
         setWatchStatus('connected');
-        // Loading will be set to false by batch processor after initial events arrive
-        // Use a small delay to ensure events have been processed
-        setTimeout(() => {
-          if (watchGen === watchGenRef.current) {
-            setLoading(false);
-          }
-        }, 50);
       })
       .catch((err) => {
-        // Ignore if this watch was superseded
         if (watchGen !== watchGenRef.current) return;
-
         console.error('useResourceData: failed to start watch:', err);
         setError(err instanceof Error ? err : new Error(String(err)));
         setWatchStatus('error');
         setLoading(false);
       });
 
-    // Subscribe to events from backend
-    const unsubscribe = EventsOn('resource:update', (event: ResourceEvent) => {
-      // Only process events for current watch generation
-      if (watchGen === watchGenRef.current) {
-        pendingEvents.current.push(event);
+    // Subscribe to lightweight events (Pull Model)
+    const unsubscribe = EventsOn('resource:update', (event: ResourceEventMeta) => {
+      if (watchGen !== watchGenRef.current) return;
+
+      if (event.type === 'DELETED') {
+        // Collect deletes separately
+        pendingDeletes.current.add(event.key);
+        pendingKeys.current.delete(event.key); // No need to fetch deleted resources
+      } else {
+        // ADDED or MODIFIED - collect key for batch fetch
+        pendingKeys.current.add(event.key);
       }
     });
 
-    // Cleanup: unsubscribe and stop watch
+    // Cleanup
     return () => {
       unsubscribe();
       StopWatch()
-        .then(() => {
-          console.log('useResourceData: watch stopped');
-        })
-        .catch((err) => {
-          console.error('useResourceData: failed to stop watch:', err);
-        });
+        .then(() => console.log('useResourceData: watch stopped'))
+        .catch((err) => console.error('useResourceData: failed to stop watch:', err));
       setWatchStatus('disconnected');
     };
   }, [watch, gvk, contexts]);
 
-  // Setup batch processor (processes ADDED for initial data, MODIFIED/DELETED for updates)
-  const changedCells = useBatchProcessor(pendingEvents, setData, batchInterval);
+  // Batch processor: fetch resources and apply updates (Pull Model)
+  useEffect(() => {
+    if (!watch) return;
 
-  // Manual refresh - restarts the watch to get fresh data
+    const flush = async () => {
+      const keysToFetch = Array.from(pendingKeys.current);
+      const keysToDelete = Array.from(pendingDeletes.current);
+
+      // Clear pending sets
+      pendingKeys.current.clear();
+      pendingDeletes.current.clear();
+
+      // Nothing to do
+      if (keysToFetch.length === 0 && keysToDelete.length === 0) {
+        return;
+      }
+
+      // Fetch resources for ADDED/MODIFIED keys
+      let fetchedResources: any[] = [];
+      if (keysToFetch.length > 0) {
+        try {
+          fetchedResources = await GetResourcesByKeys(keysToFetch);
+        } catch (err) {
+          console.error('useResourceData: failed to fetch resources:', err);
+          return;
+        }
+      }
+
+      // Apply updates to data
+      setData((prev) => {
+        const now = Date.now();
+        const changes: CellChange[] = [];
+
+        // Build map from current data
+        const dataMap = new Map(prev.map((item) => [getResourceKey(item), item]));
+
+        // Apply deletes
+        for (const key of keysToDelete) {
+          dataMap.delete(key);
+        }
+
+        // Apply fetched resources (ADDED/MODIFIED)
+        for (const resource of fetchedResources) {
+          const rowId = getResourceKey(resource);
+          const prevResource = dataMap.get(rowId);
+
+          // Track changes for MODIFIED
+          if (prevResource) {
+            const changedPaths = diffFields(prevResource, resource);
+            for (const columnId of changedPaths) {
+              changes.push({ rowId, columnId, timestamp: now });
+            }
+          }
+
+          dataMap.set(rowId, resource);
+        }
+
+        // Update changed cells
+        if (changes.length > 0) {
+          setChangedCells(changes);
+        }
+
+        return Array.from(dataMap.values());
+      });
+
+      // Loading complete after first batch
+      setLoading(false);
+    };
+
+    const timer = setInterval(flush, batchInterval);
+    return () => clearInterval(timer);
+  }, [watch, batchInterval]);
+
+  // Manual refresh - restarts the watch
   const refresh = useCallback(() => {
     if (!gvk || contexts.length === 0) return;
 
@@ -136,18 +203,14 @@ export function useResourceData(
     setLoading(true);
     setError(null);
     setData([]);
+    pendingKeys.current.clear();
+    pendingDeletes.current.clear();
 
-    // Stop and restart watch
     StopWatch()
       .then(() => StartWatch(gvk, contexts))
       .then(() => {
         if (watchGen !== watchGenRef.current) return;
         setWatchStatus('connected');
-        setTimeout(() => {
-          if (watchGen === watchGenRef.current) {
-            setLoading(false);
-          }
-        }, 50);
       })
       .catch((err) => {
         if (watchGen !== watchGenRef.current) return;
