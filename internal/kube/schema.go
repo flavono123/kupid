@@ -1,11 +1,14 @@
 package kube
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/go-openapi/jsonreference"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -320,3 +323,130 @@ func getDocumentPath(gvr schema.GroupVersionResource) string {
 // func GetNamespaceScopedNamePath(gvr schema.GroupVersionResource) string {
 // 	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, "namespaces", "{namespace}", gvr.Resource, "{name}"}, "/")
 // }
+
+// GetPrinterColumnsForContext retrieves additionalPrinterColumns for a GVK from CRD definition.
+// Uses dynamic client to avoid new dependencies.
+// Returns field paths (e.g., [][]string{{"spec", "replicas"}, {"status", "phase"}})
+// For built-in resources or if CRD not found, returns nil.
+func GetPrinterColumnsForContext(contextName string, gvk schema.GroupVersionKind) ([][]string, error) {
+	// Get GVR first
+	gvr, err := GetGVRForContext(contextName, gvk)
+	if err != nil {
+		return nil, nil // Can't get GVR, skip
+	}
+
+	// Build CRD name: plural.group (e.g., "certificates.cert-manager.io")
+	crdName := gvr.Resource
+	if gvk.Group != "" {
+		crdName = gvr.Resource + "." + gvk.Group
+	}
+
+	// CRD GVR
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinitions",
+	}
+
+	client, err := DynamicClientForContext(contextName)
+	if err != nil {
+		return nil, nil
+	}
+
+	// Try to get CRD (cluster-scoped, so no namespace)
+	crd, err := client.Resource(crdGVR).Get(context.Background(), crdName, metav1.GetOptions{})
+	if err != nil {
+		// Not a CRD or not found
+		return nil, nil
+	}
+
+	// Extract additionalPrinterColumns from CRD
+	// Path: spec.versions[].additionalPrinterColumns[]
+	versions, found, err := unstructured.NestedSlice(crd.Object, "spec", "versions")
+	if err != nil || !found {
+		return nil, nil
+	}
+
+	for _, v := range versions {
+		versionMap, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _, _ := unstructured.NestedString(versionMap, "name")
+		if name != gvk.Version {
+			continue
+		}
+
+		columns, found, _ := unstructured.NestedSlice(versionMap, "additionalPrinterColumns")
+		if !found || len(columns) == 0 {
+			return nil, nil
+		}
+
+		var paths [][]string
+		for _, col := range columns {
+			colMap, ok := col.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			jsonPath, _, _ := unstructured.NestedString(colMap, "jsonPath")
+			path := jsonPathToFieldPath(jsonPath)
+			if len(path) > 0 {
+				paths = append(paths, path)
+			}
+		}
+		return paths, nil
+	}
+
+	return nil, nil
+}
+
+// jsonPathToFieldPath converts a JSONPath expression to a field path.
+// Examples:
+//   - ".spec.replicas" -> ["spec", "replicas"]
+//   - ".status.conditions[0].type" -> ["status", "conditions", "*", "type"]
+//   - ".metadata.creationTimestamp" -> ["metadata", "creationTimestamp"]
+//
+// Note: Array indices and wildcards are converted to "*" for tree navigation.
+func jsonPathToFieldPath(jsonPath string) []string {
+	if jsonPath == "" {
+		return nil
+	}
+
+	// Remove leading dot
+	jsonPath = strings.TrimPrefix(jsonPath, ".")
+
+	var parts []string
+	current := ""
+
+	for i := 0; i < len(jsonPath); i++ {
+		ch := jsonPath[i]
+		switch ch {
+		case '.':
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+		case '[':
+			// Save current part before bracket
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+			// Skip to closing bracket and add wildcard
+			for i < len(jsonPath) && jsonPath[i] != ']' {
+				i++
+			}
+			parts = append(parts, "*")
+		default:
+			current += string(ch)
+		}
+	}
+
+	// Add remaining part
+	if current != "" {
+		parts = append(parts, current)
+	}
+
+	return parts
+}

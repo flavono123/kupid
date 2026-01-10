@@ -14,6 +14,10 @@ export function GetCurrentContext() {
   return window['go']['main']['App']['GetCurrentContext']();
 }
 
+export function GetDefaultSelectedPaths(arg1, arg2) {
+  return window['go']['main']['App']['GetDefaultSelectedPaths'](arg1, arg2);
+}
+
 export function GetFavoriteViewsForGVK(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetFavoriteViewsForGVK'](arg1, arg2, arg3);
 }

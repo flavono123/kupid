@@ -1,6 +1,6 @@
 import { useReducer, useEffect, useMemo, useCallback, useRef } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
-import { GetNodeTree } from '../../wailsjs/go/main/App';
+import { GetNodeTree, GetDefaultSelectedPaths } from '../../wailsjs/go/main/App';
 import { main } from '../../wailsjs/go/models';
 import { useFuzzySearch } from './useFuzzySearch';
 import type { ResourceEventMeta } from '../lib/resource-utils';
@@ -444,6 +444,48 @@ export function useTree({
   useEffect(() => {
     fetchNodeTree();
   }, [fetchNodeTree]);
+
+  // Fetch and apply default selected paths (additionalPrinterColumns) when GVK changes
+  // Only applies when tree is first loaded and no selections exist yet
+  useEffect(() => {
+    // Skip if still loading, no tree, or already have selections
+    if (loading || nodeTree.length === 0 || selectedPaths.size > 0) {
+      return;
+    }
+    // Skip if no GVK selected
+    if (!selectedGVK || connectedContexts.length === 0) {
+      return;
+    }
+
+    GetDefaultSelectedPaths(selectedGVK, connectedContexts)
+      .then((paths) => {
+        if (!paths || paths.length === 0) {
+          return;
+        }
+        // Convert string[][] to Set<string> of path keys
+        const pathKeys = new Set<string>();
+        paths.forEach((path) => {
+          pathKeys.add(path.join(PATH_DELIMITER));
+        });
+        // Only set if we got valid paths
+        if (pathKeys.size > 0) {
+          // Compute parent path keys for expansion
+          const parentPathKeys: string[] = [];
+          pathKeys.forEach((pathKey) => {
+            getParentPathKeys(pathKey).forEach((p) => {
+              if (!parentPathKeys.includes(p)) {
+                parentPathKeys.push(p);
+              }
+            });
+          });
+          dispatch({ type: 'SET_SELECTIONS', paths: pathKeys, parentPathKeys });
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to get default selected paths:', error);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, nodeTree.length, selectedGVK, connectedContexts]);
 
   // Watch subscription for real-time tree updates
   useEffect(() => {
