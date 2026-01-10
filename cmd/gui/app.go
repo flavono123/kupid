@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +20,13 @@ import (
 	"github.com/flavono123/kattle/internal/kube"
 	"github.com/flavono123/kattle/internal/store"
 )
+
+// logMemoryStats logs current goroutine count and event metrics for debugging
+func logMemoryStats(label string) {
+	emitted, dropped := kube.GetEventMetrics()
+	log.Printf("[DEBUG] %s: goroutines=%d, events_emitted=%d, events_dropped=%d",
+		label, goruntime.NumGoroutine(), emitted, dropped)
+}
 
 // App struct
 type App struct {
@@ -463,6 +471,7 @@ func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
 	}()
 
 	log.Printf("Started watching %s/%s/%s across %d contexts", gvk.Group, gvk.Version, gvk.Kind, len(a.controllers))
+	logMemoryStats("StartWatch")
 	return nil
 }
 
@@ -499,6 +508,10 @@ func (a *App) StopWatch() {
 	a.watchDone = nil
 
 	log.Printf("Stopped all resource watches")
+	logMemoryStats("StopWatch")
+
+	// Reset event metrics for next watch cycle
+	kube.ResetEventMetrics()
 }
 
 // convertNodeTree converts kube.Node map to frontend TreeNode array
