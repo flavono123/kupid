@@ -24,7 +24,11 @@ var dumpDir string
 var dumpSeq int
 
 func initMemoryDump() {
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Failed to get home directory: %v", err)
+		return
+	}
 	dumpDir = filepath.Join(homeDir, "kattle-dumps")
 	if err := os.MkdirAll(dumpDir, 0755); err != nil {
 		log.Printf("Failed to create dump directory: %v", err)
