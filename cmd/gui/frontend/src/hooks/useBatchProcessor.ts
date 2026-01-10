@@ -6,6 +6,18 @@ import {
 } from '../lib/resource-utils';
 
 /**
+ * @deprecated This hook is no longer used by useResourceData as of v0.2.0.
+ * The Push Model (full objects via EventsEmit) has been replaced by Pull Model
+ * (key emit + GetResourcesByKeys fetch) to fix WebView memory leaks caused by
+ * Wails EventsEmit using eval() internally.
+ *
+ * This hook is kept for one release cycle for backward compatibility.
+ * Scheduled for removal in v0.3.0.
+ *
+ * See: planning/memory-leak-investigation.md section 2.5 for Pull Model design.
+ *
+ * ---
+ *
  * Batch processor hook for resource watch events
  *
  * Accumulates events in pendingEvents ref and flushes them at intervals,

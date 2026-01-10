@@ -6,9 +6,20 @@
  * - Batch processing of watch events
  */
 
-// Types for resource events (matches backend ResourceEvent struct)
+// Types for resource events
 export type ResourceEventType = 'ADDED' | 'MODIFIED' | 'DELETED';
 
+// Pull Model: lightweight event with only type and key (no full object)
+export interface ResourceEventMeta {
+  type: ResourceEventType;
+  /** Unique key: "context/namespace/name" */
+  key: string;
+}
+
+/**
+ * @deprecated Legacy Push Model type. Use ResourceEventMeta instead.
+ * Scheduled for removal in v0.3.0.
+ */
 export interface ResourceEvent {
   type: ResourceEventType;
   /** Kubernetes context name (optional, also in object._context) */
@@ -98,6 +109,9 @@ export function diffFields(prev: any, next: any, path: string[] = []): string[] 
 }
 
 /**
+ * @deprecated Legacy Push Model function. No longer used by useResourceData.
+ * Scheduled for removal in v0.3.0.
+ *
  * Apply a batch of resource events to the current data array
  *
  * Uses Map for O(1) lookups, making it efficient for large datasets:
@@ -137,13 +151,19 @@ export function applyBatchEvents(data: any[], events: ResourceEvent[]): any[] {
   return Array.from(dataMap.values());
 }
 
-/** Result of applying batch events with change tracking */
+/**
+ * @deprecated Legacy Push Model type. Scheduled for removal in v0.3.0.
+ * Result of applying batch events with change tracking
+ */
 export interface BatchResult {
   data: any[];
   changes: CellChange[];
 }
 
 /**
+ * @deprecated Legacy Push Model function. No longer used by useResourceData.
+ * Scheduled for removal in v0.3.0.
+ *
  * Apply batch events and track which cells changed
  *
  * @param data Current resource data array

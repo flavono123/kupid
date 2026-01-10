@@ -34,10 +34,11 @@ type App struct {
 	favoriteStore *store.Store
 
 	// Watch state
-	watchMu     sync.RWMutex
-	controllers []*watchController
-	stopChs     []chan struct{}
-	watchDone   chan struct{}
+	watchMu       sync.RWMutex
+	controllers   []*watchController
+	stopChs       []chan struct{}
+	watchDone     chan struct{}
+	resourceCache sync.Map // key: "context/namespace/name" → value: map[string]any
 }
 
 // watchController wraps a ResourceController with context info
@@ -385,13 +386,16 @@ func (a *App) GetResources(gvk MultiClusterGVK, contexts []string) ([]map[string
 	return allResources, nil
 }
 
-// ResourceEvent represents a watch event sent to the frontend
-type ResourceEvent struct {
-	Type      string                 `json:"type"`      // "ADDED", "MODIFIED", "DELETED"
-	Context   string                 `json:"context"`   // Kubernetes context name
-	Namespace string                 `json:"namespace"` // Resource namespace (empty for cluster-scoped)
-	Name      string                 `json:"name"`      // Resource name
-	Object    map[string]interface{} `json:"object"`    // Full resource object
+// ResourceEventMeta represents a lightweight watch event (Pull Model)
+// Only contains metadata - frontend fetches full object via GetResources()
+type ResourceEventMeta struct {
+	Type string `json:"type"` // "ADDED", "MODIFIED", "DELETED"
+	Key  string `json:"key"`  // "context/namespace/name" unique identifier
+}
+
+// makeResourceKey creates a unique cache key for a resource
+func makeResourceKey(context, namespace, name string) string {
+	return fmt.Sprintf("%s/%s/%s", context, namespace, name)
 }
 
 // StartWatch starts watching resources for the given GVK across specified contexts
@@ -435,7 +439,7 @@ func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
 		})
 		a.stopChs = append(a.stopChs, stopCh)
 
-		// Start goroutine to forward events to frontend
+		// Start goroutine to forward events to frontend (Pull Model)
 		wg.Add(1)
 		go func(ctx string, ctrl *kube.ResourceController) {
 			defer wg.Done()
@@ -445,18 +449,24 @@ func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
 					if event.Obj == nil {
 						continue // skip invalid events
 					}
-					obj := event.Obj.Object
-					obj["_context"] = ctx
 
-					resourceEvent := ResourceEvent{
-						Type:      string(event.Type),
-						Context:   ctx,
-						Namespace: event.Obj.GetNamespace(),
-						Name:      event.Obj.GetName(),
-						Object:    obj,
+					key := makeResourceKey(ctx, event.Obj.GetNamespace(), event.Obj.GetName())
+
+					if string(event.Type) == "DELETED" {
+						// Remove from cache on delete
+						a.resourceCache.Delete(key)
+					} else {
+						// Store in cache for ADDED/MODIFIED
+						obj := event.Obj.Object
+						obj["_context"] = ctx
+						a.resourceCache.Store(key, obj)
 					}
 
-					runtime.EventsEmit(a.ctx, "resource:update", resourceEvent)
+					// Emit only lightweight metadata (no full object via eval)
+					runtime.EventsEmit(a.ctx, "resource:update", ResourceEventMeta{
+						Type: string(event.Type),
+						Key:  key,
+					})
 				case <-ctrl.Done():
 					return
 				}
@@ -507,11 +517,31 @@ func (a *App) StopWatch() {
 	a.stopChs = nil
 	a.watchDone = nil
 
+	// Clear resource cache
+	a.resourceCache.Range(func(key, value any) bool {
+		a.resourceCache.Delete(key)
+		return true
+	})
+
 	log.Printf("Stopped all resource watches")
 	logMemoryStats("StopWatch")
 
 	// Reset event metrics for next watch cycle
 	kube.ResetEventMetrics()
+}
+
+// GetResourcesByKeys fetches resources from cache by keys (Pull Model)
+// Called by frontend after receiving resource:update events
+func (a *App) GetResourcesByKeys(keys []string) []map[string]any {
+	result := make([]map[string]any, 0, len(keys))
+	for _, key := range keys {
+		if obj, ok := a.resourceCache.Load(key); ok {
+			if m, ok := obj.(map[string]any); ok {
+				result = append(result, m)
+			}
+		}
+	}
+	return result
 }
 
 // convertNodeTree converts kube.Node map to frontend TreeNode array
