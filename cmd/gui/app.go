@@ -297,7 +297,7 @@ func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, 
 
 // GetDefaultSelectedPaths returns the default fields to select for a GVK.
 // For CRDs, this returns paths from additionalPrinterColumns.
-// For built-in resources, returns nil (no default selection beyond metadata.name).
+// For built-in resources, this uses Table API printer columns when available.
 func (a *App) GetDefaultSelectedPaths(gvk MultiClusterGVK, contexts []string) [][]string {
 	schemaGVK := schema.GroupVersionKind{
 		Group:   gvk.Group,

@@ -152,7 +152,7 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 				if !ok {
 					return
 				}
-				// Update cached name (in case of rename, though rare)
+				// Update cached name for this key, since the object reference may change
 				key, _ := cache.MetaNamespaceKeyFunc(n)
 				i.nameCacheMu.Lock()
 				i.nameCache[key] = n.GetName()
