@@ -1,6 +1,6 @@
-import { useReducer, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useReducer, useEffect, useMemo, useCallback, useRef, useState } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
-import { GetNodeTree, GetDefaultSelectedPaths } from '../../wailsjs/go/main/App';
+import { GetNodeTree, GetDefaultSelectedPaths, GetIgnoredStructureFields } from '../../wailsjs/go/main/App';
 import { main } from '../../wailsjs/go/models';
 import { useFuzzySearch } from './useFuzzySearch';
 import type { ResourceEventMeta } from '../lib/resource-utils';
@@ -424,6 +424,26 @@ export function useTree({
     focusedPathKey,
     focusTrigger,
   } = state;
+
+  // Fields to ignore in tree (disabled for expand/select)
+  // Map of field name -> reason for ignoring
+  // Fetched once from backend - these fields change frequently but aren't useful in tree
+  const [ignoredFields, setIgnoredFields] = useState<Map<string, string>>(new Map());
+
+  // Fetch ignored fields once on mount
+  useEffect(() => {
+    GetIgnoredStructureFields()
+      .then((fields) => {
+        const map = new Map<string, string>();
+        (fields || []).forEach((f: { name: string; reason: string }) => {
+          map.set(f.name, f.reason);
+        });
+        setIgnoredFields(map);
+      })
+      .catch((error) => {
+        console.error('Failed to fetch ignored structure fields:', error);
+      });
+  }, []);
 
   // Use ref for stable callback access
   const searchVisibleRef = useRef(searchVisible);
@@ -1087,5 +1107,8 @@ export function useTree({
 
     // Filtered view
     filteredNodeTree,
+
+    // Ignored fields (disabled in tree UI)
+    ignoredFields,
   };
 }

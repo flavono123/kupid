@@ -72,6 +72,20 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class IgnoredField {
+	    name: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new IgnoredField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.reason = source["reason"];
+	    }
+	}
 	export class MultiClusterGVK {
 	    group: string;
 	    version: string;

@@ -14,6 +14,8 @@ export function GetFavoriteViewsForGVK(arg1:string,arg2:string,arg3:string):Prom
 
 export function GetGVKs(arg1:Array<string>):Promise<Array<main.MultiClusterGVK>>;
 
+export function GetIgnoredStructureFields():Promise<Array<main.IgnoredField>>;
+
 export function GetNodeTree(arg1:main.MultiClusterGVK,arg2:Array<string>):Promise<Array<main.TreeNode>>;
 
 export function GetResources(arg1:main.MultiClusterGVK,arg2:Array<string>):Promise<Array<Record<string, any>>>;

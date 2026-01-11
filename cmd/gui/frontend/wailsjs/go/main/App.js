@@ -26,6 +26,10 @@ export function GetGVKs(arg1) {
   return window['go']['main']['App']['GetGVKs'](arg1);
 }
 
+export function GetIgnoredStructureFields() {
+  return window['go']['main']['App']['GetIgnoredStructureFields']();
+}
+
 export function GetNodeTree(arg1, arg2) {
   return window['go']['main']['App']['GetNodeTree'](arg1, arg2);
 }

@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { Spinner } from './ui/spinner';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from './ui/hover-card';
 import { FieldSearchBar, FieldSearchBarHandle } from './FieldSearchBar';
 import { main } from '../../wailsjs/go/models';
 import { useTree, TreeNode, PATH_DELIMITER } from '@/hooks/useTree';
@@ -51,6 +52,8 @@ interface TreeNodeItemProps {
   wildcardIndeterminatePaths: Set<string>;
   /** Paths of wildcard child fields where all indexed siblings are selected */
   wildcardSelectedPaths: Set<string>;
+  /** Fields to ignore (disabled for expand/select) - maps field name to reason */
+  ignoredFields: Map<string, string>;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -67,6 +70,7 @@ const TreeNodeItem = memo(({
   highlightedFieldPathKey,
   wildcardIndeterminatePaths,
   wildcardSelectedPaths,
+  ignoredFields,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
@@ -74,6 +78,9 @@ const TreeNodeItem = memo(({
   const pathKey = node.fullPath.join(PATH_DELIMITER);
   // Default columns (always shown in ResultTable) - disable selection
   const isDefaultColumn = DEFAULT_SCHEMA_FIELDS.includes(node.fullPath.join('.') as typeof DEFAULT_SCHEMA_FIELDS[number]);
+  // Check if this field is in the ignored list (disabled for expand/select)
+  const isIgnored = ignoredFields.has(node.name);
+  const ignoredReason = ignoredFields.get(node.name);
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
   // For wildcard child fields: check if all indexed siblings are selected or partially selected
@@ -134,8 +141,11 @@ const TreeNodeItem = memo(({
       >
 
         {/* Expand/Collapse button OR Checkbox (mutually exclusive) */}
+        {/* Ignored fields: show empty spacer (no expand/checkbox) */}
         {/* Map wildcard (*) node: leaf-like, shows checkbox for selecting all siblings */}
-        {node.name === '*' && !hasChildren ? (
+        {isIgnored ? (
+          <span className="w-4 mr-1.5 shrink-0" />
+        ) : node.name === '*' && !hasChildren ? (
           <Checkbox
             checked={isWildcardIndeterminate ? 'indeterminate' : (selected || isWildcardSelected)}
             onCheckedChange={handleSelectChange}
@@ -170,25 +180,48 @@ const TreeNodeItem = memo(({
           <span className="w-4 mr-1.5 shrink-0" />
         )}
 
-        {/* Field name */}
-        <span className="text-sm text-foreground font-mono">
-          {hasHighlight && matchIndices ? (
-            <HighlightedText text={node.name} indices={matchIndices} />
-          ) : (
-            node.name
-          )}
-        </span>
-
-        {/* Type - styled with color, no angle brackets */}
-        {node.type && (
-          <span className="text-xs text-primary/70 ml-2 font-mono">
-            {node.type}
-          </span>
+        {/* Field name and type - wrapped in HoverCard for ignored fields */}
+        {isIgnored ? (
+          <HoverCard openDelay={200}>
+            <HoverCardTrigger asChild>
+              <span className="flex items-center cursor-help">
+                <span className="text-sm font-mono text-muted-foreground/50">
+                  {node.name}
+                </span>
+                {node.type && (
+                  <span className="text-xs text-muted-foreground/30 ml-2 font-mono">
+                    {node.type}
+                  </span>
+                )}
+              </span>
+            </HoverCardTrigger>
+            <HoverCardContent className="w-72 text-sm" side="right">
+              <p className="font-medium mb-1">Structure tracking disabled</p>
+              <p className="text-muted-foreground text-xs">
+                {ignoredReason}
+              </p>
+            </HoverCardContent>
+          </HoverCard>
+        ) : (
+          <>
+            <span className="text-sm font-mono text-foreground">
+              {hasHighlight && matchIndices ? (
+                <HighlightedText text={node.name} indices={matchIndices} />
+              ) : (
+                node.name
+              )}
+            </span>
+            {node.type && (
+              <span className="text-xs text-primary/70 ml-2 font-mono">
+                {node.type}
+              </span>
+            )}
+          </>
         )}
       </div>
 
-      {/* Children (if expanded) */}
-      {expanded && hasChildren && (
+      {/* Children (if expanded and not ignored) */}
+      {expanded && hasChildren && !isIgnored && (
         <div>
           {node.children.map((child, idx) => (
             <TreeNodeItem
@@ -205,6 +238,7 @@ const TreeNodeItem = memo(({
               highlightedFieldPathKey={highlightedFieldPathKey}
               wildcardIndeterminatePaths={wildcardIndeterminatePaths}
               wildcardSelectedPaths={wildcardSelectedPaths}
+              ignoredFields={ignoredFields}
             />
           ))}
         </div>
@@ -261,6 +295,9 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
 
     // Filtered view
     filteredNodeTree,
+
+    // Ignored fields (disabled in tree UI)
+    ignoredFields,
   } = useTree({
     selectedGVK,
     connectedContexts,
@@ -369,6 +406,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                 highlightedFieldPathKey={highlightedFieldPathKey}
                 wildcardIndeterminatePaths={wildcardIndeterminatePaths}
                 wildcardSelectedPaths={wildcardSelectedPaths}
+                ignoredFields={ignoredFields}
               />
             ))}
           </div>

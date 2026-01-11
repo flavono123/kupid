@@ -441,6 +441,28 @@ func makeResourceKey(context, namespace, name string) string {
 	return fmt.Sprintf("%s/%s/%s", context, namespace, name)
 }
 
+// IgnoredField represents a field excluded from structure change detection
+type IgnoredField struct {
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+}
+
+// Fields to ignore when detecting structure changes
+// Maps field name to reason for ignoring
+var ignoreStructureFields = map[string]string{
+	"managedFields": "SSA (Server-Side Apply) metadata that changes very frequently but is rarely useful for display.",
+}
+
+// GetIgnoredStructureFields returns the list of fields ignored in structure comparison
+// Frontend uses this to disable expand/select for these fields in tree UI
+func (a *App) GetIgnoredStructureFields() []IgnoredField {
+	fields := make([]IgnoredField, 0, len(ignoreStructureFields))
+	for name, reason := range ignoreStructureFields {
+		fields = append(fields, IgnoredField{Name: name, Reason: reason})
+	}
+	return fields
+}
+
 // detectStructureChange compares old and new objects to detect structural changes
 // (array length changes, map key additions/removals)
 // Returns true if tree needs to be refreshed
@@ -448,60 +470,96 @@ func detectStructureChange(oldObj, newObj map[string]interface{}) bool {
 	if oldObj == nil {
 		return true // new object, assume structure change
 	}
-	return !structureEqual(oldObj, newObj)
+	changed, path := structureEqualDebug(oldObj, newObj, "", "")
+	if !changed {
+		log.Printf("[DEBUG] structure change detected at path: %s", path)
+	}
+	return !changed
 }
 
 // structureEqual recursively compares two objects for structural equality
 // Only checks array lengths and map keys, not primitive values
 func structureEqual(a, b interface{}) bool {
+	eq, _ := structureEqualDebug(a, b, "", "")
+	return eq
+}
+
+// isIgnoredField checks if a field name is in the ignore list
+func isIgnoredField(name string) bool {
+	_, ok := ignoreStructureFields[name]
+	return ok
+}
+
+// structureEqualDebug is like structureEqual but returns the path where change was detected
+// key is the current field name (used for ignore checking)
+func structureEqualDebug(a, b interface{}, path string, key string) (bool, string) {
+	// Skip ignored fields entirely
+	if isIgnoredField(key) {
+		return true, ""
+	}
+
 	if a == nil && b == nil {
-		return true
+		return true, ""
 	}
 	if a == nil || b == nil {
-		return false
+		return false, path + "(nil mismatch)"
 	}
 
 	switch aVal := a.(type) {
 	case map[string]interface{}:
 		bVal, ok := b.(map[string]interface{})
 		if !ok {
-			return false
+			return false, path + "(type mismatch: map vs non-map)"
 		}
-		// Check if keys are the same
-		if len(aVal) != len(bVal) {
-			return false
+		// Count keys excluding ignored fields
+		aCount, bCount := 0, 0
+		for k := range aVal {
+			if !isIgnoredField(k) {
+				aCount++
+			}
 		}
-		for key := range aVal {
-			if _, exists := bVal[key]; !exists {
-				return false
+		for k := range bVal {
+			if !isIgnoredField(k) {
+				bCount++
+			}
+		}
+		if aCount != bCount {
+			return false, fmt.Sprintf("%s(key count: %d vs %d)", path, aCount, bCount)
+		}
+		for k := range aVal {
+			if isIgnoredField(k) {
+				continue // skip ignored fields
+			}
+			if _, exists := bVal[k]; !exists {
+				return false, path + "." + k + "(missing key)"
 			}
 			// Recursively check nested structures
-			if !structureEqual(aVal[key], bVal[key]) {
-				return false
+			if eq, p := structureEqualDebug(aVal[k], bVal[k], path+"."+k, k); !eq {
+				return false, p
 			}
 		}
-		return true
+		return true, ""
 
 	case []interface{}:
 		bVal, ok := b.([]interface{})
 		if !ok {
-			return false
+			return false, path + "(type mismatch: array vs non-array)"
 		}
 		// Check if array lengths are the same
 		if len(aVal) != len(bVal) {
-			return false
+			return false, fmt.Sprintf("%s(array len: %d vs %d)", path, len(aVal), len(bVal))
 		}
 		// Recursively check each element's structure
 		for i := range aVal {
-			if !structureEqual(aVal[i], bVal[i]) {
-				return false
+			if eq, p := structureEqualDebug(aVal[i], bVal[i], fmt.Sprintf("%s[%d]", path, i), ""); !eq {
+				return false, p
 			}
 		}
-		return true
+		return true, ""
 
 	default:
 		// Primitive types - structure is always equal
-		return true
+		return true, ""
 	}
 }
 
