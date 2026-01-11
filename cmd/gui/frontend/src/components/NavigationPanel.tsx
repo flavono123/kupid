@@ -47,8 +47,10 @@ interface TreeNodeItemProps {
   shouldAutoScroll?: boolean;
   /** Path highlighted from ResultTable hover */
   highlightedFieldPathKey?: string;
-  /** Paths of wildcard nodes that are in indeterminate state */
+  /** Paths of wildcard child fields that are in indeterminate state */
   wildcardIndeterminatePaths: Set<string>;
+  /** Paths of wildcard child fields where all indexed siblings are selected */
+  wildcardSelectedPaths: Set<string>;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -64,6 +66,7 @@ const TreeNodeItem = memo(({
   shouldAutoScroll = false,
   highlightedFieldPathKey,
   wildcardIndeterminatePaths,
+  wildcardSelectedPaths,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
@@ -73,6 +76,9 @@ const TreeNodeItem = memo(({
   const isDefaultColumn = DEFAULT_SCHEMA_FIELDS.includes(node.fullPath.join('.') as typeof DEFAULT_SCHEMA_FIELDS[number]);
   const expanded = expandedPaths.has(pathKey);
   const selected = selectedPaths.has(pathKey);
+  // For wildcard child fields: check if all indexed siblings are selected or partially selected
+  const isWildcardSelected = wildcardSelectedPaths.has(pathKey);
+  const isWildcardIndeterminate = wildcardIndeterminatePaths.has(pathKey);
   const matchIndices = searchResultsMap.get(pathKey);
   const hasHighlight = matchIndices !== undefined && matchIndices !== null && matchIndices.length > 0;
   const isFocused = focusedPath === pathKey;
@@ -131,7 +137,7 @@ const TreeNodeItem = memo(({
         {/* Map wildcard (*) node: leaf-like, shows checkbox for selecting all siblings */}
         {node.name === '*' && !hasChildren ? (
           <Checkbox
-            checked={wildcardIndeterminatePaths.has(pathKey) ? 'indeterminate' : selected}
+            checked={isWildcardIndeterminate ? 'indeterminate' : (selected || isWildcardSelected)}
             onCheckedChange={handleSelectChange}
             className="mr-1.5 h-3.5 w-3.5 shrink-0"
           />
@@ -150,7 +156,11 @@ const TreeNodeItem = memo(({
           </Button>
         ) : isLeaf ? (
           <Checkbox
-            checked={isDefaultColumn || selected}
+            checked={
+              isDefaultColumn ? true :
+              isWildcardIndeterminate ? 'indeterminate' :
+              (selected || isWildcardSelected)
+            }
             onCheckedChange={handleSelectChange}
             disabled={isDefaultColumn}
             className="mr-1.5 h-3.5 w-3.5 shrink-0"
@@ -194,6 +204,7 @@ const TreeNodeItem = memo(({
               shouldAutoScroll={shouldAutoScroll}
               highlightedFieldPathKey={highlightedFieldPathKey}
               wildcardIndeterminatePaths={wildcardIndeterminatePaths}
+              wildcardSelectedPaths={wildcardSelectedPaths}
             />
           ))}
         </div>
@@ -239,6 +250,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     clearAllSelections,
     setSelectionsFromPaths,
     wildcardIndeterminatePaths,
+    wildcardSelectedPaths,
 
     // Keyboard navigation
     focusedPathKey,
@@ -356,6 +368,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                 }
                 highlightedFieldPathKey={highlightedFieldPathKey}
                 wildcardIndeterminatePaths={wildcardIndeterminatePaths}
+                wildcardSelectedPaths={wildcardSelectedPaths}
               />
             ))}
           </div>

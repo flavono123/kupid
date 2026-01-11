@@ -568,11 +568,58 @@ export function useTree({
     return paths;
   }, [selectedPaths]);
 
-  // Compute indeterminate state for wildcard (*) nodes
-  const wildcardIndeterminatePaths = useMemo(() => {
+  // Compute indeterminate and selected state for wildcard child fields
+  // e.g., containers.*.image shows indeterminate when containers.0.image is selected but containers.1.image is not
+  const { wildcardIndeterminatePaths, wildcardSelectedPaths } = useMemo(() => {
     const indeterminatePaths = new Set<string>();
+    const selectedPaths_ = new Set<string>();
 
-    // Find all * nodes and calculate their indeterminate state
+    // Find all leaf nodes under * and calculate their state based on indexed siblings
+    flatNodesMap.forEach((node, pathKey) => {
+      // Skip non-leaf nodes
+      const hasChildren = node.children && node.children.length > 0;
+      const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+      const isLeaf = !hasChildren && !isArrayOrMap;
+      if (!isLeaf) return;
+
+      // Check if this node is under a * (Array wildcard child)
+      const wildcardIndex = node.fullPath.indexOf('*');
+      if (wildcardIndex === -1) return;
+
+      // Get the array parent path (before *)
+      const arrayParentPath = node.fullPath.slice(0, wildcardIndex);
+      const arrayParentPathKey = arrayParentPath.join(PATH_DELIMITER);
+      const arrayParentNode = flatNodesMap.get(arrayParentPathKey);
+      if (!arrayParentNode || !arrayParentNode.children) return;
+
+      // Get all indexed siblings (0, 1, 2, ...)
+      const indexNodes = arrayParentNode.children.filter((child) => {
+        return child.name !== '*' && !isNaN(Number(child.name));
+      });
+
+      if (indexNodes.length === 0) return;
+
+      // Build corresponding indexed paths for this wildcard child
+      // e.g., containers.*.image → [containers.0.image, containers.1.image, ...]
+      const suffixPath = node.fullPath.slice(wildcardIndex + 1); // path after *
+      const indexedPaths = indexNodes.map((indexNode) => {
+        return [...arrayParentPath, indexNode.name, ...suffixPath].join(PATH_DELIMITER);
+      });
+
+      // Count how many indexed paths are selected
+      const selectedCount = indexedPaths.filter((p) => selectedPaths.has(p)).length;
+
+      if (selectedCount === indexedPaths.length) {
+        // All selected → mark as selected
+        selectedPaths_.add(pathKey);
+      } else if (selectedCount > 0) {
+        // Partially selected → mark as indeterminate
+        indeterminatePaths.add(pathKey);
+      }
+      // If none selected, neither set is updated (shows as unchecked)
+    });
+
+    // Also handle Map wildcard (*) node indeterminate state
     flatNodesMap.forEach((node, pathKey) => {
       if (node.name !== '*') return;
 
@@ -582,56 +629,34 @@ export function useTree({
 
       if (!parentNode || !parentNode.children) return;
 
-      // Get target leaf paths based on wildcard type
-      let targetLeaves: string[] = [];
-
-      // Check if it's a Map * (has non-numeric siblings) or Array *
+      // Check if it's a Map * (has non-numeric siblings)
       const siblingKeys = parentNode.children.filter((child) => {
         return child.name !== '*' && isNaN(Number(child.name));
       });
 
       if (siblingKeys.length > 0) {
         // Map * - target is sibling key leaves
-        targetLeaves = siblingKeys
+        const targetLeaves = siblingKeys
           .filter((child) => {
             const hasChildren = child.children && child.children.length > 0;
             const isArrayOrMap = child.type && (child.type.startsWith('[]') || child.type.startsWith('map['));
             return !hasChildren && !isArrayOrMap;
           })
           .map((child) => child.fullPath.join(PATH_DELIMITER));
-      } else {
-        // Array * - target is leaves from indexed children
-        const indexNodes = parentNode.children.filter((child) => {
-          return child.name !== '*' && !isNaN(Number(child.name));
-        });
 
-        const collectLeaves = (n: TreeNode) => {
-          const hasChildren = n.children && n.children.length > 0;
-          const isArrayOrMap = n.type && (n.type.startsWith('[]') || n.type.startsWith('map['));
-          const isLeaf = !hasChildren && !isArrayOrMap;
+        if (targetLeaves.length === 0) return;
 
-          if (isLeaf && n.name !== '*') {
-            targetLeaves.push(n.fullPath.join(PATH_DELIMITER));
-          }
-          if (n.children) {
-            n.children.forEach(collectLeaves);
-          }
-        };
+        const selectedCount = targetLeaves.filter((p) => selectedPaths.has(p)).length;
 
-        indexNodes.forEach(collectLeaves);
-      }
-
-      if (targetLeaves.length === 0) return;
-
-      const selectedCount = targetLeaves.filter((p) => selectedPaths.has(p)).length;
-      const isPartiallySelected = selectedCount > 0 && selectedCount < targetLeaves.length;
-
-      if (isPartiallySelected) {
-        indeterminatePaths.add(pathKey);
+        if (selectedCount === targetLeaves.length) {
+          selectedPaths_.add(pathKey);
+        } else if (selectedCount > 0) {
+          indeterminatePaths.add(pathKey);
+        }
       }
     });
 
-    return indeterminatePaths;
+    return { wildcardIndeterminatePaths: indeterminatePaths, wildcardSelectedPaths: selectedPaths_ };
   }, [flatNodesMap, selectedPaths]);
 
   // Compute paths to expand based on search results
@@ -1031,6 +1056,7 @@ export function useTree({
     clearAllSelections,
     setSelectionsFromPaths,
     wildcardIndeterminatePaths,
+    wildcardSelectedPaths,
 
     // Keyboard navigation
     focusedPathKey,
