@@ -898,3 +898,559 @@ describe('boundedMatchIndex helper', () => {
     expect(computeBoundedIndex(5, 1)).toBe(0);  // clamped to 0
   });
 });
+
+// ============================================================================
+// Helper function tests (replicated from useTree.ts for unit testing)
+// ============================================================================
+
+// Helper: check if a node is a leaf (no children and not array/map type)
+function isLeafNode(node: TreeNode): boolean {
+  const hasChildren = node.children && node.children.length > 0;
+  const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+  return !hasChildren && !isArrayOrMap;
+}
+
+// Helper: get Map sibling keys (non-numeric, non-* children) for Map wildcard detection
+function getMapSiblingKeys(parentNode: TreeNode): TreeNode[] {
+  if (!parentNode.children) return [];
+  return parentNode.children.filter((child) => {
+    return child.name !== '*' && isNaN(Number(child.name));
+  });
+}
+
+// Helper: get index nodes (numeric children, excluding *) for Array wildcard detection
+function getIndexNodes(parentNode: TreeNode): TreeNode[] {
+  if (!parentNode.children) return [];
+  return parentNode.children.filter((child) => {
+    return child.name !== '*' && !isNaN(Number(child.name));
+  });
+}
+
+describe('isLeafNode helper', () => {
+  it('should return true for leaf nodes without children', () => {
+    const leaf: TreeNode = {
+      name: 'name',
+      type: 'string',
+      fullPath: ['metadata', 'name'],
+      level: 1,
+      children: [],
+    };
+    expect(isLeafNode(leaf)).toBe(true);
+  });
+
+  it('should return false for nodes with children', () => {
+    const parent: TreeNode = {
+      name: 'metadata',
+      type: 'ObjectMeta',
+      fullPath: ['metadata'],
+      level: 0,
+      children: [
+        { name: 'name', type: 'string', fullPath: ['metadata', 'name'], level: 1, children: [] },
+      ],
+    };
+    expect(isLeafNode(parent)).toBe(false);
+  });
+
+  it('should return false for array type nodes even without children', () => {
+    const arrayNode: TreeNode = {
+      name: 'containers',
+      type: '[]Container',
+      fullPath: ['spec', 'containers'],
+      level: 1,
+      children: [],
+    };
+    expect(isLeafNode(arrayNode)).toBe(false);
+  });
+
+  it('should return false for map type nodes even without children', () => {
+    const mapNode: TreeNode = {
+      name: 'labels',
+      type: 'map[string]string',
+      fullPath: ['metadata', 'labels'],
+      level: 1,
+      children: [],
+    };
+    expect(isLeafNode(mapNode)).toBe(false);
+  });
+});
+
+describe('getMapSiblingKeys helper (Map wildcard detection)', () => {
+  it('should return non-numeric children for Map parent', () => {
+    // Map parent: metadata.annotations with keys like "app", "version", "karpenter.sh/node-hash"
+    const mapParent: TreeNode = {
+      name: 'annotations',
+      type: 'map[string]string',
+      fullPath: ['metadata', 'annotations'],
+      level: 1,
+      children: [
+        { name: '*', type: '', fullPath: ['metadata', 'annotations', '*'], level: 2, children: [] },
+        { name: 'app', type: 'string', fullPath: ['metadata', 'annotations', 'app'], level: 2, children: [] },
+        { name: 'version', type: 'string', fullPath: ['metadata', 'annotations', 'version'], level: 2, children: [] },
+        { name: 'karpenter.sh/node-hash', type: 'string', fullPath: ['metadata', 'annotations', 'karpenter.sh/node-hash'], level: 2, children: [] },
+      ],
+    };
+
+    const siblings = getMapSiblingKeys(mapParent);
+
+    expect(siblings).toHaveLength(3);
+    expect(siblings.map((s) => s.name)).toEqual(['app', 'version', 'karpenter.sh/node-hash']);
+  });
+
+  it('should return empty array for Array parent (numeric children)', () => {
+    // Array parent: spec.containers with indices 0, 1, 2
+    const arrayParent: TreeNode = {
+      name: 'containers',
+      type: '[]Container',
+      fullPath: ['spec', 'containers'],
+      level: 1,
+      children: [
+        { name: '*', type: '', fullPath: ['spec', 'containers', '*'], level: 2, children: [] },
+        { name: '0', type: '', fullPath: ['spec', 'containers', '0'], level: 2, children: [] },
+        { name: '1', type: '', fullPath: ['spec', 'containers', '1'], level: 2, children: [] },
+      ],
+    };
+
+    const siblings = getMapSiblingKeys(arrayParent);
+
+    expect(siblings).toHaveLength(0);
+  });
+
+  it('should exclude * node from siblings', () => {
+    const mapParent: TreeNode = {
+      name: 'labels',
+      type: 'map[string]string',
+      fullPath: ['metadata', 'labels'],
+      level: 1,
+      children: [
+        { name: '*', type: '', fullPath: ['metadata', 'labels', '*'], level: 2, children: [] },
+        { name: 'app', type: 'string', fullPath: ['metadata', 'labels', 'app'], level: 2, children: [] },
+      ],
+    };
+
+    const siblings = getMapSiblingKeys(mapParent);
+
+    expect(siblings).toHaveLength(1);
+    expect(siblings[0].name).toBe('app');
+  });
+
+  it('should handle node without children', () => {
+    const nodeWithoutChildren: TreeNode = {
+      name: 'empty',
+      type: 'string',
+      fullPath: ['empty'],
+      level: 0,
+      children: [],
+    };
+
+    expect(getMapSiblingKeys(nodeWithoutChildren)).toEqual([]);
+  });
+});
+
+describe('getIndexNodes helper (Array wildcard detection)', () => {
+  it('should return numeric children for Array parent', () => {
+    const arrayParent: TreeNode = {
+      name: 'containers',
+      type: '[]Container',
+      fullPath: ['spec', 'containers'],
+      level: 1,
+      children: [
+        { name: '*', type: '', fullPath: ['spec', 'containers', '*'], level: 2, children: [] },
+        { name: '0', type: '', fullPath: ['spec', 'containers', '0'], level: 2, children: [] },
+        { name: '1', type: '', fullPath: ['spec', 'containers', '1'], level: 2, children: [] },
+        { name: '2', type: '', fullPath: ['spec', 'containers', '2'], level: 2, children: [] },
+      ],
+    };
+
+    const indices = getIndexNodes(arrayParent);
+
+    expect(indices).toHaveLength(3);
+    expect(indices.map((i) => i.name)).toEqual(['0', '1', '2']);
+  });
+
+  it('should return empty array for Map parent (non-numeric children)', () => {
+    const mapParent: TreeNode = {
+      name: 'labels',
+      type: 'map[string]string',
+      fullPath: ['metadata', 'labels'],
+      level: 1,
+      children: [
+        { name: '*', type: '', fullPath: ['metadata', 'labels', '*'], level: 2, children: [] },
+        { name: 'app', type: 'string', fullPath: ['metadata', 'labels', 'app'], level: 2, children: [] },
+        { name: 'env', type: 'string', fullPath: ['metadata', 'labels', 'env'], level: 2, children: [] },
+      ],
+    };
+
+    const indices = getIndexNodes(mapParent);
+
+    expect(indices).toHaveLength(0);
+  });
+
+  it('should exclude * node from indices', () => {
+    const arrayParent: TreeNode = {
+      name: 'items',
+      type: '[]string',
+      fullPath: ['items'],
+      level: 0,
+      children: [
+        { name: '*', type: '', fullPath: ['items', '*'], level: 1, children: [] },
+        { name: '0', type: 'string', fullPath: ['items', '0'], level: 1, children: [] },
+      ],
+    };
+
+    const indices = getIndexNodes(arrayParent);
+
+    expect(indices).toHaveLength(1);
+    expect(indices[0].name).toBe('0');
+  });
+});
+
+// ============================================================================
+// Wildcard indeterminate state calculation tests
+// ============================================================================
+
+describe('wildcardIndeterminatePaths calculation', () => {
+  // Replicate the calculation logic from useTree.ts for testing
+  function calculateWildcardStates(
+    flatNodesMap: Map<string, TreeNode>,
+    selectedPaths: Set<string>
+  ): { indeterminatePaths: Set<string>; selectedPaths_: Set<string> } {
+    const indeterminatePaths = new Set<string>();
+    const selectedPaths_ = new Set<string>();
+
+    // Array wildcard child fields
+    flatNodesMap.forEach((node, pathKey) => {
+      if (!isLeafNode(node)) return;
+
+      const wildcardIndex = node.fullPath.indexOf('*');
+      if (wildcardIndex === -1) return;
+
+      const arrayParentPath = node.fullPath.slice(0, wildcardIndex);
+      const arrayParentPathKey = arrayParentPath.join(PATH_DELIMITER);
+      const arrayParentNode = flatNodesMap.get(arrayParentPathKey);
+      if (!arrayParentNode) return;
+
+      const indexedChildren = getIndexNodes(arrayParentNode);
+      if (indexedChildren.length === 0) return;
+
+      const suffixPath = node.fullPath.slice(wildcardIndex + 1);
+      const indexedPaths = indexedChildren.map((indexNode) => {
+        return [...arrayParentPath, indexNode.name, ...suffixPath].join(PATH_DELIMITER);
+      });
+
+      const selectedCount = indexedPaths.filter((p) => selectedPaths.has(p)).length;
+
+      if (selectedCount === indexedPaths.length) {
+        selectedPaths_.add(pathKey);
+      } else if (selectedCount > 0) {
+        indeterminatePaths.add(pathKey);
+      }
+    });
+
+    // Map wildcard (*) node itself
+    flatNodesMap.forEach((node, pathKey) => {
+      if (node.name !== '*') return;
+
+      const parentPath = node.fullPath.slice(0, -1);
+      const parentPathKey = parentPath.join(PATH_DELIMITER);
+      const parentNode = flatNodesMap.get(parentPathKey);
+      if (!parentNode) return;
+
+      const siblingKeys = getMapSiblingKeys(parentNode);
+      if (siblingKeys.length === 0) return;
+
+      const targetLeaves = siblingKeys
+        .filter((child) => isLeafNode(child))
+        .map((child) => child.fullPath.join(PATH_DELIMITER));
+
+      if (targetLeaves.length === 0) return;
+
+      const selectedCount = targetLeaves.filter((p) => selectedPaths.has(p)).length;
+
+      if (selectedCount === targetLeaves.length) {
+        selectedPaths_.add(pathKey);
+      } else if (selectedCount > 0) {
+        indeterminatePaths.add(pathKey);
+      }
+    });
+
+    return { indeterminatePaths, selectedPaths_ };
+  }
+
+  describe('Array wildcard child fields', () => {
+    // Create a sample tree: spec.containers[*].image with 2 containers
+    const createArrayWildcardTree = () => {
+      const flatNodesMap = new Map<string, TreeNode>();
+
+      // spec
+      flatNodesMap.set('spec', {
+        name: 'spec',
+        type: 'PodSpec',
+        fullPath: ['spec'],
+        level: 0,
+        children: [],
+      });
+
+      // spec.containers (array parent)
+      const containersNode: TreeNode = {
+        name: 'containers',
+        type: '[]Container',
+        fullPath: ['spec', 'containers'],
+        level: 1,
+        children: [],
+      };
+
+      // Index nodes
+      const index0: TreeNode = {
+        name: '0',
+        type: '',
+        fullPath: ['spec', 'containers', '0'],
+        level: 2,
+        children: [],
+      };
+      const index1: TreeNode = {
+        name: '1',
+        type: '',
+        fullPath: ['spec', 'containers', '1'],
+        level: 2,
+        children: [],
+      };
+      const wildcardNode: TreeNode = {
+        name: '*',
+        type: '',
+        fullPath: ['spec', 'containers', '*'],
+        level: 2,
+        children: [],
+      };
+
+      containersNode.children = [wildcardNode, index0, index1];
+
+      // Leaf nodes under wildcard
+      const wildcardImage: TreeNode = {
+        name: 'image',
+        type: 'string',
+        fullPath: ['spec', 'containers', '*', 'image'],
+        level: 3,
+        children: [],
+      };
+
+      // Leaf nodes under index 0
+      const index0Image: TreeNode = {
+        name: 'image',
+        type: 'string',
+        fullPath: ['spec', 'containers', '0', 'image'],
+        level: 3,
+        children: [],
+      };
+
+      // Leaf nodes under index 1
+      const index1Image: TreeNode = {
+        name: 'image',
+        type: 'string',
+        fullPath: ['spec', 'containers', '1', 'image'],
+        level: 3,
+        children: [],
+      };
+
+      flatNodesMap.set(['spec', 'containers'].join(PATH_DELIMITER), containersNode);
+      flatNodesMap.set(['spec', 'containers', '*'].join(PATH_DELIMITER), wildcardNode);
+      flatNodesMap.set(['spec', 'containers', '0'].join(PATH_DELIMITER), index0);
+      flatNodesMap.set(['spec', 'containers', '1'].join(PATH_DELIMITER), index1);
+      flatNodesMap.set(['spec', 'containers', '*', 'image'].join(PATH_DELIMITER), wildcardImage);
+      flatNodesMap.set(['spec', 'containers', '0', 'image'].join(PATH_DELIMITER), index0Image);
+      flatNodesMap.set(['spec', 'containers', '1', 'image'].join(PATH_DELIMITER), index1Image);
+
+      return flatNodesMap;
+    };
+
+    it('should show indeterminate when only some indexed paths are selected', () => {
+      const flatNodesMap = createArrayWildcardTree();
+      // Select only containers[0].image
+      const selectedPaths = new Set([
+        ['spec', 'containers', '0', 'image'].join(PATH_DELIMITER),
+      ]);
+
+      const { indeterminatePaths, selectedPaths_ } = calculateWildcardStates(flatNodesMap, selectedPaths);
+
+      // containers.*.image should be indeterminate (1 of 2 selected)
+      const wildcardImageKey = ['spec', 'containers', '*', 'image'].join(PATH_DELIMITER);
+      expect(indeterminatePaths.has(wildcardImageKey)).toBe(true);
+      expect(selectedPaths_.has(wildcardImageKey)).toBe(false);
+    });
+
+    it('should show selected when all indexed paths are selected', () => {
+      const flatNodesMap = createArrayWildcardTree();
+      // Select both containers[0].image and containers[1].image
+      const selectedPaths = new Set([
+        ['spec', 'containers', '0', 'image'].join(PATH_DELIMITER),
+        ['spec', 'containers', '1', 'image'].join(PATH_DELIMITER),
+      ]);
+
+      const { indeterminatePaths, selectedPaths_ } = calculateWildcardStates(flatNodesMap, selectedPaths);
+
+      const wildcardImageKey = ['spec', 'containers', '*', 'image'].join(PATH_DELIMITER);
+      expect(selectedPaths_.has(wildcardImageKey)).toBe(true);
+      expect(indeterminatePaths.has(wildcardImageKey)).toBe(false);
+    });
+
+    it('should show unchecked when no indexed paths are selected', () => {
+      const flatNodesMap = createArrayWildcardTree();
+      const selectedPaths = new Set<string>();
+
+      const { indeterminatePaths, selectedPaths_ } = calculateWildcardStates(flatNodesMap, selectedPaths);
+
+      const wildcardImageKey = ['spec', 'containers', '*', 'image'].join(PATH_DELIMITER);
+      expect(selectedPaths_.has(wildcardImageKey)).toBe(false);
+      expect(indeterminatePaths.has(wildcardImageKey)).toBe(false);
+    });
+  });
+
+  describe('Map wildcard (*) node', () => {
+    // Create a sample tree: metadata.labels.* with keys "app", "env"
+    const createMapWildcardTree = () => {
+      const flatNodesMap = new Map<string, TreeNode>();
+
+      // metadata
+      flatNodesMap.set('metadata', {
+        name: 'metadata',
+        type: 'ObjectMeta',
+        fullPath: ['metadata'],
+        level: 0,
+        children: [],
+      });
+
+      // metadata.labels (map parent)
+      const labelsNode: TreeNode = {
+        name: 'labels',
+        type: 'map[string]string',
+        fullPath: ['metadata', 'labels'],
+        level: 1,
+        children: [],
+      };
+
+      // Wildcard and key nodes
+      const wildcardNode: TreeNode = {
+        name: '*',
+        type: '',
+        fullPath: ['metadata', 'labels', '*'],
+        level: 2,
+        children: [],
+      };
+      const appNode: TreeNode = {
+        name: 'app',
+        type: 'string',
+        fullPath: ['metadata', 'labels', 'app'],
+        level: 2,
+        children: [],
+      };
+      const envNode: TreeNode = {
+        name: 'env',
+        type: 'string',
+        fullPath: ['metadata', 'labels', 'env'],
+        level: 2,
+        children: [],
+      };
+
+      labelsNode.children = [wildcardNode, appNode, envNode];
+
+      flatNodesMap.set(['metadata', 'labels'].join(PATH_DELIMITER), labelsNode);
+      flatNodesMap.set(['metadata', 'labels', '*'].join(PATH_DELIMITER), wildcardNode);
+      flatNodesMap.set(['metadata', 'labels', 'app'].join(PATH_DELIMITER), appNode);
+      flatNodesMap.set(['metadata', 'labels', 'env'].join(PATH_DELIMITER), envNode);
+
+      return flatNodesMap;
+    };
+
+    it('should show indeterminate when only some sibling keys are selected', () => {
+      const flatNodesMap = createMapWildcardTree();
+      // Select only labels.app
+      const selectedPaths = new Set([
+        ['metadata', 'labels', 'app'].join(PATH_DELIMITER),
+      ]);
+
+      const { indeterminatePaths, selectedPaths_ } = calculateWildcardStates(flatNodesMap, selectedPaths);
+
+      const wildcardKey = ['metadata', 'labels', '*'].join(PATH_DELIMITER);
+      expect(indeterminatePaths.has(wildcardKey)).toBe(true);
+      expect(selectedPaths_.has(wildcardKey)).toBe(false);
+    });
+
+    it('should show selected when all sibling keys are selected', () => {
+      const flatNodesMap = createMapWildcardTree();
+      // Select both labels.app and labels.env
+      const selectedPaths = new Set([
+        ['metadata', 'labels', 'app'].join(PATH_DELIMITER),
+        ['metadata', 'labels', 'env'].join(PATH_DELIMITER),
+      ]);
+
+      const { indeterminatePaths, selectedPaths_ } = calculateWildcardStates(flatNodesMap, selectedPaths);
+
+      const wildcardKey = ['metadata', 'labels', '*'].join(PATH_DELIMITER);
+      expect(selectedPaths_.has(wildcardKey)).toBe(true);
+      expect(indeterminatePaths.has(wildcardKey)).toBe(false);
+    });
+
+    it('should show unchecked when no sibling keys are selected', () => {
+      const flatNodesMap = createMapWildcardTree();
+      const selectedPaths = new Set<string>();
+
+      const { indeterminatePaths, selectedPaths_ } = calculateWildcardStates(flatNodesMap, selectedPaths);
+
+      const wildcardKey = ['metadata', 'labels', '*'].join(PATH_DELIMITER);
+      expect(selectedPaths_.has(wildcardKey)).toBe(false);
+      expect(indeterminatePaths.has(wildcardKey)).toBe(false);
+    });
+
+    it('should handle annotation keys with special characters', () => {
+      const flatNodesMap = new Map<string, TreeNode>();
+
+      const annotationsNode: TreeNode = {
+        name: 'annotations',
+        type: 'map[string]string',
+        fullPath: ['metadata', 'annotations'],
+        level: 1,
+        children: [],
+      };
+
+      const wildcardNode: TreeNode = {
+        name: '*',
+        type: '',
+        fullPath: ['metadata', 'annotations', '*'],
+        level: 2,
+        children: [],
+      };
+      // Kubernetes annotation with slashes
+      const karpenterNode: TreeNode = {
+        name: 'karpenter.sh/node-hash',
+        type: 'string',
+        fullPath: ['metadata', 'annotations', 'karpenter.sh/node-hash'],
+        level: 2,
+        children: [],
+      };
+      const normalNode: TreeNode = {
+        name: 'description',
+        type: 'string',
+        fullPath: ['metadata', 'annotations', 'description'],
+        level: 2,
+        children: [],
+      };
+
+      annotationsNode.children = [wildcardNode, karpenterNode, normalNode];
+
+      flatNodesMap.set(['metadata', 'annotations'].join(PATH_DELIMITER), annotationsNode);
+      flatNodesMap.set(['metadata', 'annotations', '*'].join(PATH_DELIMITER), wildcardNode);
+      flatNodesMap.set(['metadata', 'annotations', 'karpenter.sh/node-hash'].join(PATH_DELIMITER), karpenterNode);
+      flatNodesMap.set(['metadata', 'annotations', 'description'].join(PATH_DELIMITER), normalNode);
+
+      // Select only the karpenter annotation
+      const selectedPaths = new Set([
+        ['metadata', 'annotations', 'karpenter.sh/node-hash'].join(PATH_DELIMITER),
+      ]);
+
+      const { indeterminatePaths } = calculateWildcardStates(flatNodesMap, selectedPaths);
+
+      // Should be indeterminate (1 of 2 selected)
+      const wildcardKey = ['metadata', 'annotations', '*'].join(PATH_DELIMITER);
+      expect(indeterminatePaths.has(wildcardKey)).toBe(true);
+    });
+  });
+});

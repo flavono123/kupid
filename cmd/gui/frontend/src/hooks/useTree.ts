@@ -352,6 +352,38 @@ function flattenTree(nodes: TreeNode[]): Map<string, TreeNode> {
   return map;
 }
 
+// Helper: check if a node is a leaf (no children and not array/map type)
+function isLeafNode(node: TreeNode): boolean {
+  const hasChildren = node.children && node.children.length > 0;
+  const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+  return !hasChildren && !isArrayOrMap;
+}
+
+// Helper: get Map sibling keys (non-numeric, non-* children) for Map wildcard detection
+function getMapSiblingKeys(parentNode: TreeNode): TreeNode[] {
+  if (!parentNode.children) return [];
+  return parentNode.children.filter((child) => {
+    return child.name !== '*' && isNaN(Number(child.name));
+  });
+}
+
+// Helper: get index nodes (numeric children, excluding *) for Array wildcard detection
+function getIndexNodes(parentNode: TreeNode): TreeNode[] {
+  if (!parentNode.children) return [];
+  return parentNode.children.filter((child) => {
+    return child.name !== '*' && !isNaN(Number(child.name));
+  });
+}
+
+// Helper: collect unique parent path keys from multiple target paths (using Set for O(n*m) complexity)
+function collectParentPathKeys(targetPathKeys: string[]): string[] {
+  const parentSet = new Set<string>();
+  targetPathKeys.forEach((key) => {
+    getParentPathKeys(key).forEach((p) => parentSet.add(p));
+  });
+  return Array.from(parentSet);
+}
+
 // Searchable item type for fuzzy search
 interface SearchableItem {
   text: string;
@@ -610,6 +642,83 @@ export function useTree({
     return paths;
   }, [selectedPaths]);
 
+  // Compute indeterminate and selected state for wildcard child fields
+  // e.g., containers.*.image shows indeterminate when containers.0.image is selected but containers.1.image is not
+  const { wildcardIndeterminatePaths, wildcardSelectedPaths } = useMemo(() => {
+    const indeterminatePaths = new Set<string>();
+    const selectedPaths_ = new Set<string>();
+
+    // Find all leaf nodes under * and calculate their state based on indexed siblings
+    flatNodesMap.forEach((node, pathKey) => {
+      // Skip non-leaf nodes
+      if (!isLeafNode(node)) return;
+
+      // Check if this node is under a * (Array wildcard child)
+      const wildcardIndex = node.fullPath.indexOf('*');
+      if (wildcardIndex === -1) return;
+
+      // Get the array parent path (before *)
+      const arrayParentPath = node.fullPath.slice(0, wildcardIndex);
+      const arrayParentPathKey = arrayParentPath.join(PATH_DELIMITER);
+      const arrayParentNode = flatNodesMap.get(arrayParentPathKey);
+      if (!arrayParentNode) return;
+
+      // Get all indexed siblings (0, 1, 2, ...)
+      const indexedChildren = getIndexNodes(arrayParentNode);
+      if (indexedChildren.length === 0) return;
+
+      // Build corresponding indexed paths for this wildcard child
+      // e.g., containers.*.image → [containers.0.image, containers.1.image, ...]
+      const suffixPath = node.fullPath.slice(wildcardIndex + 1); // path after *
+      const indexedPaths = indexedChildren.map((indexNode) => {
+        return [...arrayParentPath, indexNode.name, ...suffixPath].join(PATH_DELIMITER);
+      });
+
+      // Count how many indexed paths are selected
+      const selectedCount = indexedPaths.filter((p) => selectedPaths.has(p)).length;
+
+      if (selectedCount === indexedPaths.length) {
+        // All selected → mark as selected
+        selectedPaths_.add(pathKey);
+      } else if (selectedCount > 0) {
+        // Partially selected → mark as indeterminate
+        indeterminatePaths.add(pathKey);
+      }
+      // If none selected, neither set is updated (shows as unchecked)
+    });
+
+    // Also handle Map wildcard (*) node indeterminate state
+    flatNodesMap.forEach((node, pathKey) => {
+      if (node.name !== '*') return;
+
+      const parentPath = node.fullPath.slice(0, -1);
+      const parentPathKey = parentPath.join(PATH_DELIMITER);
+      const parentNode = flatNodesMap.get(parentPathKey);
+      if (!parentNode) return;
+
+      // Check if it's a Map * (has non-numeric siblings)
+      const siblingKeys = getMapSiblingKeys(parentNode);
+      if (siblingKeys.length === 0) return;
+
+      // Map * - target is sibling key leaves
+      const targetLeaves = siblingKeys
+        .filter((child) => isLeafNode(child))
+        .map((child) => child.fullPath.join(PATH_DELIMITER));
+
+      if (targetLeaves.length === 0) return;
+
+      const selectedCount = targetLeaves.filter((p) => selectedPaths.has(p)).length;
+
+      if (selectedCount === targetLeaves.length) {
+        selectedPaths_.add(pathKey);
+      } else if (selectedCount > 0) {
+        indeterminatePaths.add(pathKey);
+      }
+    });
+
+    return { wildcardIndeterminatePaths: indeterminatePaths, wildcardSelectedPaths: selectedPaths_ };
+  }, [flatNodesMap, selectedPaths]);
+
   // Compute paths to expand based on search results
   const searchExpandedPaths = useMemo(() => {
     if (!debouncedQuery || matchedPaths.length === 0) {
@@ -675,42 +784,79 @@ export function useTree({
         parentPathKeys: getParentPathKeys(pathKey),
       });
       // Parent is notified via the onFieldsSelected useEffect
+    } else if (wildcardIndex === path.length - 1) {
+      // Wildcard at the end - check if it's a Map * (leaf-like, selects all sibling keys)
+      const parentPath = path.slice(0, wildcardIndex);
+      const parentPathKey = parentPath.join(PATH_DELIMITER);
+      const parentNode = flatNodesMap.get(parentPathKey);
+
+      if (!parentNode) {
+        return;
+      }
+
+      // Check if parent is a Map (has non-numeric, non-* children that are leaves)
+      const siblingKeys = getMapSiblingKeys(parentNode);
+
+      if (siblingKeys.length > 0) {
+        // Map * - select all sibling key leaves
+        const targetPathKeys = siblingKeys
+          .filter((child) => isLeafNode(child))
+          .map((child) => child.fullPath.join(PATH_DELIMITER));
+
+        dispatch({
+          type: 'TOGGLE_SELECT_WILDCARD',
+          wildcardPathKey: pathKey,
+          targetPathKeys,
+          parentPathKeys: collectParentPathKeys(targetPathKeys),
+        });
+      } else {
+        // Array * at the end - select all leaves from indexed children
+        const indexedChildren = getIndexNodes(parentNode);
+
+        // Collect all leaf descendants from indexed children
+        const targetPathKeys: string[] = [];
+        const collectLeaves = (node: TreeNode) => {
+          if (isLeafNode(node) && node.name !== '*') {
+            targetPathKeys.push(node.fullPath.join(PATH_DELIMITER));
+          }
+          if (node.children) {
+            node.children.forEach(collectLeaves);
+          }
+        };
+
+        indexedChildren.forEach(collectLeaves);
+
+        dispatch({
+          type: 'TOGGLE_SELECT_WILDCARD',
+          wildcardPathKey: pathKey,
+          targetPathKeys,
+          parentPathKeys: collectParentPathKeys(targetPathKeys),
+        });
+      }
     } else {
-      // Wildcard found - toggle all index nodes
+      // Wildcard in the middle (Array *) - toggle all index nodes with path after wildcard
       const arrayPath = path.slice(0, wildcardIndex);
       const pathAfterWildcard = path.slice(wildcardIndex + 1);
       const arrayPathKey = arrayPath.join(PATH_DELIMITER);
       const arrayNode = flatNodesMap.get(arrayPathKey);
 
-      if (!arrayNode || !arrayNode.children) {
+      if (!arrayNode) {
         return;
       }
 
       // Find all index nodes (numeric children)
-      const indexNodes = arrayNode.children.filter((child) => {
-        return child.name !== '*' && !isNaN(Number(child.name));
-      });
+      const indexedChildren = getIndexNodes(arrayNode);
 
-      const targetPathKeys = indexNodes.map((indexNode) => {
+      const targetPathKeys = indexedChildren.map((indexNode) => {
         const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
         return targetPath.join(PATH_DELIMITER);
-      });
-
-      // Collect all parent paths for expansion
-      const parentPathKeys: string[] = [];
-      targetPathKeys.forEach((key) => {
-        getParentPathKeys(key).forEach((p) => {
-          if (!parentPathKeys.includes(p)) {
-            parentPathKeys.push(p);
-          }
-        });
       });
 
       dispatch({
         type: 'TOGGLE_SELECT_WILDCARD',
         wildcardPathKey: pathKey,
         targetPathKeys,
-        parentPathKeys,
+        parentPathKeys: collectParentPathKeys(targetPathKeys),
       });
     }
   }, [flatNodesMap]);
@@ -926,6 +1072,8 @@ export function useTree({
     toggleSelect,
     clearAllSelections,
     setSelectionsFromPaths,
+    wildcardIndeterminatePaths,
+    wildcardSelectedPaths,
 
     // Keyboard navigation
     focusedPathKey,
