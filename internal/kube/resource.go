@@ -96,7 +96,9 @@ func (i *ResourceController) Context() string {
 func (i *ResourceController) Objects() []*unstructured.Unstructured {
 	objs := make([]*unstructured.Unstructured, 0)
 	for _, obj := range i.store.List() {
-		objs = append(objs, obj.(*unstructured.Unstructured))
+		// DeepCopy to avoid concurrent map read/write panic
+		// The informer's watch goroutine may be modifying objects while we read them
+		objs = append(objs, obj.(*unstructured.Unstructured).DeepCopy())
 	}
 	sort.Slice(objs, func(i, j int) bool {
 		// TODO: sort by namespace if gvr is namespaced
