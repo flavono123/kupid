@@ -46,8 +46,9 @@ const (
 
 // WatchEvent represents a watch event with type and object
 type WatchEvent struct {
-	Type EventType
-	Obj  *unstructured.Unstructured
+	Type   EventType
+	Obj    *unstructured.Unstructured
+	OldObj *unstructured.Unstructured // Only set for MODIFIED events
 }
 
 // Deprecated: use WatchEvent instead
@@ -120,6 +121,23 @@ func (i *ResourceController) Objects() []*unstructured.Unstructured {
 	return objs
 }
 
+// GetByKey returns a resource by its key (namespace/name or just name for cluster-scoped)
+// Returns nil if not found or store is not initialized
+func (i *ResourceController) GetByKey(key string) *unstructured.Unstructured {
+	if i.store == nil {
+		return nil
+	}
+	obj, exists, err := i.store.GetByKey(key)
+	if err != nil || !exists {
+		return nil
+	}
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil
+	}
+	return u
+}
+
 func (i *ResourceController) Inform() (chan struct{}, error) {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -152,13 +170,15 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 				if !ok {
 					return
 				}
+				o, _ := oldObj.(*unstructured.Unstructured) // may be nil if not castable
+
 				// Update cached name for this key, since the object reference may change
 				key, _ := cache.MetaNamespaceKeyFunc(n)
 				i.nameCacheMu.Lock()
 				i.nameCache[key] = n.GetName()
 				i.nameCacheMu.Unlock()
 
-				i.trySend(emitMsg{Type: EventModified, Obj: n})
+				i.trySend(emitMsg{Type: EventModified, Obj: n, OldObj: o})
 			},
 			DeleteFunc: func(obj interface{}) {
 				var d *unstructured.Unstructured

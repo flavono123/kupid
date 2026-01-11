@@ -34,11 +34,10 @@ type App struct {
 	favoriteStore *store.Store
 
 	// Watch state
-	watchMu       sync.RWMutex
-	controllers   []*watchController
-	stopChs       []chan struct{}
-	watchDone     chan struct{}
-	resourceCache sync.Map // key: "context/namespace/name" → value: map[string]any
+	watchMu     sync.RWMutex
+	controllers []*watchController
+	stopChs     []chan struct{}
+	watchDone   chan struct{}
 }
 
 // watchController wraps a ResourceController with context info
@@ -477,13 +476,6 @@ func detectStructureChange(oldObj, newObj map[string]interface{}) bool {
 	return !changed
 }
 
-// structureEqual recursively compares two objects for structural equality
-// Only checks array lengths and map keys, not primitive values
-func structureEqual(a, b interface{}) bool {
-	eq, _ := structureEqualDebug(a, b, "", "")
-	return eq
-}
-
 // isIgnoredField checks if a field name is in the ignore list
 func isIgnoredField(name string) bool {
 	_, ok := ignoreStructureFields[name]
@@ -619,20 +611,15 @@ func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
 					structureChanged := false
 
 					if string(event.Type) == "DELETED" {
-						// Remove from cache on delete
-						a.resourceCache.Delete(key)
 						structureChanged = true // deletion may affect tree structure
 					} else {
-						// Get old object for comparison (if exists)
+						// Use OldObj from event for structure change detection
+						// No more duplicate cache - informer store is the single source of truth
 						var oldObj map[string]interface{}
-						if cached, ok := a.resourceCache.Load(key); ok {
-							oldObj, _ = cached.(map[string]interface{})
+						if event.OldObj != nil {
+							oldObj = event.OldObj.Object
 						}
-
-						// Store in cache for ADDED/MODIFIED
 						newObj := event.Obj.Object
-						newObj["_context"] = ctx
-						a.resourceCache.Store(key, newObj)
 
 						// Detect structure change (array lengths, map keys)
 						structureChanged = detectStructureChange(oldObj, newObj)
@@ -709,12 +696,6 @@ func (a *App) StopWatch() {
 	a.stopChs = nil
 	a.watchDone = nil
 
-	// Clear resource cache
-	a.resourceCache.Range(func(key, value any) bool {
-		a.resourceCache.Delete(key)
-		return true
-	})
-
 	log.Printf("Stopped all resource watches")
 	logMemoryStats("StopWatch")
 
@@ -722,18 +703,63 @@ func (a *App) StopWatch() {
 	kube.ResetEventMetrics()
 }
 
-// GetResourcesByKeys fetches resources from cache by keys (Pull Model)
+// GetResourcesByKeys fetches resources from informer store by keys (Pull Model)
 // Called by frontend after receiving resource:update events
+// Key format: "context/namespace/name" or "context//name" for cluster-scoped
 func (a *App) GetResourcesByKeys(keys []string) []map[string]any {
+	a.watchMu.RLock()
+	defer a.watchMu.RUnlock()
+
 	result := make([]map[string]any, 0, len(keys))
 	for _, key := range keys {
-		if obj, ok := a.resourceCache.Load(key); ok {
-			if m, ok := obj.(map[string]any); ok {
-				result = append(result, m)
+		// Parse key: "context/namespace/name" or "context//name"
+		ctx, storeKey := parseResourceKey(key)
+		if ctx == "" {
+			continue
+		}
+
+		// Find controller for this context
+		var controller *kube.ResourceController
+		for _, wc := range a.controllers {
+			if wc.contextName == ctx {
+				controller = wc.controller
+				break
 			}
 		}
+		if controller == nil {
+			continue
+		}
+
+		// Get from informer store directly (no duplicate cache)
+		obj := controller.GetByKey(storeKey)
+		if obj == nil {
+			continue
+		}
+
+		// Add context to the object (frontend needs this)
+		m := obj.Object
+		m["_context"] = ctx
+		result = append(result, m)
 	}
 	return result
+}
+
+// parseResourceKey parses "context/namespace/name" into context and "namespace/name"
+// For cluster-scoped resources: "context//name" -> context, "name"
+func parseResourceKey(key string) (context, storeKey string) {
+	parts := strings.SplitN(key, "/", 3)
+	if len(parts) < 3 {
+		return "", ""
+	}
+	context = parts[0]
+	if parts[1] == "" {
+		// Cluster-scoped: "context//name" -> storeKey = "name"
+		storeKey = parts[2]
+	} else {
+		// Namespaced: "context/namespace/name" -> storeKey = "namespace/name"
+		storeKey = parts[1] + "/" + parts[2]
+	}
+	return
 }
 
 // convertNodeTree converts kube.Node map to frontend TreeNode array
