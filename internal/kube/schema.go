@@ -559,8 +559,7 @@ func mapColumnNameToFieldPath(columnName string, kind string) []string {
 			// - "Access Modes": spec.accessModes (array)
 		},
 		"StatefulSet": {
-			"Ready":    {"status", "readyReplicas"},
-			"Replicas": {"spec", "replicas"},
+			"Ready": {"status", "readyReplicas"},
 			// EXCLUDED:
 			// - "Containers": computed from spec.template.spec.containers[].name
 			// - "Images": computed from spec.template.spec.containers[].image
