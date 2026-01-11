@@ -528,10 +528,13 @@ export function useTree({
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingRefresh = false;
 
-    const handleEvent = (_event: ResourceEventMeta) => {
-      // Refresh tree on any event type:
-      // - ADDED/MODIFIED: may add new keys/indices to tree
-      // - DELETED: may remove nodes if field only existed in deleted resource
+    const handleEvent = (event: ResourceEventMeta) => {
+      // Only refresh tree if structure actually changed (array lengths, map keys)
+      // This avoids expensive GetNodeTree calls for simple value changes
+      if (!event.structureChanged) {
+        return; // skip - no tree refresh needed
+      }
+
       pendingRefresh = true;
 
       // Debounce: wait for events to settle before refreshing
@@ -540,7 +543,7 @@ export function useTree({
       }
       debounceTimer = setTimeout(() => {
         if (pendingRefresh) {
-          console.log('useTree: refreshing tree due to watch events');
+          console.log('useTree: refreshing tree due to structure change');
           fetchNodeTree(true);  // silent refresh - no loading indicator
           pendingRefresh = false;
         }

@@ -14,6 +14,8 @@ export interface ResourceEventMeta {
   type: ResourceEventType;
   /** Unique key: "context/namespace/name" */
   key: string;
+  /** True if array lengths or map keys changed (tree needs refresh) */
+  structureChanged: boolean;
 }
 
 /**

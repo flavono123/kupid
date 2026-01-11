@@ -258,6 +258,8 @@ type TreeNode struct {
 // GetNodeTree retrieves the node tree for a given GVK and contexts
 // Returns a tree structure representing the schema + actual data
 func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, error) {
+	DumpMemory("GetNodeTree_start")
+
 	// Convert MultiClusterGVK to schema.GroupVersionKind
 	schemaGVK := schema.GroupVersionKind{
 		Group:   gvk.Group,
@@ -277,6 +279,7 @@ func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field tree: %w", err)
 	}
+	DumpMemory("GetNodeTree_after_field_tree")
 
 	// 2. Get resources - prefer active watch store to avoid duplicate List calls
 	objs := a.getWatchedResources()
@@ -287,18 +290,25 @@ func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, 
 			return nil, fmt.Errorf("failed to get resources: %w", err)
 		}
 	}
+	DumpMemory("GetNodeTree_after_get_resources")
+	log.Printf("[DEBUG] GetNodeTree: objs=%d", len(objs))
 
 	// 3. Create node tree
 	nodes := kube.CreateNodeTree(fields, objs, []string{})
+	DumpMemory("GetNodeTree_after_create_node_tree")
 
 	// 4. Convert to frontend format (remove UI state, convert to array)
-	return convertNodeTree(nodes), nil
+	result := convertNodeTree(nodes)
+	DumpMemory("GetNodeTree_end")
+	return result, nil
 }
 
 // GetDefaultSelectedPaths returns the default fields to select for a GVK.
 // For CRDs, this returns paths from additionalPrinterColumns.
 // For built-in resources, this uses Table API printer columns when available.
 func (a *App) GetDefaultSelectedPaths(gvk MultiClusterGVK, contexts []string) [][]string {
+	DumpMemory("before_GetDefaultSelectedPaths")
+
 	schemaGVK := schema.GroupVersionKind{
 		Group:   gvk.Group,
 		Version: gvk.Version,
@@ -309,6 +319,7 @@ func (a *App) GetDefaultSelectedPaths(gvk MultiClusterGVK, contexts []string) []
 	for _, contextName := range contexts {
 		paths, err := kube.GetPrinterColumnsForContext(contextName, schemaGVK)
 		if err == nil && len(paths) > 0 {
+			DumpMemory("after_GetDefaultSelectedPaths")
 			return paths
 		}
 	}
@@ -317,10 +328,12 @@ func (a *App) GetDefaultSelectedPaths(gvk MultiClusterGVK, contexts []string) []
 	for _, contextName := range gvk.Contexts {
 		paths, err := kube.GetPrinterColumnsForContext(contextName, schemaGVK)
 		if err == nil && len(paths) > 0 {
+			DumpMemory("after_GetDefaultSelectedPaths")
 			return paths
 		}
 	}
 
+	DumpMemory("after_GetDefaultSelectedPaths")
 	return nil
 }
 
@@ -418,13 +431,78 @@ func (a *App) GetResources(gvk MultiClusterGVK, contexts []string) ([]map[string
 // ResourceEventMeta represents a lightweight watch event (Pull Model)
 // Only contains metadata - frontend fetches full object via GetResources()
 type ResourceEventMeta struct {
-	Type string `json:"type"` // "ADDED", "MODIFIED", "DELETED"
-	Key  string `json:"key"`  // "context/namespace/name" unique identifier
+	Type             string `json:"type"`             // "ADDED", "MODIFIED", "DELETED"
+	Key              string `json:"key"`              // "context/namespace/name" unique identifier
+	StructureChanged bool   `json:"structureChanged"` // true if array lengths or map keys changed
 }
 
 // makeResourceKey creates a unique cache key for a resource
 func makeResourceKey(context, namespace, name string) string {
 	return fmt.Sprintf("%s/%s/%s", context, namespace, name)
+}
+
+// detectStructureChange compares old and new objects to detect structural changes
+// (array length changes, map key additions/removals)
+// Returns true if tree needs to be refreshed
+func detectStructureChange(oldObj, newObj map[string]interface{}) bool {
+	if oldObj == nil {
+		return true // new object, assume structure change
+	}
+	return !structureEqual(oldObj, newObj)
+}
+
+// structureEqual recursively compares two objects for structural equality
+// Only checks array lengths and map keys, not primitive values
+func structureEqual(a, b interface{}) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	switch aVal := a.(type) {
+	case map[string]interface{}:
+		bVal, ok := b.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		// Check if keys are the same
+		if len(aVal) != len(bVal) {
+			return false
+		}
+		for key := range aVal {
+			if _, exists := bVal[key]; !exists {
+				return false
+			}
+			// Recursively check nested structures
+			if !structureEqual(aVal[key], bVal[key]) {
+				return false
+			}
+		}
+		return true
+
+	case []interface{}:
+		bVal, ok := b.([]interface{})
+		if !ok {
+			return false
+		}
+		// Check if array lengths are the same
+		if len(aVal) != len(bVal) {
+			return false
+		}
+		// Recursively check each element's structure
+		for i := range aVal {
+			if !structureEqual(aVal[i], bVal[i]) {
+				return false
+			}
+		}
+		return true
+
+	default:
+		// Primitive types - structure is always equal
+		return true
+	}
 }
 
 // StartWatch starts watching resources for the given GVK across specified contexts
@@ -480,21 +558,33 @@ func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
 					}
 
 					key := makeResourceKey(ctx, event.Obj.GetNamespace(), event.Obj.GetName())
+					structureChanged := false
 
 					if string(event.Type) == "DELETED" {
 						// Remove from cache on delete
 						a.resourceCache.Delete(key)
+						structureChanged = true // deletion may affect tree structure
 					} else {
+						// Get old object for comparison (if exists)
+						var oldObj map[string]interface{}
+						if cached, ok := a.resourceCache.Load(key); ok {
+							oldObj, _ = cached.(map[string]interface{})
+						}
+
 						// Store in cache for ADDED/MODIFIED
-						obj := event.Obj.Object
-						obj["_context"] = ctx
-						a.resourceCache.Store(key, obj)
+						newObj := event.Obj.Object
+						newObj["_context"] = ctx
+						a.resourceCache.Store(key, newObj)
+
+						// Detect structure change (array lengths, map keys)
+						structureChanged = detectStructureChange(oldObj, newObj)
 					}
 
 					// Emit only lightweight metadata (no full object via eval)
 					runtime.EventsEmit(a.ctx, "resource:update", ResourceEventMeta{
-						Type: string(event.Type),
-						Key:  key,
+						Type:             string(event.Type),
+						Key:              key,
+						StructureChanged: structureChanged,
 					})
 				case <-ctrl.Done():
 					return
@@ -509,8 +599,23 @@ func (a *App) StartWatch(gvk MultiClusterGVK, contexts []string) error {
 		close(a.watchDone)
 	}()
 
+	// Periodic memory dump for debugging (every 30 seconds)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				DumpMemory("watch_periodic")
+			case <-a.watchDone:
+				return
+			}
+		}
+	}()
+
 	log.Printf("Started watching %s/%s/%s across %d contexts", gvk.Group, gvk.Version, gvk.Kind, len(a.controllers))
 	logMemoryStats("StartWatch")
+	DumpMemory("StartWatch_done")
 	return nil
 }
 
