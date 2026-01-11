@@ -178,13 +178,13 @@ var _ = Describe("ResourceController", func() {
 			// Create a fake store
 			store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 
-			// Create a controller with the fake store and nameCache
+			// Create a controller with the fake store and sortKeyCache
 			controller := &ResourceController{
-				store:     store,
-				nameCache: make(map[string]string),
+				store:        store,
+				sortKeyCache: make(map[string]string),
 			}
 
-			// Add objects to store and populate nameCache
+			// Add objects to store and populate sortKeyCache
 			obj1 := &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "v1",
@@ -192,6 +192,7 @@ var _ = Describe("ResourceController", func() {
 					"metadata": map[string]interface{}{
 						"name":      "zebra-pod",
 						"namespace": "default",
+						"uid":       "uid-zebra",
 					},
 				},
 			}
@@ -202,6 +203,7 @@ var _ = Describe("ResourceController", func() {
 					"metadata": map[string]interface{}{
 						"name":      "alpha-pod",
 						"namespace": "default",
+						"uid":       "uid-alpha",
 					},
 				},
 			}
@@ -209,11 +211,11 @@ var _ = Describe("ResourceController", func() {
 			Expect(store.Add(obj1)).To(Succeed())
 			Expect(store.Add(obj2)).To(Succeed())
 
-			// Populate nameCache (simulating what informer handlers do)
+			// Populate sortKeyCache (simulating what informer handlers do)
 			key1, _ := cache.MetaNamespaceKeyFunc(obj1)
 			key2, _ := cache.MetaNamespaceKeyFunc(obj2)
-			controller.nameCache[key1] = obj1.GetName()
-			controller.nameCache[key2] = obj2.GetName()
+			controller.sortKeyCache[string(obj1.GetUID())] = key1
+			controller.sortKeyCache[string(obj2.GetUID())] = key2
 
 			// Get objects via controller - should be sorted by name
 			objs := controller.Objects()
@@ -228,13 +230,14 @@ var _ = Describe("ResourceController", func() {
 			// Create a fake store with multiple objects
 			store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 			controller := &ResourceController{
-				store:     store,
-				nameCache: make(map[string]string),
+				store:        store,
+				sortKeyCache: make(map[string]string),
 			}
 
-			// Add objects to store and populate nameCache
+			// Add objects to store and populate sortKeyCache
 			for i := 0; i < 50; i++ {
 				name := "pod-" + string(rune('a'+i%26)) + string(rune('0'+i/26))
+				uid := "uid-" + name
 				obj := &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "v1",
@@ -242,16 +245,17 @@ var _ = Describe("ResourceController", func() {
 						"metadata": map[string]interface{}{
 							"name":      name,
 							"namespace": "default",
+							"uid":       uid,
 						},
 					},
 				}
 				Expect(store.Add(obj)).To(Succeed())
 
-				// Populate nameCache
+				// Populate sortKeyCache
 				key, _ := cache.MetaNamespaceKeyFunc(obj)
-				controller.nameCacheMu.Lock()
-				controller.nameCache[key] = name
-				controller.nameCacheMu.Unlock()
+				controller.sortKeyCacheMu.Lock()
+				controller.sortKeyCache[uid] = key
+				controller.sortKeyCacheMu.Unlock()
 			}
 
 			// Multiple goroutines calling Objects() and simulating informer updates
@@ -281,11 +285,11 @@ var _ = Describe("ResourceController", func() {
 					defer wg.Done()
 					defer GinkgoRecover()
 					for j := 0; j < 100; j++ {
-						// Simulate nameCache update (like informer handlers do)
-						key := "default/pod-update-" + string(rune('0'+id))
-						controller.nameCacheMu.Lock()
-						controller.nameCache[key] = "updated-name-" + string(rune('0'+j%10))
-						controller.nameCacheMu.Unlock()
+						// Simulate sortKeyCache update (like informer handlers do)
+						uid := "uid-update-" + string(rune('0'+id))
+						controller.sortKeyCacheMu.Lock()
+						controller.sortKeyCache[uid] = "default/updated-name-" + string(rune('0'+j%10))
+						controller.sortKeyCacheMu.Unlock()
 					}
 				}(i)
 			}

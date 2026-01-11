@@ -63,10 +63,11 @@ type ResourceController struct {
 	doneCh      chan struct{} // signals that controller is closed (for event consumers)
 	closed      atomic.Bool   // guards trySend to prevent sends after close
 
-	// nameCache stores object names by key to avoid race conditions during sorting.
+	// sortKeyCache stores sort keys (namespace/name) by object UID for race-free sorting.
+	// Using UID as map key because object pointers may change on updates.
 	// Updated synchronously by informer handlers, read by Objects().
-	nameCache   map[string]string
-	nameCacheMu sync.RWMutex
+	sortKeyCache   map[string]string // UID -> "namespace/name" or just "name"
+	sortKeyCacheMu sync.RWMutex
 }
 
 // NewResourceController creates a controller for the current context (legacy, kept for TUI compatibility)
@@ -87,12 +88,12 @@ func NewResourceControllerForContext(contextName string, gvr schema.GroupVersion
 	}
 
 	return &ResourceController{
-		contextName: contextName,
-		client:      client,
-		gvr:         gvr,
-		emitCh:      make(chan emitMsg, 256),
-		doneCh:      make(chan struct{}),
-		nameCache:   make(map[string]string),
+		contextName:  contextName,
+		client:       client,
+		gvr:          gvr,
+		emitCh:       make(chan emitMsg, 256),
+		doneCh:       make(chan struct{}),
+		sortKeyCache: make(map[string]string),
 	}
 }
 
@@ -107,16 +108,15 @@ func (i *ResourceController) Objects() []*unstructured.Unstructured {
 		objs = append(objs, obj.(*unstructured.Unstructured))
 	}
 
-	// Use cached names for sorting to avoid race conditions.
-	// The nameCache is updated synchronously by informer handlers.
-	// Hold read lock during sort to prevent writes while sorting.
-	i.nameCacheMu.RLock()
+	// Use cached sort keys to avoid race conditions.
+	// Sort keys are cached by UID in handlers - no object reads needed during sort.
+	i.sortKeyCacheMu.RLock()
 	sort.Slice(objs, func(a, b int) bool {
-		keyA, _ := cache.MetaNamespaceKeyFunc(objs[a])
-		keyB, _ := cache.MetaNamespaceKeyFunc(objs[b])
-		return i.nameCache[keyA] < i.nameCache[keyB]
+		uidA := string(objs[a].GetUID())
+		uidB := string(objs[b].GetUID())
+		return i.sortKeyCache[uidA] < i.sortKeyCache[uidB]
 	})
-	i.nameCacheMu.RUnlock()
+	i.sortKeyCacheMu.RUnlock()
 
 	return objs
 }
@@ -151,17 +151,30 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 	options := cache.InformerOptions{
 		ListerWatcher: lw,
 		ObjectType:    &unstructured.Unstructured{},
+		// Transform removes unused fields before storing in cache to reduce memory
+		Transform: func(obj interface{}) (interface{}, error) {
+			u, ok := obj.(*unstructured.Unstructured)
+			if !ok {
+				return obj, nil
+			}
+			// Deep copy to avoid race conditions - the original object may be read concurrently
+			u = u.DeepCopy()
+			// Remove managedFields - large, frequently changing, rarely useful for display
+			unstructured.RemoveNestedField(u.Object, "metadata", "managedFields")
+			return u, nil
+		},
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				u, ok := obj.(*unstructured.Unstructured)
 				if !ok {
 					return
 				}
-				// Cache the name for race-free sorting in Objects()
-				key, _ := cache.MetaNamespaceKeyFunc(u)
-				i.nameCacheMu.Lock()
-				i.nameCache[key] = u.GetName()
-				i.nameCacheMu.Unlock()
+				// Cache sort key by UID for race-free sorting in Objects()
+				uid := string(u.GetUID())
+				sortKey, _ := cache.MetaNamespaceKeyFunc(u)
+				i.sortKeyCacheMu.Lock()
+				i.sortKeyCache[uid] = sortKey
+				i.sortKeyCacheMu.Unlock()
 
 				i.trySend(emitMsg{Type: EventAdded, Obj: u})
 			},
@@ -172,17 +185,17 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 				}
 				o, _ := oldObj.(*unstructured.Unstructured) // may be nil if not castable
 
-				// Update cached name for this key, since the object reference may change
-				key, _ := cache.MetaNamespaceKeyFunc(n)
-				i.nameCacheMu.Lock()
-				i.nameCache[key] = n.GetName()
-				i.nameCacheMu.Unlock()
+				// Update cached sort key (UID stays same, but cache it anyway for consistency)
+				uid := string(n.GetUID())
+				sortKey, _ := cache.MetaNamespaceKeyFunc(n)
+				i.sortKeyCacheMu.Lock()
+				i.sortKeyCache[uid] = sortKey
+				i.sortKeyCacheMu.Unlock()
 
 				i.trySend(emitMsg{Type: EventModified, Obj: n, OldObj: o})
 			},
 			DeleteFunc: func(obj interface{}) {
 				var d *unstructured.Unstructured
-				var key string
 
 				// Handle DeletedFinalStateUnknown wrapper
 				if deleted, ok := obj.(cache.DeletedFinalStateUnknown); ok {
@@ -190,20 +203,19 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 					if !ok {
 						return
 					}
-					key = deleted.Key
 				} else {
 					var ok bool
 					d, ok = obj.(*unstructured.Unstructured)
 					if !ok {
 						return
 					}
-					key, _ = cache.MetaNamespaceKeyFunc(d)
 				}
 
-				// Remove from name cache
-				i.nameCacheMu.Lock()
-				delete(i.nameCache, key)
-				i.nameCacheMu.Unlock()
+				// Remove from sort key cache
+				uid := string(d.GetUID())
+				i.sortKeyCacheMu.Lock()
+				delete(i.sortKeyCache, uid)
+				i.sortKeyCacheMu.Unlock()
 
 				i.trySend(emitMsg{Type: EventDeleted, Obj: d})
 			},
