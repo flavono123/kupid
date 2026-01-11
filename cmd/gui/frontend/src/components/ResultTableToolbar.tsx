@@ -112,8 +112,8 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
   return (
     <div className="p-4 border-b border-border">
       <div className="flex items-center justify-between gap-4">
-        {/* Left: Search input */}
-        <div className="flex-1 max-w-sm">
+        {/* Left: Search input with resource count */}
+        <div className="flex items-center gap-3">
           <Input
             ref={searchInputRef}
             placeholder="Search ..."
@@ -126,12 +126,14 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
             }}
             onFocus={() => onSearchFocusChange?.(true)}
             onBlur={() => onSearchFocusChange?.(false)}
+            className="w-48 h-8 py-1 px-2"
           />
-          {globalFilter && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Found {filteredRowCount} / {totalRowCount} rows
-            </p>
-          )}
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            {globalFilter
+              ? `${filteredRowCount}/${totalRowCount} ${resourceKind}s`
+              : `${totalRowCount} ${resourceKind}s`
+            }
+          </span>
         </div>
 
         {/* Right: Export button */}
