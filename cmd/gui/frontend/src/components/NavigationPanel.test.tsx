@@ -8,6 +8,7 @@ import * as App from '../../wailsjs/go/main/App';
 // Mock the Wails API
 vi.mock('../../wailsjs/go/main/App', () => ({
   GetNodeTree: vi.fn(),
+  GetDefaultSelectedPaths: vi.fn(() => Promise.resolve(null)),
 }));
 
 // Mock the Wails runtime (for EventsOn used by watch)

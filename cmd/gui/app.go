@@ -295,6 +295,35 @@ func (a *App) GetNodeTree(gvk MultiClusterGVK, contexts []string) ([]*TreeNode, 
 	return convertNodeTree(nodes), nil
 }
 
+// GetDefaultSelectedPaths returns the default fields to select for a GVK.
+// For CRDs, this returns paths from additionalPrinterColumns.
+// For built-in resources, this uses Table API printer columns when available.
+func (a *App) GetDefaultSelectedPaths(gvk MultiClusterGVK, contexts []string) [][]string {
+	schemaGVK := schema.GroupVersionKind{
+		Group:   gvk.Group,
+		Version: gvk.Version,
+		Kind:    gvk.Kind,
+	}
+
+	// Try each context until we get printer columns
+	for _, contextName := range contexts {
+		paths, err := kube.GetPrinterColumnsForContext(contextName, schemaGVK)
+		if err == nil && len(paths) > 0 {
+			return paths
+		}
+	}
+
+	// Also try with contexts from GVK if different
+	for _, contextName := range gvk.Contexts {
+		paths, err := kube.GetPrinterColumnsForContext(contextName, schemaGVK)
+		if err == nil && len(paths) > 0 {
+			return paths
+		}
+	}
+
+	return nil
+}
+
 // getWatchedResources returns resources from active watch controllers if available
 func (a *App) getWatchedResources() []*unstructured.Unstructured {
 	a.watchMu.RLock()

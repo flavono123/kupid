@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"sync"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,6 +61,11 @@ type ResourceController struct {
 	emitCh      chan emitMsg
 	doneCh      chan struct{} // signals that controller is closed (for event consumers)
 	closed      atomic.Bool   // guards trySend to prevent sends after close
+
+	// nameCache stores object names by key to avoid race conditions during sorting.
+	// Updated synchronously by informer handlers, read by Objects().
+	nameCache   map[string]string
+	nameCacheMu sync.RWMutex
 }
 
 // NewResourceController creates a controller for the current context (legacy, kept for TUI compatibility)
@@ -85,6 +91,7 @@ func NewResourceControllerForContext(contextName string, gvr schema.GroupVersion
 		gvr:         gvr,
 		emitCh:      make(chan emitMsg, 256),
 		doneCh:      make(chan struct{}),
+		nameCache:   make(map[string]string),
 	}
 }
 
@@ -98,10 +105,18 @@ func (i *ResourceController) Objects() []*unstructured.Unstructured {
 	for _, obj := range i.store.List() {
 		objs = append(objs, obj.(*unstructured.Unstructured))
 	}
-	sort.Slice(objs, func(i, j int) bool {
-		// TODO: sort by namespace if gvr is namespaced
-		return objs[i].GetName() < objs[j].GetName()
+
+	// Use cached names for sorting to avoid race conditions.
+	// The nameCache is updated synchronously by informer handlers.
+	// Hold read lock during sort to prevent writes while sorting.
+	i.nameCacheMu.RLock()
+	sort.Slice(objs, func(a, b int) bool {
+		keyA, _ := cache.MetaNamespaceKeyFunc(objs[a])
+		keyB, _ := cache.MetaNamespaceKeyFunc(objs[b])
+		return i.nameCache[keyA] < i.nameCache[keyB]
 	})
+	i.nameCacheMu.RUnlock()
+
 	return objs
 }
 
@@ -124,6 +139,12 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 				if !ok {
 					return
 				}
+				// Cache the name for race-free sorting in Objects()
+				key, _ := cache.MetaNamespaceKeyFunc(u)
+				i.nameCacheMu.Lock()
+				i.nameCache[key] = u.GetName()
+				i.nameCacheMu.Unlock()
+
 				i.trySend(emitMsg{Type: EventAdded, Obj: u})
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
@@ -131,10 +152,17 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 				if !ok {
 					return
 				}
+				// Update cached name for this key, since the object reference may change
+				key, _ := cache.MetaNamespaceKeyFunc(n)
+				i.nameCacheMu.Lock()
+				i.nameCache[key] = n.GetName()
+				i.nameCacheMu.Unlock()
+
 				i.trySend(emitMsg{Type: EventModified, Obj: n})
 			},
 			DeleteFunc: func(obj interface{}) {
 				var d *unstructured.Unstructured
+				var key string
 
 				// Handle DeletedFinalStateUnknown wrapper
 				if deleted, ok := obj.(cache.DeletedFinalStateUnknown); ok {
@@ -142,13 +170,21 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 					if !ok {
 						return
 					}
+					key = deleted.Key
 				} else {
 					var ok bool
 					d, ok = obj.(*unstructured.Unstructured)
 					if !ok {
 						return
 					}
+					key, _ = cache.MetaNamespaceKeyFunc(d)
 				}
+
+				// Remove from name cache
+				i.nameCacheMu.Lock()
+				delete(i.nameCache, key)
+				i.nameCacheMu.Unlock()
+
 				i.trySend(emitMsg{Type: EventDeleted, Obj: d})
 			},
 		},

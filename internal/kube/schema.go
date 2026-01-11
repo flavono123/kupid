@@ -1,13 +1,17 @@
 package kube
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/go-openapi/jsonreference"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -320,3 +324,348 @@ func getDocumentPath(gvr schema.GroupVersionResource) string {
 // func GetNamespaceScopedNamePath(gvr schema.GroupVersionResource) string {
 // 	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, "namespaces", "{namespace}", gvr.Resource, "{name}"}, "/")
 // }
+
+// GetPrinterColumnsForContext retrieves printer columns for a GVK.
+// For CRDs: extracts additionalPrinterColumns from CRD definition (has JSONPath).
+// For built-in resources: uses Table API column definitions and maps column names to field paths.
+// Returns field paths (e.g., [][]string{{"spec", "replicas"}, {"status", "phase"}})
+func GetPrinterColumnsForContext(contextName string, gvk schema.GroupVersionKind) ([][]string, error) {
+	gvr, err := GetGVRForContext(contextName, gvk)
+	if err != nil {
+		return nil, nil
+	}
+
+	// First, try to get additionalPrinterColumns from CRD
+	paths := getPrinterColumnsFromCRD(contextName, gvk, gvr)
+	if paths != nil {
+		return paths, nil
+	}
+
+	// For built-in resources, use Table API column definitions
+	return getPrinterColumnsFromTableAPI(contextName, gvk, gvr)
+}
+
+// getPrinterColumnsFromCRD extracts additionalPrinterColumns from CRD definition.
+func getPrinterColumnsFromCRD(contextName string, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) [][]string {
+	// Build CRD name: plural.group (e.g., "certificates.cert-manager.io")
+	crdName := gvr.Resource
+	if gvk.Group != "" {
+		crdName = gvr.Resource + "." + gvk.Group
+	}
+
+	// CRD GVR
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinitions",
+	}
+
+	client, err := DynamicClientForContext(contextName)
+	if err != nil {
+		return nil
+	}
+
+	// Try to get CRD (cluster-scoped, so no namespace)
+	crd, err := client.Resource(crdGVR).Get(context.Background(), crdName, metav1.GetOptions{})
+	if err != nil {
+		// Not a CRD or not found
+		return nil
+	}
+
+	// Extract additionalPrinterColumns from CRD
+	// Path: spec.versions[].additionalPrinterColumns[]
+	versions, found, err := unstructured.NestedSlice(crd.Object, "spec", "versions")
+	if err != nil || !found {
+		return nil
+	}
+
+	for _, v := range versions {
+		versionMap, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _, _ := unstructured.NestedString(versionMap, "name")
+		if name != gvk.Version {
+			continue
+		}
+
+		columns, found, _ := unstructured.NestedSlice(versionMap, "additionalPrinterColumns")
+		if !found || len(columns) == 0 {
+			return nil
+		}
+
+		var paths [][]string
+		for _, col := range columns {
+			colMap, ok := col.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			jsonPath, _, _ := unstructured.NestedString(colMap, "jsonPath")
+			path := jsonPathToFieldPath(jsonPath)
+			if len(path) > 0 {
+				paths = append(paths, path)
+			}
+		}
+		return paths
+	}
+
+	return nil
+}
+
+// getPrinterColumnsFromTableAPI uses Table API to get column definitions for built-in resources.
+// Maps column names to field paths using known mappings.
+func getPrinterColumnsFromTableAPI(contextName string, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) ([][]string, error) {
+	config, err := kubeConfigForContext(contextName)
+	if err != nil {
+		return nil, nil
+	}
+
+	// Build API path
+	var apiPath string
+	if gvr.Group == "" {
+		apiPath = fmt.Sprintf("/api/%s/%s", gvr.Version, gvr.Resource)
+	} else {
+		apiPath = fmt.Sprintf("/apis/%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+	}
+
+	// Configure REST client with Table Accept header
+	config.AcceptContentTypes = "application/json;as=Table;g=meta.k8s.io;v=v1"
+	config.ContentType = "application/json"
+	config.GroupVersion = &schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
+	config.NegotiatedSerializer = runtime.NewSimpleNegotiatedSerializer(runtime.SerializerInfo{})
+
+	restClient, err := rest.RESTClientFor(config)
+	if err != nil {
+		return nil, nil
+	}
+
+	tableRaw, err := restClient.Get().
+		AbsPath(apiPath).
+		Param("limit", "1").
+		Do(context.Background()).
+		Raw()
+	if err != nil {
+		return nil, nil
+	}
+
+	var table metav1.Table
+	if err := json.Unmarshal(tableRaw, &table); err != nil {
+		return nil, nil
+	}
+
+	var paths [][]string
+	for _, col := range table.ColumnDefinitions {
+		// Skip "Name" column as it's always shown
+		if col.Name == "Name" {
+			continue
+		}
+
+		// Map column name to field path
+		path := mapColumnNameToFieldPath(col.Name, gvk.Kind)
+		if path != nil {
+			paths = append(paths, path)
+		}
+	}
+
+	return paths, nil
+}
+
+// mapColumnNameToFieldPath maps a Table API column name to a field path.
+// Uses known mappings for common columns.
+//
+// Only maps to scalar/leaf fields that can be directly selected in the schema tree.
+// Computed columns (calculated from multiple fields or arrays) are intentionally excluded
+// since they don't have a 1:1 mapping to a selectable field.
+func mapColumnNameToFieldPath(columnName string, kind string) []string {
+	// Common mappings that apply to most resources
+	commonMappings := map[string][]string{
+		"Age":       {"metadata", "creationTimestamp"},
+		"Namespace": {"metadata", "namespace"},
+		"Labels":    {"metadata", "labels"},
+	}
+
+	if path, ok := commonMappings[columnName]; ok {
+		return path
+	}
+
+	// Kind-specific mappings - only scalar fields that can be selected in schema tree
+	// Comments indicate Table API columns that CANNOT be mapped (computed/array-based)
+	kindMappings := map[string]map[string][]string{
+		"Pod": {
+			"Status": {"status", "phase"},
+			"IP":     {"status", "podIP"},
+			"Node":   {"spec", "nodeName"},
+			// EXCLUDED - Computed columns (no 1:1 field mapping):
+			// - "Ready": computed from status.containerStatuses[].ready (e.g., "1/1")
+			// - "Restarts": computed from status.containerStatuses[].restartCount (sum)
+			// - "Nominated Node": status.nominatedNodeName (priority 1, rarely used)
+			// - "Readiness Gates": spec.readinessGates (array, priority 1)
+		},
+		"Deployment": {
+			"Ready":      {"status", "readyReplicas"},
+			"Up-to-date": {"status", "updatedReplicas"},
+			"Available":  {"status", "availableReplicas"},
+			// EXCLUDED - Computed/array columns:
+			// - "Containers": computed from spec.template.spec.containers[].name (joined string)
+			// - "Images": computed from spec.template.spec.containers[].image (joined string)
+			// - "Selector": spec.selector.matchLabels (map, displayed as label selector string)
+		},
+		"Service": {
+			"Type":       {"spec", "type"},
+			"Cluster-IP": {"spec", "clusterIP"},
+			// EXCLUDED - Array/computed columns:
+			// - "External-IP": spec.externalIPs or status.loadBalancer.ingress (array)
+			// - "Port(s)": computed from spec.ports[] (formatted string like "80/TCP")
+			// - "Selector": spec.selector (map, displayed as label selector string)
+		},
+		"ConfigMap": {
+			"Data": {"data"},
+		},
+		"Secret": {
+			"Type": {"type"},
+			"Data": {"data"},
+		},
+		"Node": {
+			"Version":           {"status", "nodeInfo", "kubeletVersion"},
+			"OS-Image":          {"status", "nodeInfo", "osImage"},
+			"Kernel-Version":    {"status", "nodeInfo", "kernelVersion"},
+			"Container-Runtime": {"status", "nodeInfo", "containerRuntimeVersion"},
+			// EXCLUDED - Computed/array columns:
+			// - "Status": computed from status.conditions[] (e.g., "Ready", "NotReady")
+			// - "Roles": computed from metadata.labels (node-role.kubernetes.io/*)
+			// - "Internal-IP": from status.addresses[] where type=InternalIP
+			// - "External-IP": from status.addresses[] where type=ExternalIP
+		},
+		"Namespace": {
+			"Status": {"status", "phase"},
+		},
+		"PersistentVolume": {
+			"Reclaim Policy": {"spec", "persistentVolumeReclaimPolicy"},
+			"Status":         {"status", "phase"},
+			"StorageClass":   {"spec", "storageClassName"},
+			"Reason":         {"status", "reason"},
+			// EXCLUDED - Computed/array columns:
+			// - "Capacity": spec.capacity.storage (map access)
+			// - "Access Modes": spec.accessModes (array, displayed as "RWO,RWX")
+			// - "Claim": spec.claimRef (object, displayed as "namespace/name")
+		},
+		"PersistentVolumeClaim": {
+			"Status":       {"status", "phase"},
+			"Volume":       {"spec", "volumeName"},
+			"StorageClass": {"spec", "storageClassName"},
+			// EXCLUDED - Computed/array columns:
+			// - "Capacity": status.capacity.storage (map access)
+			// - "Access Modes": spec.accessModes (array)
+		},
+		"StatefulSet": {
+			"Ready": {"status", "readyReplicas"},
+			// EXCLUDED:
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
+		},
+		"DaemonSet": {
+			"Desired":    {"status", "desiredNumberScheduled"},
+			"Current":    {"status", "currentNumberScheduled"},
+			"Ready":      {"status", "numberReady"},
+			"Up-to-date": {"status", "updatedNumberScheduled"},
+			"Available":  {"status", "numberAvailable"},
+			// EXCLUDED:
+			// - "Node Selector": spec.template.spec.nodeSelector (map)
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
+		},
+		"ReplicaSet": {
+			"Desired": {"spec", "replicas"},
+			"Current": {"status", "replicas"},
+			"Ready":   {"status", "readyReplicas"},
+			// EXCLUDED:
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
+			// - "Selector": spec.selector.matchLabels (map)
+		},
+		"Job": {
+			"Completions": {"spec", "completions"},
+			"Duration":    {"status", "completionTime"},
+			// EXCLUDED:
+			// - "Status": computed from status.conditions[] and status.succeeded/failed
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
+			// - "Selector": spec.selector.matchLabels (map)
+		},
+		"CronJob": {
+			"Schedule":      {"spec", "schedule"},
+			"Suspend":       {"spec", "suspend"},
+			"Last Schedule": {"status", "lastScheduleTime"},
+			// EXCLUDED:
+			// - "Active": status.active (array of object references)
+			// - "Containers": computed from spec.jobTemplate.spec.template.spec.containers[].name
+			// - "Images": computed from spec.jobTemplate.spec.template.spec.containers[].image
+		},
+		"Ingress": {
+			"Class": {"spec", "ingressClassName"},
+			// EXCLUDED:
+			// - "Hosts": computed from spec.rules[].host (joined string)
+			// - "Address": status.loadBalancer.ingress[].ip/hostname (array)
+			// - "Ports": computed from spec.rules[].http.paths[].backend.service.port
+		},
+	}
+
+	if kindMap, ok := kindMappings[kind]; ok {
+		if path, ok := kindMap[columnName]; ok {
+			return path
+		}
+	}
+
+	return nil
+}
+
+// jsonPathToFieldPath converts a JSONPath expression to a field path.
+// Examples:
+//   - ".spec.replicas" -> ["spec", "replicas"]
+//   - ".status.conditions[0].type" -> ["status", "conditions", "*", "type"]
+//   - ".metadata.creationTimestamp" -> ["metadata", "creationTimestamp"]
+//
+// Note: Array indices and wildcards are converted to "*" for tree navigation.
+func jsonPathToFieldPath(jsonPath string) []string {
+	if jsonPath == "" {
+		return nil
+	}
+
+	// Remove leading dot
+	jsonPath = strings.TrimPrefix(jsonPath, ".")
+
+	var parts []string
+	current := ""
+
+	for i := 0; i < len(jsonPath); i++ {
+		ch := jsonPath[i]
+		switch ch {
+		case '.':
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+		case '[':
+			// Save current part before bracket
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+			// Skip to closing bracket and add wildcard
+			for i < len(jsonPath) && jsonPath[i] != ']' {
+				i++
+			}
+			parts = append(parts, "*")
+		default:
+			current += string(ch)
+		}
+	}
+
+	// Add remaining part
+	if current != "" {
+		parts = append(parts, current)
+	}
+
+	return parts
+}
