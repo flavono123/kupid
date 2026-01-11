@@ -568,6 +568,72 @@ export function useTree({
     return paths;
   }, [selectedPaths]);
 
+  // Compute indeterminate state for wildcard (*) nodes
+  const wildcardIndeterminatePaths = useMemo(() => {
+    const indeterminatePaths = new Set<string>();
+
+    // Find all * nodes and calculate their indeterminate state
+    flatNodesMap.forEach((node, pathKey) => {
+      if (node.name !== '*') return;
+
+      const parentPath = node.fullPath.slice(0, -1);
+      const parentPathKey = parentPath.join(PATH_DELIMITER);
+      const parentNode = flatNodesMap.get(parentPathKey);
+
+      if (!parentNode || !parentNode.children) return;
+
+      // Get target leaf paths based on wildcard type
+      let targetLeaves: string[] = [];
+
+      // Check if it's a Map * (has non-numeric siblings) or Array *
+      const siblingKeys = parentNode.children.filter((child) => {
+        return child.name !== '*' && isNaN(Number(child.name));
+      });
+
+      if (siblingKeys.length > 0) {
+        // Map * - target is sibling key leaves
+        targetLeaves = siblingKeys
+          .filter((child) => {
+            const hasChildren = child.children && child.children.length > 0;
+            const isArrayOrMap = child.type && (child.type.startsWith('[]') || child.type.startsWith('map['));
+            return !hasChildren && !isArrayOrMap;
+          })
+          .map((child) => child.fullPath.join(PATH_DELIMITER));
+      } else {
+        // Array * - target is leaves from indexed children
+        const indexNodes = parentNode.children.filter((child) => {
+          return child.name !== '*' && !isNaN(Number(child.name));
+        });
+
+        const collectLeaves = (n: TreeNode) => {
+          const hasChildren = n.children && n.children.length > 0;
+          const isArrayOrMap = n.type && (n.type.startsWith('[]') || n.type.startsWith('map['));
+          const isLeaf = !hasChildren && !isArrayOrMap;
+
+          if (isLeaf && n.name !== '*') {
+            targetLeaves.push(n.fullPath.join(PATH_DELIMITER));
+          }
+          if (n.children) {
+            n.children.forEach(collectLeaves);
+          }
+        };
+
+        indexNodes.forEach(collectLeaves);
+      }
+
+      if (targetLeaves.length === 0) return;
+
+      const selectedCount = targetLeaves.filter((p) => selectedPaths.has(p)).length;
+      const isPartiallySelected = selectedCount > 0 && selectedCount < targetLeaves.length;
+
+      if (isPartiallySelected) {
+        indeterminatePaths.add(pathKey);
+      }
+    });
+
+    return indeterminatePaths;
+  }, [flatNodesMap, selectedPaths]);
+
   // Compute paths to expand based on search results
   const searchExpandedPaths = useMemo(() => {
     if (!debouncedQuery || matchedPaths.length === 0) {
@@ -633,8 +699,88 @@ export function useTree({
         parentPathKeys: getParentPathKeys(pathKey),
       });
       // Parent is notified via the onFieldsSelected useEffect
+    } else if (wildcardIndex === path.length - 1) {
+      // Wildcard at the end - check if it's a Map * (leaf-like, selects all sibling keys)
+      const parentPath = path.slice(0, wildcardIndex);
+      const parentPathKey = parentPath.join(PATH_DELIMITER);
+      const parentNode = flatNodesMap.get(parentPathKey);
+
+      if (!parentNode || !parentNode.children) {
+        return;
+      }
+
+      // Check if parent is a Map (has non-numeric, non-* children that are leaves)
+      const siblingKeys = parentNode.children.filter((child) => {
+        return child.name !== '*' && isNaN(Number(child.name));
+      });
+
+      if (siblingKeys.length > 0) {
+        // Map * - select all sibling key leaves
+        const targetPathKeys = siblingKeys
+          .filter((child) => {
+            // Only select leaf nodes
+            const hasChildren = child.children && child.children.length > 0;
+            const isArrayOrMap = child.type && (child.type.startsWith('[]') || child.type.startsWith('map['));
+            return !hasChildren && !isArrayOrMap;
+          })
+          .map((child) => child.fullPath.join(PATH_DELIMITER));
+
+        const parentPathKeys: string[] = [];
+        targetPathKeys.forEach((key) => {
+          getParentPathKeys(key).forEach((p) => {
+            if (!parentPathKeys.includes(p)) {
+              parentPathKeys.push(p);
+            }
+          });
+        });
+
+        dispatch({
+          type: 'TOGGLE_SELECT_WILDCARD',
+          wildcardPathKey: pathKey,
+          targetPathKeys,
+          parentPathKeys,
+        });
+      } else {
+        // Array * at the end - select all leaves from indexed children
+        const indexNodes = parentNode.children.filter((child) => {
+          return child.name !== '*' && !isNaN(Number(child.name));
+        });
+
+        // Collect all leaf descendants from indexed children
+        const targetPathKeys: string[] = [];
+        const collectLeaves = (node: TreeNode) => {
+          const hasChildren = node.children && node.children.length > 0;
+          const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+          const isLeaf = !hasChildren && !isArrayOrMap;
+
+          if (isLeaf && node.name !== '*') {
+            targetPathKeys.push(node.fullPath.join(PATH_DELIMITER));
+          }
+          if (node.children) {
+            node.children.forEach(collectLeaves);
+          }
+        };
+
+        indexNodes.forEach(collectLeaves);
+
+        const parentPathKeys: string[] = [];
+        targetPathKeys.forEach((key) => {
+          getParentPathKeys(key).forEach((p) => {
+            if (!parentPathKeys.includes(p)) {
+              parentPathKeys.push(p);
+            }
+          });
+        });
+
+        dispatch({
+          type: 'TOGGLE_SELECT_WILDCARD',
+          wildcardPathKey: pathKey,
+          targetPathKeys,
+          parentPathKeys,
+        });
+      }
     } else {
-      // Wildcard found - toggle all index nodes
+      // Wildcard in the middle (Array *) - toggle all index nodes with path after wildcard
       const arrayPath = path.slice(0, wildcardIndex);
       const pathAfterWildcard = path.slice(wildcardIndex + 1);
       const arrayPathKey = arrayPath.join(PATH_DELIMITER);
@@ -884,6 +1030,7 @@ export function useTree({
     toggleSelect,
     clearAllSelections,
     setSelectionsFromPaths,
+    wildcardIndeterminatePaths,
 
     // Keyboard navigation
     focusedPathKey,

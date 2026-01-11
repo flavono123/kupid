@@ -47,6 +47,8 @@ interface TreeNodeItemProps {
   shouldAutoScroll?: boolean;
   /** Path highlighted from ResultTable hover */
   highlightedFieldPathKey?: string;
+  /** Paths of wildcard nodes that are in indeterminate state */
+  wildcardIndeterminatePaths: Set<string>;
 }
 
 // Memoized TreeNode component to prevent unnecessary re-renders
@@ -61,6 +63,7 @@ const TreeNodeItem = memo(({
   onFocus,
   shouldAutoScroll = false,
   highlightedFieldPathKey,
+  wildcardIndeterminatePaths,
 }: TreeNodeItemProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
@@ -125,7 +128,14 @@ const TreeNodeItem = memo(({
       >
 
         {/* Expand/Collapse button OR Checkbox (mutually exclusive) */}
-        {hasChildren ? (
+        {/* Map wildcard (*) node: leaf-like, shows checkbox for selecting all siblings */}
+        {node.name === '*' && !hasChildren ? (
+          <Checkbox
+            checked={wildcardIndeterminatePaths.has(pathKey) ? 'indeterminate' : selected}
+            onCheckedChange={handleSelectChange}
+            className="mr-1.5 h-3.5 w-3.5 shrink-0"
+          />
+        ) : hasChildren ? (
           <Button
             variant="ghost"
             size="icon"
@@ -183,6 +193,7 @@ const TreeNodeItem = memo(({
               onFocus={onFocus}
               shouldAutoScroll={shouldAutoScroll}
               highlightedFieldPathKey={highlightedFieldPathKey}
+              wildcardIndeterminatePaths={wildcardIndeterminatePaths}
             />
           ))}
         </div>
@@ -227,6 +238,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
     toggleSelect,
     clearAllSelections,
     setSelectionsFromPaths,
+    wildcardIndeterminatePaths,
 
     // Keyboard navigation
     focusedPathKey,
@@ -343,6 +355,7 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
                   (Boolean(debouncedQuery) && matchedPaths.length > 0)
                 }
                 highlightedFieldPathKey={highlightedFieldPathKey}
+                wildcardIndeterminatePaths={wildcardIndeterminatePaths}
               />
             ))}
           </div>

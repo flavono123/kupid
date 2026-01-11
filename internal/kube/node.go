@@ -178,6 +178,18 @@ func CreateNodeTree(fieldTree map[string]*Field, objs []*unstructured.Unstructur
 		} else if field.IsMap() {
 			keys := getDistinctKeys(childPrefix, objs)
 			children = make(map[string]*Node)
+
+			// Add wildcard node for maps with keys (select all keys)
+			if len(keys) > 0 {
+				children["*"] = &Node{
+					field:     nil,
+					name:      "*",
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  nil, // leaf-like node for "select all siblings"
+				}
+			}
+
 			for _, key := range keys {
 				grandChildren := map[string]*Node(nil)
 				if field.Children != nil {
@@ -382,6 +394,19 @@ func UpdateNodeTree(existing map[string]*Node, fieldTree map[string]*Field, objs
 		} else if field.IsMap() {
 			keys := getDistinctKeys(childPrefix, objs)
 			children = make(map[string]*Node)
+
+			// Add wildcard node for maps with keys (select all keys)
+			if len(keys) > 0 {
+				children["*"] = &Node{
+					field:     nil,
+					name:      "*",
+					ancestors: childPrefix,
+					level:     field.Level + 1,
+					children:  nil,
+					Expanded:  exists && existingNode.children != nil && existingNode.children["*"] != nil && existingNode.children["*"].Expanded,
+					Selected:  exists && existingNode.children != nil && existingNode.children["*"] != nil && existingNode.children["*"].Selected,
+				}
+			}
 
 			for _, mapKey := range keys {
 				var grandChildren map[string]*Node
