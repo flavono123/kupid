@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -415,34 +416,46 @@ func getPrinterColumnsFromCRD(contextName string, gvk schema.GroupVersionKind, g
 // getPrinterColumnsFromTableAPI uses Table API to get column definitions for built-in resources.
 // Maps column names to field paths using known mappings.
 func getPrinterColumnsFromTableAPI(contextName string, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) ([][]string, error) {
-	restClient, err := RESTClientForContext(contextName, gvr)
+	config, err := kubeConfigForContext(contextName)
 	if err != nil {
 		return nil, nil
 	}
 
-	// Build the request path based on whether the resource is namespaced
-	req := restClient.Get().
-		Resource(gvr.Resource).
-		SetHeader("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1").
-		Param("limit", "1") // We only need column definitions, not actual data
+	// Build API path
+	var apiPath string
+	if gvr.Group == "" {
+		apiPath = fmt.Sprintf("/api/%s/%s", gvr.Version, gvr.Resource)
+	} else {
+		apiPath = fmt.Sprintf("/apis/%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+	}
 
-	raw, err := req.Do(context.Background()).Raw()
+	// Configure REST client with Table Accept header
+	config.AcceptContentTypes = "application/json;as=Table;g=meta.k8s.io;v=v1"
+	config.ContentType = "application/json"
+	config.GroupVersion = &schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
+	config.NegotiatedSerializer = runtime.NewSimpleNegotiatedSerializer(runtime.SerializerInfo{})
+
+	restClient, err := rest.RESTClientFor(config)
+	if err != nil {
+		return nil, nil
+	}
+
+	tableRaw, err := restClient.Get().
+		AbsPath(apiPath).
+		Param("limit", "1").
+		Do(context.Background()).
+		Raw()
 	if err != nil {
 		return nil, nil
 	}
 
 	var table metav1.Table
-	if err := json.Unmarshal(raw, &table); err != nil {
+	if err := json.Unmarshal(tableRaw, &table); err != nil {
 		return nil, nil
 	}
 
 	var paths [][]string
 	for _, col := range table.ColumnDefinitions {
-		// Only include priority 0 columns (shown by default in kubectl)
-		if col.Priority != 0 {
-			continue
-		}
-
 		// Skip "Name" column as it's always shown
 		if col.Name == "Name" {
 			continue
@@ -460,6 +473,10 @@ func getPrinterColumnsFromTableAPI(contextName string, gvk schema.GroupVersionKi
 
 // mapColumnNameToFieldPath maps a Table API column name to a field path.
 // Uses known mappings for common columns.
+//
+// Only maps to scalar/leaf fields that can be directly selected in the schema tree.
+// Computed columns (calculated from multiple fields or arrays) are intentionally excluded
+// since they don't have a 1:1 mapping to a selectable field.
 func mapColumnNameToFieldPath(columnName string, kind string) []string {
 	// Common mappings that apply to most resources
 	commonMappings := map[string][]string{
@@ -472,30 +489,35 @@ func mapColumnNameToFieldPath(columnName string, kind string) []string {
 		return path
 	}
 
-	// Kind-specific mappings
+	// Kind-specific mappings - only scalar fields that can be selected in schema tree
+	// Comments indicate Table API columns that CANNOT be mapped (computed/array-based)
 	kindMappings := map[string]map[string][]string{
 		"Pod": {
-			"Status":   {"status", "phase"},
-			"IP":       {"status", "podIP"},
-			"Node":     {"spec", "nodeName"},
-			"Ready":    {"status", "containerStatuses"},
-			"Restarts": {"status", "containerStatuses"},
+			"Status": {"status", "phase"},
+			"IP":     {"status", "podIP"},
+			"Node":   {"spec", "nodeName"},
+			// EXCLUDED - Computed columns (no 1:1 field mapping):
+			// - "Ready": computed from status.containerStatuses[].ready (e.g., "1/1")
+			// - "Restarts": computed from status.containerStatuses[].restartCount (sum)
+			// - "Nominated Node": status.nominatedNodeName (priority 1, rarely used)
+			// - "Readiness Gates": spec.readinessGates (array, priority 1)
 		},
 		"Deployment": {
 			"Ready":      {"status", "readyReplicas"},
 			"Up-to-date": {"status", "updatedReplicas"},
 			"Available":  {"status", "availableReplicas"},
-			"Containers": {"spec", "template", "spec", "containers"},
-			"Images":     {"spec", "template", "spec", "containers"},
-			"Selector":   {"spec", "selector"},
+			// EXCLUDED - Computed/array columns:
+			// - "Containers": computed from spec.template.spec.containers[].name (joined string)
+			// - "Images": computed from spec.template.spec.containers[].image (joined string)
+			// - "Selector": spec.selector.matchLabels (map, displayed as label selector string)
 		},
 		"Service": {
-			"Type":        {"spec", "type"},
-			"Cluster-IP":  {"spec", "clusterIP"},
-			"External-IP": {"spec", "externalIPs"},
-			"Port(s)":     {"spec", "ports"},
-			"Ports":       {"spec", "ports"},
-			"Selector":    {"spec", "selector"},
+			"Type":       {"spec", "type"},
+			"Cluster-IP": {"spec", "clusterIP"},
+			// EXCLUDED - Array/computed columns:
+			// - "External-IP": spec.externalIPs or status.loadBalancer.ingress (array)
+			// - "Port(s)": computed from spec.ports[] (formatted string like "80/TCP")
+			// - "Selector": spec.selector (map, displayed as label selector string)
 		},
 		"ConfigMap": {
 			"Data": {"data"},
@@ -505,67 +527,88 @@ func mapColumnNameToFieldPath(columnName string, kind string) []string {
 			"Data": {"data"},
 		},
 		"Node": {
-			"Status":            {"status", "conditions"},
-			"Roles":             {"metadata", "labels"},
 			"Version":           {"status", "nodeInfo", "kubeletVersion"},
-			"Internal-IP":       {"status", "addresses"},
-			"External-IP":       {"status", "addresses"},
 			"OS-Image":          {"status", "nodeInfo", "osImage"},
 			"Kernel-Version":    {"status", "nodeInfo", "kernelVersion"},
 			"Container-Runtime": {"status", "nodeInfo", "containerRuntimeVersion"},
+			// EXCLUDED - Computed/array columns:
+			// - "Status": computed from status.conditions[] (e.g., "Ready", "NotReady")
+			// - "Roles": computed from metadata.labels (node-role.kubernetes.io/*)
+			// - "Internal-IP": from status.addresses[] where type=InternalIP
+			// - "External-IP": from status.addresses[] where type=ExternalIP
 		},
 		"Namespace": {
 			"Status": {"status", "phase"},
 		},
 		"PersistentVolume": {
-			"Capacity":      {"spec", "capacity"},
-			"Access Modes":  {"spec", "accessModes"},
 			"Reclaim Policy": {"spec", "persistentVolumeReclaimPolicy"},
-			"Status":        {"status", "phase"},
-			"Claim":         {"spec", "claimRef"},
-			"StorageClass":  {"spec", "storageClassName"},
-			"Reason":        {"status", "reason"},
+			"Status":         {"status", "phase"},
+			"StorageClass":   {"spec", "storageClassName"},
+			"Reason":         {"status", "reason"},
+			// EXCLUDED - Computed/array columns:
+			// - "Capacity": spec.capacity.storage (map access)
+			// - "Access Modes": spec.accessModes (array, displayed as "RWO,RWX")
+			// - "Claim": spec.claimRef (object, displayed as "namespace/name")
 		},
 		"PersistentVolumeClaim": {
 			"Status":       {"status", "phase"},
 			"Volume":       {"spec", "volumeName"},
-			"Capacity":     {"status", "capacity"},
-			"Access Modes": {"spec", "accessModes"},
 			"StorageClass": {"spec", "storageClassName"},
+			// EXCLUDED - Computed/array columns:
+			// - "Capacity": status.capacity.storage (map access)
+			// - "Access Modes": spec.accessModes (array)
 		},
 		"StatefulSet": {
 			"Ready":    {"status", "readyReplicas"},
 			"Replicas": {"spec", "replicas"},
+			// EXCLUDED:
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
 		},
 		"DaemonSet": {
-			"Desired":   {"status", "desiredNumberScheduled"},
-			"Current":   {"status", "currentNumberScheduled"},
-			"Ready":     {"status", "numberReady"},
+			"Desired":    {"status", "desiredNumberScheduled"},
+			"Current":    {"status", "currentNumberScheduled"},
+			"Ready":      {"status", "numberReady"},
 			"Up-to-date": {"status", "updatedNumberScheduled"},
-			"Available": {"status", "numberAvailable"},
-			"Selector":  {"spec", "selector"},
+			"Available":  {"status", "numberAvailable"},
+			// EXCLUDED:
+			// - "Node Selector": spec.template.spec.nodeSelector (map)
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
 		},
 		"ReplicaSet": {
 			"Desired": {"spec", "replicas"},
 			"Current": {"status", "replicas"},
 			"Ready":   {"status", "readyReplicas"},
+			// EXCLUDED:
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
+			// - "Selector": spec.selector.matchLabels (map)
 		},
 		"Job": {
 			"Completions": {"spec", "completions"},
 			"Duration":    {"status", "completionTime"},
-			"Status":      {"status", "conditions"},
+			// EXCLUDED:
+			// - "Status": computed from status.conditions[] and status.succeeded/failed
+			// - "Containers": computed from spec.template.spec.containers[].name
+			// - "Images": computed from spec.template.spec.containers[].image
+			// - "Selector": spec.selector.matchLabels (map)
 		},
 		"CronJob": {
-			"Schedule":     {"spec", "schedule"},
-			"Suspend":      {"spec", "suspend"},
-			"Active":       {"status", "active"},
+			"Schedule":      {"spec", "schedule"},
+			"Suspend":       {"spec", "suspend"},
 			"Last Schedule": {"status", "lastScheduleTime"},
+			// EXCLUDED:
+			// - "Active": status.active (array of object references)
+			// - "Containers": computed from spec.jobTemplate.spec.template.spec.containers[].name
+			// - "Images": computed from spec.jobTemplate.spec.template.spec.containers[].image
 		},
 		"Ingress": {
-			"Class":   {"spec", "ingressClassName"},
-			"Hosts":   {"spec", "rules"},
-			"Address": {"status", "loadBalancer", "ingress"},
-			"Ports":   {"spec", "rules"},
+			"Class": {"spec", "ingressClassName"},
+			// EXCLUDED:
+			// - "Hosts": computed from spec.rules[].host (joined string)
+			// - "Address": status.loadBalancer.ingress[].ip/hostname (array)
+			// - "Ports": computed from spec.rules[].http.paths[].backend.service.port
 		},
 	}
 

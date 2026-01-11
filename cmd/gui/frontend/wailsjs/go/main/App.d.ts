@@ -8,7 +8,7 @@ export function DeleteFavoriteView(arg1:string):Promise<void>;
 
 export function GetCurrentContext():Promise<string>;
 
-export function GetDefaultSelectedPaths(arg1:main.MultiClusterGVK,arg2:Array<string>):Promise<Array<Array<string>>>;
+export function GetDefaultSelectedPaths(arg1:main.MultiClusterGVK,arg2:Array<string>):Promise<Array<any>>;
 
 export function GetFavoriteViewsForGVK(arg1:string,arg2:string,arg3:string):Promise<Array<main.FavoriteViewResponse>>;
 

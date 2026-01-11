@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -196,47 +195,6 @@ func DiscoveryClientForContext(contextName string) (discovery.DiscoveryInterface
 		return nil, err
 	}
 	return cs.Discovery(), nil
-}
-
-// RESTClientForContext returns a REST client for the specified context and GVR
-// If contextName is empty, uses the current context
-func RESTClientForContext(contextName string, gvr schema.GroupVersionResource) (rest.Interface, error) {
-	cs, err := clientSetForContext(contextName)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return appropriate REST client based on group
-	switch gvr.Group {
-	case "":
-		return cs.CoreV1().RESTClient(), nil
-	case "apps":
-		return cs.AppsV1().RESTClient(), nil
-	case "batch":
-		return cs.BatchV1().RESTClient(), nil
-	case "networking.k8s.io":
-		return cs.NetworkingV1().RESTClient(), nil
-	case "storage.k8s.io":
-		return cs.StorageV1().RESTClient(), nil
-	case "rbac.authorization.k8s.io":
-		return cs.RbacV1().RESTClient(), nil
-	case "autoscaling":
-		return cs.AutoscalingV1().RESTClient(), nil
-	case "policy":
-		return cs.PolicyV1().RESTClient(), nil
-	case "coordination.k8s.io":
-		return cs.CoordinationV1().RESTClient(), nil
-	case "scheduling.k8s.io":
-		return cs.SchedulingV1().RESTClient(), nil
-	case "admissionregistration.k8s.io":
-		return cs.AdmissionregistrationV1().RESTClient(), nil
-	case "apiextensions.k8s.io":
-		// For CRDs, we need to use the discovery or dynamic client
-		return nil, fmt.Errorf("apiextensions.k8s.io not supported via REST client")
-	default:
-		// For unknown groups, return core v1 as fallback
-		return cs.CoreV1().RESTClient(), nil
-	}
 }
 
 // TryTshKubeLogin attempts to run tsh kube login for a context
