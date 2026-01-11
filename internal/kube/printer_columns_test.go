@@ -8,10 +8,15 @@ import (
 )
 
 func TestGetPrinterColumnsForContext_BuiltInResources(t *testing.T) {
-	// Skip if no cluster available
-	_, err := GetCurrentContext()
+	// Skip if no cluster available - try actual API call to verify connectivity
+	dc, err := DiscoveryClientForContext("")
 	if err != nil {
-		t.Skip("No Kubernetes cluster available")
+		t.Skip("No Kubernetes cluster available: " + err.Error())
+	}
+	// Try to get server version to verify actual connectivity
+	_, err = dc.ServerVersion()
+	if err != nil {
+		t.Skip("Cannot connect to Kubernetes cluster: " + err.Error())
 	}
 
 	testCases := []struct {
