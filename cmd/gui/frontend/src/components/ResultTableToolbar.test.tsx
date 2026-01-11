@@ -120,7 +120,7 @@ describe('ResultTableToolbar - Keyboard Event Propagation', () => {
   });
 });
 
-describe('ResultTableToolbar - Search Results Count', () => {
+describe('ResultTableToolbar - Resource Count Display', () => {
   it('should show filtered count when search query is present', () => {
     render(
       <ResultTableToolbar
@@ -131,10 +131,10 @@ describe('ResultTableToolbar - Search Results Count', () => {
       />
     );
 
-    expect(screen.getByText('Found 5 / 100 rows')).toBeInTheDocument();
+    expect(screen.getByText('5/100 Pods')).toBeInTheDocument();
   });
 
-  it('should not show filtered count when search query is empty', () => {
+  it('should show total count when search query is empty', () => {
     render(
       <ResultTableToolbar
         {...defaultProps}
@@ -144,7 +144,7 @@ describe('ResultTableToolbar - Search Results Count', () => {
       />
     );
 
-    expect(screen.queryByText(/Found/)).not.toBeInTheDocument();
+    expect(screen.getByText('100 Pods')).toBeInTheDocument();
   });
 });
 

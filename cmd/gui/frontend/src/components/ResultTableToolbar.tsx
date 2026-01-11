@@ -113,7 +113,7 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
     <div className="p-4 border-b border-border">
       <div className="flex items-center justify-between gap-4">
         {/* Left: Search input with resource count */}
-        <div className="flex items-center gap-3 flex-1 max-w-md">
+        <div className="flex items-center gap-3">
           <Input
             ref={searchInputRef}
             placeholder="Search ..."
@@ -126,7 +126,7 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
             }}
             onFocus={() => onSearchFocusChange?.(true)}
             onBlur={() => onSearchFocusChange?.(false)}
-            className="flex-1"
+            className="w-48 h-8 py-1 px-2"
           />
           <span className="text-sm text-muted-foreground whitespace-nowrap">
             {globalFilter
