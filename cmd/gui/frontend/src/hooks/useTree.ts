@@ -352,6 +352,38 @@ function flattenTree(nodes: TreeNode[]): Map<string, TreeNode> {
   return map;
 }
 
+// Helper: check if a node is a leaf (no children and not array/map type)
+function isLeafNode(node: TreeNode): boolean {
+  const hasChildren = node.children && node.children.length > 0;
+  const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
+  return !hasChildren && !isArrayOrMap;
+}
+
+// Helper: get Map sibling keys (non-numeric, non-* children) for Map wildcard detection
+function getMapSiblingKeys(parentNode: TreeNode): TreeNode[] {
+  if (!parentNode.children) return [];
+  return parentNode.children.filter((child) => {
+    return child.name !== '*' && isNaN(Number(child.name));
+  });
+}
+
+// Helper: get index nodes (numeric children, excluding *) for Array wildcard detection
+function getIndexNodes(parentNode: TreeNode): TreeNode[] {
+  if (!parentNode.children) return [];
+  return parentNode.children.filter((child) => {
+    return child.name !== '*' && !isNaN(Number(child.name));
+  });
+}
+
+// Helper: collect unique parent path keys from multiple target paths (using Set for O(n*m) complexity)
+function collectParentPathKeys(targetPathKeys: string[]): string[] {
+  const parentSet = new Set<string>();
+  targetPathKeys.forEach((key) => {
+    getParentPathKeys(key).forEach((p) => parentSet.add(p));
+  });
+  return Array.from(parentSet);
+}
+
 // Searchable item type for fuzzy search
 interface SearchableItem {
   text: string;
@@ -577,10 +609,7 @@ export function useTree({
     // Find all leaf nodes under * and calculate their state based on indexed siblings
     flatNodesMap.forEach((node, pathKey) => {
       // Skip non-leaf nodes
-      const hasChildren = node.children && node.children.length > 0;
-      const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
-      const isLeaf = !hasChildren && !isArrayOrMap;
-      if (!isLeaf) return;
+      if (!isLeafNode(node)) return;
 
       // Check if this node is under a * (Array wildcard child)
       const wildcardIndex = node.fullPath.indexOf('*');
@@ -590,19 +619,16 @@ export function useTree({
       const arrayParentPath = node.fullPath.slice(0, wildcardIndex);
       const arrayParentPathKey = arrayParentPath.join(PATH_DELIMITER);
       const arrayParentNode = flatNodesMap.get(arrayParentPathKey);
-      if (!arrayParentNode || !arrayParentNode.children) return;
+      if (!arrayParentNode) return;
 
       // Get all indexed siblings (0, 1, 2, ...)
-      const indexNodes = arrayParentNode.children.filter((child) => {
-        return child.name !== '*' && !isNaN(Number(child.name));
-      });
-
-      if (indexNodes.length === 0) return;
+      const indexedChildren = getIndexNodes(arrayParentNode);
+      if (indexedChildren.length === 0) return;
 
       // Build corresponding indexed paths for this wildcard child
       // e.g., containers.*.image → [containers.0.image, containers.1.image, ...]
       const suffixPath = node.fullPath.slice(wildcardIndex + 1); // path after *
-      const indexedPaths = indexNodes.map((indexNode) => {
+      const indexedPaths = indexedChildren.map((indexNode) => {
         return [...arrayParentPath, indexNode.name, ...suffixPath].join(PATH_DELIMITER);
       });
 
@@ -626,33 +652,25 @@ export function useTree({
       const parentPath = node.fullPath.slice(0, -1);
       const parentPathKey = parentPath.join(PATH_DELIMITER);
       const parentNode = flatNodesMap.get(parentPathKey);
-
-      if (!parentNode || !parentNode.children) return;
+      if (!parentNode) return;
 
       // Check if it's a Map * (has non-numeric siblings)
-      const siblingKeys = parentNode.children.filter((child) => {
-        return child.name !== '*' && isNaN(Number(child.name));
-      });
+      const siblingKeys = getMapSiblingKeys(parentNode);
+      if (siblingKeys.length === 0) return;
 
-      if (siblingKeys.length > 0) {
-        // Map * - target is sibling key leaves
-        const targetLeaves = siblingKeys
-          .filter((child) => {
-            const hasChildren = child.children && child.children.length > 0;
-            const isArrayOrMap = child.type && (child.type.startsWith('[]') || child.type.startsWith('map['));
-            return !hasChildren && !isArrayOrMap;
-          })
-          .map((child) => child.fullPath.join(PATH_DELIMITER));
+      // Map * - target is sibling key leaves
+      const targetLeaves = siblingKeys
+        .filter((child) => isLeafNode(child))
+        .map((child) => child.fullPath.join(PATH_DELIMITER));
 
-        if (targetLeaves.length === 0) return;
+      if (targetLeaves.length === 0) return;
 
-        const selectedCount = targetLeaves.filter((p) => selectedPaths.has(p)).length;
+      const selectedCount = targetLeaves.filter((p) => selectedPaths.has(p)).length;
 
-        if (selectedCount === targetLeaves.length) {
-          selectedPaths_.add(pathKey);
-        } else if (selectedCount > 0) {
-          indeterminatePaths.add(pathKey);
-        }
+      if (selectedCount === targetLeaves.length) {
+        selectedPaths_.add(pathKey);
+      } else if (selectedCount > 0) {
+        indeterminatePaths.add(pathKey);
       }
     });
 
@@ -730,55 +748,33 @@ export function useTree({
       const parentPathKey = parentPath.join(PATH_DELIMITER);
       const parentNode = flatNodesMap.get(parentPathKey);
 
-      if (!parentNode || !parentNode.children) {
+      if (!parentNode) {
         return;
       }
 
       // Check if parent is a Map (has non-numeric, non-* children that are leaves)
-      const siblingKeys = parentNode.children.filter((child) => {
-        return child.name !== '*' && isNaN(Number(child.name));
-      });
+      const siblingKeys = getMapSiblingKeys(parentNode);
 
       if (siblingKeys.length > 0) {
         // Map * - select all sibling key leaves
         const targetPathKeys = siblingKeys
-          .filter((child) => {
-            // Only select leaf nodes
-            const hasChildren = child.children && child.children.length > 0;
-            const isArrayOrMap = child.type && (child.type.startsWith('[]') || child.type.startsWith('map['));
-            return !hasChildren && !isArrayOrMap;
-          })
+          .filter((child) => isLeafNode(child))
           .map((child) => child.fullPath.join(PATH_DELIMITER));
-
-        const parentPathKeys: string[] = [];
-        targetPathKeys.forEach((key) => {
-          getParentPathKeys(key).forEach((p) => {
-            if (!parentPathKeys.includes(p)) {
-              parentPathKeys.push(p);
-            }
-          });
-        });
 
         dispatch({
           type: 'TOGGLE_SELECT_WILDCARD',
           wildcardPathKey: pathKey,
           targetPathKeys,
-          parentPathKeys,
+          parentPathKeys: collectParentPathKeys(targetPathKeys),
         });
       } else {
         // Array * at the end - select all leaves from indexed children
-        const indexNodes = parentNode.children.filter((child) => {
-          return child.name !== '*' && !isNaN(Number(child.name));
-        });
+        const indexedChildren = getIndexNodes(parentNode);
 
         // Collect all leaf descendants from indexed children
         const targetPathKeys: string[] = [];
         const collectLeaves = (node: TreeNode) => {
-          const hasChildren = node.children && node.children.length > 0;
-          const isArrayOrMap = node.type && (node.type.startsWith('[]') || node.type.startsWith('map['));
-          const isLeaf = !hasChildren && !isArrayOrMap;
-
-          if (isLeaf && node.name !== '*') {
+          if (isLeafNode(node) && node.name !== '*') {
             targetPathKeys.push(node.fullPath.join(PATH_DELIMITER));
           }
           if (node.children) {
@@ -786,22 +782,13 @@ export function useTree({
           }
         };
 
-        indexNodes.forEach(collectLeaves);
-
-        const parentPathKeys: string[] = [];
-        targetPathKeys.forEach((key) => {
-          getParentPathKeys(key).forEach((p) => {
-            if (!parentPathKeys.includes(p)) {
-              parentPathKeys.push(p);
-            }
-          });
-        });
+        indexedChildren.forEach(collectLeaves);
 
         dispatch({
           type: 'TOGGLE_SELECT_WILDCARD',
           wildcardPathKey: pathKey,
           targetPathKeys,
-          parentPathKeys,
+          parentPathKeys: collectParentPathKeys(targetPathKeys),
         });
       }
     } else {
@@ -811,35 +798,23 @@ export function useTree({
       const arrayPathKey = arrayPath.join(PATH_DELIMITER);
       const arrayNode = flatNodesMap.get(arrayPathKey);
 
-      if (!arrayNode || !arrayNode.children) {
+      if (!arrayNode) {
         return;
       }
 
       // Find all index nodes (numeric children)
-      const indexNodes = arrayNode.children.filter((child) => {
-        return child.name !== '*' && !isNaN(Number(child.name));
-      });
+      const indexedChildren = getIndexNodes(arrayNode);
 
-      const targetPathKeys = indexNodes.map((indexNode) => {
+      const targetPathKeys = indexedChildren.map((indexNode) => {
         const targetPath = [...arrayPath, indexNode.name, ...pathAfterWildcard];
         return targetPath.join(PATH_DELIMITER);
-      });
-
-      // Collect all parent paths for expansion
-      const parentPathKeys: string[] = [];
-      targetPathKeys.forEach((key) => {
-        getParentPathKeys(key).forEach((p) => {
-          if (!parentPathKeys.includes(p)) {
-            parentPathKeys.push(p);
-          }
-        });
       });
 
       dispatch({
         type: 'TOGGLE_SELECT_WILDCARD',
         wildcardPathKey: pathKey,
         targetPathKeys,
-        parentPathKeys,
+        parentPathKeys: collectParentPathKeys(targetPathKeys),
       });
     }
   }, [flatNodesMap]);
