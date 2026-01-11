@@ -324,17 +324,28 @@ func getDocumentPath(gvr schema.GroupVersionResource) string {
 // 	return strings.Join([]string{GetPathPrefix(gvr), gvr.Version, "namespaces", "{namespace}", gvr.Resource, "{name}"}, "/")
 // }
 
-// GetPrinterColumnsForContext retrieves additionalPrinterColumns for a GVK from CRD definition.
-// Uses dynamic client to avoid new dependencies.
+// GetPrinterColumnsForContext retrieves printer columns for a GVK.
+// For CRDs: extracts additionalPrinterColumns from CRD definition (has JSONPath).
+// For built-in resources: uses Table API column definitions and maps column names to field paths.
 // Returns field paths (e.g., [][]string{{"spec", "replicas"}, {"status", "phase"}})
-// For built-in resources or if CRD not found, returns nil.
 func GetPrinterColumnsForContext(contextName string, gvk schema.GroupVersionKind) ([][]string, error) {
-	// Get GVR first
 	gvr, err := GetGVRForContext(contextName, gvk)
 	if err != nil {
-		return nil, nil // Can't get GVR, skip
+		return nil, nil
 	}
 
+	// First, try to get additionalPrinterColumns from CRD
+	paths := getPrinterColumnsFromCRD(contextName, gvk, gvr)
+	if paths != nil {
+		return paths, nil
+	}
+
+	// For built-in resources, use Table API column definitions
+	return getPrinterColumnsFromTableAPI(contextName, gvk, gvr)
+}
+
+// getPrinterColumnsFromCRD extracts additionalPrinterColumns from CRD definition.
+func getPrinterColumnsFromCRD(contextName string, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) [][]string {
 	// Build CRD name: plural.group (e.g., "certificates.cert-manager.io")
 	crdName := gvr.Resource
 	if gvk.Group != "" {
@@ -350,21 +361,21 @@ func GetPrinterColumnsForContext(contextName string, gvk schema.GroupVersionKind
 
 	client, err := DynamicClientForContext(contextName)
 	if err != nil {
-		return nil, nil
+		return nil
 	}
 
 	// Try to get CRD (cluster-scoped, so no namespace)
 	crd, err := client.Resource(crdGVR).Get(context.Background(), crdName, metav1.GetOptions{})
 	if err != nil {
 		// Not a CRD or not found
-		return nil, nil
+		return nil
 	}
 
 	// Extract additionalPrinterColumns from CRD
 	// Path: spec.versions[].additionalPrinterColumns[]
 	versions, found, err := unstructured.NestedSlice(crd.Object, "spec", "versions")
 	if err != nil || !found {
-		return nil, nil
+		return nil
 	}
 
 	for _, v := range versions {
@@ -380,7 +391,7 @@ func GetPrinterColumnsForContext(contextName string, gvk schema.GroupVersionKind
 
 		columns, found, _ := unstructured.NestedSlice(versionMap, "additionalPrinterColumns")
 		if !found || len(columns) == 0 {
-			return nil, nil
+			return nil
 		}
 
 		var paths [][]string
@@ -395,10 +406,176 @@ func GetPrinterColumnsForContext(contextName string, gvk schema.GroupVersionKind
 				paths = append(paths, path)
 			}
 		}
-		return paths, nil
+		return paths
 	}
 
-	return nil, nil
+	return nil
+}
+
+// getPrinterColumnsFromTableAPI uses Table API to get column definitions for built-in resources.
+// Maps column names to field paths using known mappings.
+func getPrinterColumnsFromTableAPI(contextName string, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) ([][]string, error) {
+	restClient, err := RESTClientForContext(contextName, gvr)
+	if err != nil {
+		return nil, nil
+	}
+
+	// Build the request path based on whether the resource is namespaced
+	req := restClient.Get().
+		Resource(gvr.Resource).
+		SetHeader("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1").
+		Param("limit", "1") // We only need column definitions, not actual data
+
+	raw, err := req.Do(context.Background()).Raw()
+	if err != nil {
+		return nil, nil
+	}
+
+	var table metav1.Table
+	if err := json.Unmarshal(raw, &table); err != nil {
+		return nil, nil
+	}
+
+	var paths [][]string
+	for _, col := range table.ColumnDefinitions {
+		// Only include priority 0 columns (shown by default in kubectl)
+		if col.Priority != 0 {
+			continue
+		}
+
+		// Skip "Name" column as it's always shown
+		if col.Name == "Name" {
+			continue
+		}
+
+		// Map column name to field path
+		path := mapColumnNameToFieldPath(col.Name, gvk.Kind)
+		if path != nil {
+			paths = append(paths, path)
+		}
+	}
+
+	return paths, nil
+}
+
+// mapColumnNameToFieldPath maps a Table API column name to a field path.
+// Uses known mappings for common columns.
+func mapColumnNameToFieldPath(columnName string, kind string) []string {
+	// Common mappings that apply to most resources
+	commonMappings := map[string][]string{
+		"Age":       {"metadata", "creationTimestamp"},
+		"Namespace": {"metadata", "namespace"},
+		"Labels":    {"metadata", "labels"},
+	}
+
+	if path, ok := commonMappings[columnName]; ok {
+		return path
+	}
+
+	// Kind-specific mappings
+	kindMappings := map[string]map[string][]string{
+		"Pod": {
+			"Status":   {"status", "phase"},
+			"IP":       {"status", "podIP"},
+			"Node":     {"spec", "nodeName"},
+			"Ready":    {"status", "containerStatuses"},
+			"Restarts": {"status", "containerStatuses"},
+		},
+		"Deployment": {
+			"Ready":      {"status", "readyReplicas"},
+			"Up-to-date": {"status", "updatedReplicas"},
+			"Available":  {"status", "availableReplicas"},
+			"Containers": {"spec", "template", "spec", "containers"},
+			"Images":     {"spec", "template", "spec", "containers"},
+			"Selector":   {"spec", "selector"},
+		},
+		"Service": {
+			"Type":        {"spec", "type"},
+			"Cluster-IP":  {"spec", "clusterIP"},
+			"External-IP": {"spec", "externalIPs"},
+			"Port(s)":     {"spec", "ports"},
+			"Ports":       {"spec", "ports"},
+			"Selector":    {"spec", "selector"},
+		},
+		"ConfigMap": {
+			"Data": {"data"},
+		},
+		"Secret": {
+			"Type": {"type"},
+			"Data": {"data"},
+		},
+		"Node": {
+			"Status":            {"status", "conditions"},
+			"Roles":             {"metadata", "labels"},
+			"Version":           {"status", "nodeInfo", "kubeletVersion"},
+			"Internal-IP":       {"status", "addresses"},
+			"External-IP":       {"status", "addresses"},
+			"OS-Image":          {"status", "nodeInfo", "osImage"},
+			"Kernel-Version":    {"status", "nodeInfo", "kernelVersion"},
+			"Container-Runtime": {"status", "nodeInfo", "containerRuntimeVersion"},
+		},
+		"Namespace": {
+			"Status": {"status", "phase"},
+		},
+		"PersistentVolume": {
+			"Capacity":      {"spec", "capacity"},
+			"Access Modes":  {"spec", "accessModes"},
+			"Reclaim Policy": {"spec", "persistentVolumeReclaimPolicy"},
+			"Status":        {"status", "phase"},
+			"Claim":         {"spec", "claimRef"},
+			"StorageClass":  {"spec", "storageClassName"},
+			"Reason":        {"status", "reason"},
+		},
+		"PersistentVolumeClaim": {
+			"Status":       {"status", "phase"},
+			"Volume":       {"spec", "volumeName"},
+			"Capacity":     {"status", "capacity"},
+			"Access Modes": {"spec", "accessModes"},
+			"StorageClass": {"spec", "storageClassName"},
+		},
+		"StatefulSet": {
+			"Ready":    {"status", "readyReplicas"},
+			"Replicas": {"spec", "replicas"},
+		},
+		"DaemonSet": {
+			"Desired":   {"status", "desiredNumberScheduled"},
+			"Current":   {"status", "currentNumberScheduled"},
+			"Ready":     {"status", "numberReady"},
+			"Up-to-date": {"status", "updatedNumberScheduled"},
+			"Available": {"status", "numberAvailable"},
+			"Selector":  {"spec", "selector"},
+		},
+		"ReplicaSet": {
+			"Desired": {"spec", "replicas"},
+			"Current": {"status", "replicas"},
+			"Ready":   {"status", "readyReplicas"},
+		},
+		"Job": {
+			"Completions": {"spec", "completions"},
+			"Duration":    {"status", "completionTime"},
+			"Status":      {"status", "conditions"},
+		},
+		"CronJob": {
+			"Schedule":     {"spec", "schedule"},
+			"Suspend":      {"spec", "suspend"},
+			"Active":       {"status", "active"},
+			"Last Schedule": {"status", "lastScheduleTime"},
+		},
+		"Ingress": {
+			"Class":   {"spec", "ingressClassName"},
+			"Hosts":   {"spec", "rules"},
+			"Address": {"status", "loadBalancer", "ingress"},
+			"Ports":   {"spec", "rules"},
+		},
+	}
+
+	if kindMap, ok := kindMappings[kind]; ok {
+		if path, ok := kindMap[columnName]; ok {
+			return path
+		}
+	}
+
+	return nil
 }
 
 // jsonPathToFieldPath converts a JSONPath expression to a field path.
