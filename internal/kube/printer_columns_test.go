@@ -42,7 +42,7 @@ func TestGetPrinterColumnsForContext_BuiltInResources(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, paths, "Expected paths but got nil")
 			t.Logf("Got paths for %s: %v", tc.name, paths)
-			
+
 			// Check that expected paths are present
 			for _, expected := range tc.expected {
 				found := false
