@@ -29,6 +29,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card';
 import { CellContent } from './CellContent';
 import { DIYTableToolbar, DIYTableToolbarHandle } from './DIYTableToolbar';
 import { useCellHighlight } from '../hooks/useCellHighlight';
@@ -99,6 +100,7 @@ class ResizeAwarePointerSensor extends PointerSensor {
 interface SortableHeaderProps {
   id: string;
   headerText: string;
+  jsonPath: string;  // full JSON path for hover tooltip (original casing)
   sortDirection: false | 'asc' | 'desc';
   onSort: ((event: unknown) => void) | undefined;
   width: number;
@@ -116,6 +118,7 @@ interface SortableHeaderProps {
 function SortableHeader({
   id,
   headerText,
+  jsonPath,
   sortDirection,
   onSort,
   width,
@@ -129,6 +132,7 @@ function SortableHeader({
   isHighlighted,
   isPreview,
 }: SortableHeaderProps) {
+  const [copied, setCopied] = useState(false);
   const {
     attributes,
     listeners,
@@ -150,12 +154,24 @@ function SortableHeader({
   // Draggable columns: entire header is draggable (click = sort, drag 5px+ = reorder)
   const dragProps = isDraggable ? { ...attributes, ...listeners } : {};
 
+  // Copy JSON path to clipboard
+  const handleCopyPath = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(jsonPath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative px-2 py-2 text-left text-sm font-semibold uppercase flex-shrink-0 text-muted-foreground group",
+        "relative px-2 py-2 text-left text-sm font-semibold flex-shrink-0 text-muted-foreground group",
         isDragging && "bg-accent",
         isDraggable && "cursor-grab active:cursor-grabbing",
         isHighlighted && "bg-focus",
@@ -165,25 +181,44 @@ function SortableHeader({
       onMouseLeave={onHoverEnd}
       {...dragProps}
     >
-      {/* Sort button - click handled by dnd-kit (clicks <5px don't trigger drag) */}
-      <div
-        className="flex items-center gap-1 select-none hover:text-foreground transition-colors"
-        onClick={(e) => onSort?.(e)}
-      >
-        <span className="truncate">{headerText}</span>
-        {/* Hide sort icons for preview columns */}
-        {!isPreview && (
-          <span className="flex-shrink-0">
-            {sortDirection === 'asc' ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : sortDirection === 'desc' ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+      {/* Sort button with HoverCard for JSON path tooltip */}
+      <HoverCard openDelay={300} closeDelay={200}>
+        <HoverCardTrigger asChild>
+          <div
+            className="flex items-center gap-1 select-none hover:text-foreground transition-colors"
+            onClick={(e) => onSort?.(e)}
+          >
+            <span className="truncate capitalize">{headerText}</span>
+            {/* Hide sort icons for preview columns */}
+            {!isPreview && (
+              <span className="flex-shrink-0">
+                {sortDirection === 'asc' ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : sortDirection === 'desc' ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+                )}
+              </span>
             )}
-          </span>
-        )}
-      </div>
+          </div>
+        </HoverCardTrigger>
+        <HoverCardContent
+          side="top"
+          align="start"
+          className="w-auto p-2 text-xs"
+        >
+          <div className="flex items-center gap-2">
+            <code
+              className="px-1.5 py-0.5 rounded bg-muted font-mono cursor-pointer hover:bg-accent transition-colors"
+              onClick={handleCopyPath}
+            >
+              {jsonPath}
+            </code>
+            {copied && <span className="text-primary font-medium">Copied</span>}
+          </div>
+        </HoverCardContent>
+      </HoverCard>
       {/* Remove column button - only for draggable (non-fixed) columns */}
       {isDraggable && onRemove && (
         <button
@@ -270,8 +305,36 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
   // Unified focus state (keyboard navigation + mouse hover)
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const [focusedColIndex, setFocusedColIndex] = useState<number | null>(null);
+  // Debounced popover state (shows popover after delay)
+  const [popoverCell, setPopoverCell] = useState<{ row: number; col: number } | null>(null);
+  const popoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track copied cell for "Copied" feedback
   const [copiedCellKey, setCopiedCellKey] = useState<string | null>(null);
+
+  // Debounce popover display (300ms delay)
+  useEffect(() => {
+    // Clear any existing timeout
+    if (popoverTimeoutRef.current) {
+      clearTimeout(popoverTimeoutRef.current);
+      popoverTimeoutRef.current = null;
+    }
+
+    // Always clear popover immediately when focus changes
+    setPopoverCell(null);
+
+    if (focusedRowIndex !== null && focusedColIndex !== null) {
+      // Set timeout to show popover after delay
+      popoverTimeoutRef.current = setTimeout(() => {
+        setPopoverCell({ row: focusedRowIndex, col: focusedColIndex });
+      }, 300);
+    }
+
+    return () => {
+      if (popoverTimeoutRef.current) {
+        clearTimeout(popoverTimeoutRef.current);
+      }
+    };
+  }, [focusedRowIndex, focusedColIndex]);
 
   // Get highlight function based on current search query
   const getHighlightIndices = useCellHighlight(globalFilter);
@@ -301,9 +364,9 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
   // Calculate column width based on field name and data
   // Returns { size: initial display width, maxSize: max possible width }
   const calculateColumnWidth = (fieldName: string, values: any[]): { size: number; maxSize: number } => {
-    // Header is displayed in UPPERCASE, so use wider char width (10px per char)
+    // Header is displayed capitalized, estimate 8px per char
     // Add 40px for padding (px-4 = 32px) + resize handle (8px)
-    const headerWidth = fieldName.length * 10 + 40;
+    const headerWidth = fieldName.length * 8 + 40;
 
     // Sample first 100 values to estimate max width
     const sampleSize = Math.min(100, values.length);
@@ -318,10 +381,10 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
       maxValueWidth = Math.max(maxValueWidth, width);
     }
 
-    // maxSize: actual max of header and values (no cap)
-    const maxSize = Math.max(headerWidth, maxValueWidth, 80);
-    // size: initial display width capped at 300px
-    const size = Math.min(maxSize, 300);
+    // size: initial display width based on actual content
+    const size = Math.max(headerWidth, maxValueWidth, 80);
+    // maxSize: at least 400px so users can expand columns beyond content width
+    const maxSize = Math.max(size, 400);
 
     return { size, maxSize };
   };
@@ -342,8 +405,11 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
     const widths: Record<string, { size: number; maxSize: number }> = {};
     fieldsToUse.forEach((fieldPath) => {
       const fieldName = fieldPath[fieldPath.length - 1];
+      const columnId = fieldPath.join('.');
+      // Use last field name for header width (except _context which displays as 'context')
+      const headerText = fieldName === '_context' ? 'context' : fieldName;
       const columnValues = data.map((row) => getNestedValue(row, fieldPath));
-      widths[fieldPath.join('.')] = calculateColumnWidth(fieldName, columnValues);
+      widths[columnId] = calculateColumnWidth(headerText, columnValues);
     });
 
     return widths;
@@ -370,7 +436,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
 
       return {
         id: columnId,
-        header: fieldName === '_context' ? 'context' : fieldName,  // Rename _context to context
+        header: fieldName === '_context' ? 'context' : fieldName,  // Show last field name (capitalize in UI)
         accessorFn: (row) => getNestedValue(row, fieldPath),
         size: widths.size,  // Use pre-calculated initial width
         minSize: 80,  // Minimum column width
@@ -611,8 +677,11 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
         }}
       >
         {loading ? (
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full flex flex-col items-center justify-center gap-2">
             <Spinner className="w-8 h-8" />
+            <p className="text-sm text-muted-foreground">
+              Loading {selectedGVK?.kind?.toLowerCase() ?? 'resource'}s...
+            </p>
           </div>
         ) : data.length === 0 ? (
           <div className="h-full flex items-center justify-center">
@@ -664,11 +733,17 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
                           ? header.column.id === highlightedColumnPath.join('.')
                           : false;
 
+                        // Get full JSON path for hover tooltip (strip _preview. prefix if present)
+                        const jsonPath = isPreviewColumn
+                          ? header.column.id.replace('_preview.', '')
+                          : header.column.id;
+
                         return (
                           <SortableHeader
                             key={header.id}
                             id={header.column.id}
                             headerText={headerText}
+                            jsonPath={jsonPath}
                             sortDirection={isPreviewColumn ? false : sortDirection}
                             onSort={isPreviewColumn ? undefined : header.column.getToggleSortingHandler()}
                             width={header.getSize()}
@@ -677,7 +752,15 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
                             isResizing={header.column.getIsResizing()}
                             isDraggable={isDraggable}
                             onRemove={field && onFieldRemove ? () => onFieldRemove(field) : undefined}
-                            onHover={onColumnFocus && !isPreviewColumn ? () => onColumnFocus(columnFieldPath) : undefined}
+                            onHover={() => {
+                              // Clear body cell focus when hovering header
+                              setFocusedRowIndex(null);
+                              setFocusedColIndex(null);
+                              // Sync with NavigationPanel
+                              if (onColumnFocus && !isPreviewColumn) {
+                                onColumnFocus(columnFieldPath);
+                              }
+                            }}
                             onHoverEnd={onColumnFocus && !isPreviewColumn ? () => onColumnFocus(null) : undefined}
                             isHighlighted={isHighlighted}
                             isPreview={isPreviewColumn}
@@ -715,6 +798,8 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
                   >
                     {row.getVisibleCells().map((cell, cellIndex) => {
                       const isCellFocused = isRowFocused && focusedColIndex === cellIndex;
+                      // Debounced popover: only show after delay (popoverCell state)
+                      const showCellPopover = popoverCell?.row === virtualRow.index && popoverCell?.col === cellIndex;
                       const cellKey = `${row.id}-${cell.column.id}`;
                       const showCopied = copiedCellKey === cellKey;
                       const isPreviewCell = cell.column.id.startsWith('_preview.');
@@ -750,6 +835,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
                             value={value}
                             highlightIndices={highlightIndices}
                             isFocused={isCellFocused}
+                            showPopover={showCellPopover}
                             showCopied={showCopied}
                           />
                         </div>

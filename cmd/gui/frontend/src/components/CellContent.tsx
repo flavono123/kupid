@@ -6,8 +6,10 @@ import { cn } from '@/lib/utils';
 interface CellContentProps {
   value: any;
   highlightIndices?: [number, number][] | null;
-  /** Whether this cell is focused (keyboard or mouse) */
+  /** Whether this cell is focused (keyboard or mouse) - for visual highlight */
   isFocused?: boolean;
+  /** Whether to show popover (debounced) - separate from focus highlight */
+  showPopover?: boolean;
   /** Whether to show "Copied" feedback (controlled by parent) */
   showCopied?: boolean;
 }
@@ -16,6 +18,7 @@ export function CellContent({
   value,
   highlightIndices,
   isFocused = false,
+  showPopover = false,
   showCopied = false,
 }: CellContentProps) {
   const [copied, setCopied] = useState(false);
@@ -59,7 +62,7 @@ export function CellContent({
 
   // Always render with popover for consistency
   return (
-    <Popover open={isFocused}>
+    <Popover open={showPopover}>
       <PopoverTrigger asChild>
         <div
           className={cn(

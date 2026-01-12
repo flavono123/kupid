@@ -371,9 +371,9 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
             className="flex flex-col h-full relative"
             onMouseDown={() => setFocusedPanel('nav')}
           >
-            {/* Focus overlay - renders above all content including sticky headers */}
+            {/* Focus overlay - fades out after focus */}
             {focusedPanel === 'nav' && (
-              <div className="absolute inset-0 ring-2 ring-primary/50 ring-inset pointer-events-none z-50" />
+              <div className="absolute inset-0 animate-panel-focus pointer-events-none z-50" />
             )}
             {/* Nav Header */}
             <NavHeader
@@ -438,9 +438,9 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
             className="h-full relative"
             onMouseDown={() => setFocusedPanel('table')}
           >
-            {/* Focus overlay - renders above all content including sticky headers */}
+            {/* Focus overlay - fades out after focus */}
             {focusedPanel === 'table' && (
-              <div className="absolute inset-0 ring-2 ring-primary/50 ring-inset pointer-events-none z-50" />
+              <div className="absolute inset-0 animate-panel-focus pointer-events-none z-50" />
             )}
             {/* Floating Expand Button (only when collapsed) */}
             {isSidebarCollapsed && (
