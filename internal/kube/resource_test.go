@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"fmt"
 	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -309,7 +310,7 @@ var _ = Describe("ResourceController", func() {
 			// Create objects and keep references for concurrent modification
 			objects := make([]*unstructured.Unstructured, 20)
 			for i := 0; i < 20; i++ {
-				name := "pod-" + string(rune('a'+i))
+				name := fmt.Sprintf("pod-%d", i)
 				obj := &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "v1",
