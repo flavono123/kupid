@@ -18,6 +18,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// MetaNamespaceKeyFunc is a wrapper for cache.MetaNamespaceKeyFunc
+// Returns "namespace/name" for namespaced objects, "name" for cluster-scoped
+func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
+	return cache.MetaNamespaceKeyFunc(obj)
+}
+
 // Event metrics for debugging memory leaks
 var (
 	eventsEmitted atomic.Int64
@@ -159,8 +165,10 @@ func (i *ResourceController) Inform() (chan struct{}, error) {
 			}
 			// Deep copy to avoid race conditions - the original object may be read concurrently
 			u = u.DeepCopy()
-			// Remove managedFields - large, frequently changing, rarely useful for display
+
+			// Remove managedFields to reduce memory usage
 			unstructured.RemoveNestedField(u.Object, "metadata", "managedFields")
+
 			return u, nil
 		},
 		Handler: cache.ResourceEventHandlerFuncs{

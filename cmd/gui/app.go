@@ -730,7 +730,7 @@ func (a *App) GetResourcesByKeys(keys []string) []map[string]any {
 			continue
 		}
 
-		// Get from informer store directly (no duplicate cache)
+		// Get from informer store directly
 		obj := controller.GetByKey(storeKey)
 		if obj == nil {
 			continue
