@@ -12,12 +12,12 @@ import { HighlightedText } from "./HighlightedText";
 import { Kbd } from "./ui/kbd";
 import { toast } from "sonner";
 
-interface ContextGalleryProps {
+interface ContextSelectorProps {
   onContextsConnected: (selectedContexts: string[], connectedContexts: string[]) => void;
   onLogoClick?: () => void;
 }
 
-export function ContextGallery({ onContextsConnected, onLogoClick }: ContextGalleryProps) {
+export function ContextSelector({ onContextsConnected, onLogoClick }: ContextSelectorProps) {
   const [contexts, setContexts] = useState<string[]>([]);
   const [selectedContexts, setSelectedContexts] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);

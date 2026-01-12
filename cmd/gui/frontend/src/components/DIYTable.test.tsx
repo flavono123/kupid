@@ -1,5 +1,5 @@
 /**
- * Tests for ResultTable component
+ * Tests for DIYTable component
  *
  * Focus on:
  * - Cell focus cleared when isTableFocused becomes false (Tab to nav panel)
@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ResultTable } from './ResultTable';
+import { DIYTable } from './DIYTable';
 
 // Mock data
 const mockData = [
@@ -79,9 +79,9 @@ const getFocusedCellCount = () => {
 };
 
 
-describe('ResultTable - Cell Focus Clear on Panel Switch', () => {
+describe('DIYTable - Cell Focus Clear on Panel Switch', () => {
   it('should clear cell focus when isTableFocused becomes false', async () => {
-    const { rerender } = render(<ResultTable {...defaultProps} isTableFocused={true} />);
+    const { rerender } = render(<DIYTable {...defaultProps} isTableFocused={true} />);
 
     // Wait for table to render
     await waitFor(() => {
@@ -96,14 +96,14 @@ describe('ResultTable - Cell Focus Clear on Panel Switch', () => {
     expect(getFocusedCellCount()).toBeGreaterThan(0);
 
     // Now simulate Tab to nav panel by changing isTableFocused to false
-    rerender(<ResultTable {...defaultProps} isTableFocused={false} />);
+    rerender(<DIYTable {...defaultProps} isTableFocused={false} />);
 
     // After isTableFocused becomes false, cell focus should be cleared
     expect(getFocusedCellCount()).toBe(0);
   });
 
   it('should not show cell focus when table panel is not focused', async () => {
-    render(<ResultTable {...defaultProps} isTableFocused={false} />);
+    render(<DIYTable {...defaultProps} isTableFocused={false} />);
 
     await waitFor(() => {
       expect(screen.getByText('pod-1')).toBeInTheDocument();
@@ -114,9 +114,9 @@ describe('ResultTable - Cell Focus Clear on Panel Switch', () => {
   });
 });
 
-describe('ResultTable - Cell Focus Clear on Mouse Leave', () => {
+describe('DIYTable - Cell Focus Clear on Mouse Leave', () => {
   it('should clear cell focus when mouse leaves table area', async () => {
-    render(<ResultTable {...defaultProps} />);
+    render(<DIYTable {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('pod-1')).toBeInTheDocument();
@@ -141,9 +141,9 @@ describe('ResultTable - Cell Focus Clear on Mouse Leave', () => {
   });
 });
 
-describe('ResultTable - Search Focus Clear', () => {
+describe('DIYTable - Search Focus Clear', () => {
   it('should clear cell focus when search input is focused', async () => {
-    render(<ResultTable {...defaultProps} />);
+    render(<DIYTable {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('pod-1')).toBeInTheDocument();
@@ -165,12 +165,12 @@ describe('ResultTable - Search Focus Clear', () => {
   });
 });
 
-describe('ResultTable - Column Hover Sync (RT → NP)', () => {
+describe('DIYTable - Column Hover Sync (RT → NP)', () => {
   it('should call onColumnFocus with path when hovering a column header', async () => {
     const mockOnColumnFocus = vi.fn();
 
     render(
-      <ResultTable
+      <DIYTable
         {...defaultProps}
         onColumnFocus={mockOnColumnFocus}
       />
@@ -196,7 +196,7 @@ describe('ResultTable - Column Hover Sync (RT → NP)', () => {
     const mockOnColumnFocus = vi.fn();
 
     render(
-      <ResultTable
+      <DIYTable
         {...defaultProps}
         onColumnFocus={mockOnColumnFocus}
       />
@@ -218,10 +218,10 @@ describe('ResultTable - Column Hover Sync (RT → NP)', () => {
   });
 });
 
-describe('ResultTable - Column Highlight from NP (NP → RT)', () => {
+describe('DIYTable - Column Highlight from NP (NP → RT)', () => {
   it('should apply highlight style to entire column when highlightedColumnPath matches', async () => {
     render(
-      <ResultTable
+      <DIYTable
         {...defaultProps}
         highlightedColumnPath={['metadata', 'namespace']}
       />
@@ -247,7 +247,7 @@ describe('ResultTable - Column Highlight from NP (NP → RT)', () => {
 
   it('should not highlight columns when highlightedColumnPath is undefined', async () => {
     render(
-      <ResultTable
+      <DIYTable
         {...defaultProps}
         highlightedColumnPath={undefined}
       />
@@ -264,10 +264,10 @@ describe('ResultTable - Column Highlight from NP (NP → RT)', () => {
   });
 });
 
-describe('ResultTable - Preview Column', () => {
+describe('DIYTable - Preview Column', () => {
   it('should render preview column with muted style when previewField is provided', async () => {
     render(
-      <ResultTable
+      <DIYTable
         {...defaultProps}
         previewField={['metadata', 'name']}
       />
@@ -288,7 +288,7 @@ describe('ResultTable - Preview Column', () => {
 
   it('should render preview column data with muted style', async () => {
     render(
-      <ResultTable
+      <DIYTable
         {...defaultProps}
         previewField={['metadata', 'name']}
       />
@@ -306,7 +306,7 @@ describe('ResultTable - Preview Column', () => {
 
   it('should not show sort icons on preview column header', async () => {
     render(
-      <ResultTable
+      <DIYTable
         {...defaultProps}
         previewField={['metadata', 'name']}
       />
@@ -326,9 +326,9 @@ describe('ResultTable - Preview Column', () => {
   });
 });
 
-describe('ResultTable - Basic Rendering', () => {
+describe('DIYTable - Basic Rendering', () => {
   it('should render table with data', async () => {
-    render(<ResultTable {...defaultProps} />);
+    render(<DIYTable {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('pod-1')).toBeInTheDocument();
@@ -338,7 +338,7 @@ describe('ResultTable - Basic Rendering', () => {
   });
 
   it('should render column headers', async () => {
-    render(<ResultTable {...defaultProps} />);
+    render(<DIYTable {...defaultProps} />);
 
     await waitFor(() => {
       // Headers are uppercase
@@ -348,7 +348,7 @@ describe('ResultTable - Basic Rendering', () => {
   });
 
   it('should render search toolbar', () => {
-    render(<ResultTable {...defaultProps} />);
+    render(<DIYTable {...defaultProps} />);
 
     expect(screen.getByPlaceholderText('Search ...')).toBeInTheDocument();
   });

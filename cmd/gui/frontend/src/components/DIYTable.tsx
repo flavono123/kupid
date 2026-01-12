@@ -30,26 +30,26 @@ import { ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { CellContent } from './CellContent';
-import { ResultTableToolbar, ResultTableToolbarHandle } from './ResultTableToolbar';
+import { DIYTableToolbar, DIYTableToolbarHandle } from './DIYTableToolbar';
 import { useCellHighlight } from '../hooks/useCellHighlight';
 import { useResourceData } from '../hooks/useResourceData';
 import { useFlashingCells } from '../hooks/useFlashingCells';
 import type { main } from '../../wailsjs/go/models';
 
-interface ResultTableProps {
-  selectedFields: string[][];  // From NavigationPanel
+interface DIYTableProps {
+  selectedFields: string[][];  // From DynamicFieldTree
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
   isTableFocused?: boolean;  // Whether the table panel is focused (from MainView)
   onFieldsReorder?: (newFields: string[][]) => void;  // Callback when columns are reordered
   onFieldRemove?: (field: string[]) => void;  // Callback when a column is removed
   onColumnFocus?: (path: string[] | null) => void;  // Callback when column header is focused
-  highlightedColumnPath?: string[];  // Column to highlight (from NavigationPanel hover)
+  highlightedColumnPath?: string[];  // Column to highlight (from DynamicFieldTree hover)
   previewField?: string[];  // Unchecked field to preview as muted column at the end
   onPreviewClear?: () => void;  // Callback to clear preview before export
 }
 
-export interface ResultTableHandle {
+export interface DIYTableHandle {
   focusSearch: () => void;
   isSearchFocused: () => boolean;
   navigateUp: () => void;
@@ -212,7 +212,7 @@ function SortableHeader({
   );
 }
 
-export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
+export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
   selectedFields,
   selectedGVK,
   connectedContexts,
@@ -237,7 +237,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   const [globalFilter, setGlobalFilter] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const toolbarRef = useRef<ResultTableToolbarHandle>(null);
+  const toolbarRef = useRef<DIYTableToolbarHandle>(null);
 
   // DnD sensors for column reordering
   const sensors = useSensors(
@@ -587,7 +587,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar with Search and Export */}
-      <ResultTableToolbar
+      <DIYTableToolbar
         ref={toolbarRef}
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
@@ -659,7 +659,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
                         // Get field path from column ID (for default columns too)
                         const columnFieldPath = header.column.id.split('.');
 
-                        // Check if this column is highlighted from NavigationPanel hover
+                        // Check if this column is highlighted from DynamicFieldTree hover
                         const isHighlighted = highlightedColumnPath && !isPreviewColumn
                           ? header.column.id === highlightedColumnPath.join('.')
                           : false;
@@ -766,4 +766,4 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(({
   );
 });
 
-ResultTable.displayName = 'ResultTable';
+DIYTable.displayName = 'DIYTable';

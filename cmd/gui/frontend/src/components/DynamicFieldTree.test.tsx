@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { NavigationPanel } from './NavigationPanel';
+import { DynamicFieldTree } from './DynamicFieldTree';
 import { main } from '../../wailsjs/go/models';
 import * as App from '../../wailsjs/go/main/App';
 
@@ -28,7 +28,7 @@ const createMockGVK = (
   allCount: 1,
 });
 
-describe('NavigationPanel', () => {
+describe('DynamicFieldTree', () => {
   const mockGVK = createMockGVK('Pod', '', 'v1');
   const mockContexts = ['test-context'];
   const mockOnFieldsSelected = vi.fn();
@@ -45,7 +45,7 @@ describe('NavigationPanel', () => {
       );
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -63,7 +63,7 @@ describe('NavigationPanel', () => {
       (App.GetNodeTree as any).mockResolvedValue([]);
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -77,7 +77,7 @@ describe('NavigationPanel', () => {
 
     it('should show empty state when no GVK selected', () => {
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={null as any}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -89,7 +89,7 @@ describe('NavigationPanel', () => {
 
     it('should show empty state when no contexts connected', () => {
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={[]}
           onFieldsSelected={mockOnFieldsSelected}
@@ -137,7 +137,7 @@ describe('NavigationPanel', () => {
       (App.GetNodeTree as any).mockResolvedValue(mockTreeData);
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -156,7 +156,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -210,7 +210,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -243,7 +243,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -324,7 +324,7 @@ describe('NavigationPanel', () => {
         .mockResolvedValueOnce(mockDeploymentTreeData);
 
       const { rerender } = render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={createMockGVK('Pod')}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -338,7 +338,7 @@ describe('NavigationPanel', () => {
 
       // Change to Deployment GVK
       rerender(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={createMockGVK('Deployment', 'apps')}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -370,7 +370,7 @@ describe('NavigationPanel', () => {
         .mockResolvedValueOnce(mockDeploymentTreeData);
 
       const { rerender } = render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={createMockGVK('Pod')}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -404,7 +404,7 @@ describe('NavigationPanel', () => {
 
       // Change to Deployment GVK
       rerender(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={createMockGVK('Deployment', 'apps')}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -481,7 +481,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -527,7 +527,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -602,7 +602,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -718,7 +718,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -838,7 +838,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -935,7 +935,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -1041,7 +1041,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -1100,7 +1100,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -1193,7 +1193,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -1231,7 +1231,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -1277,7 +1277,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -1318,7 +1318,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -1380,7 +1380,7 @@ describe('NavigationPanel', () => {
       const user = userEvent.setup();
 
       const { rerender } = render(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -1406,7 +1406,7 @@ describe('NavigationPanel', () => {
 
       // Rerender with highlightedFieldPath
       rerender(
-        <NavigationPanel
+        <DynamicFieldTree
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
           onFieldsSelected={mockOnFieldsSelected}
@@ -1469,7 +1469,7 @@ describe('NavigationPanel', () => {
 
       const ref = { current: null as any };
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -1519,7 +1519,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -1569,7 +1569,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}
@@ -1617,7 +1617,7 @@ describe('NavigationPanel', () => {
       const ref = { current: null as any };
 
       render(
-        <NavigationPanel
+        <DynamicFieldTree
           ref={ref}
           selectedGVK={mockGVK}
           connectedContexts={mockContexts}

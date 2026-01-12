@@ -12,7 +12,7 @@ import { Kbd } from './ui/kbd';
 import { convertToCSV, copyToClipboard, downloadCSV } from '@/lib/csv-export';
 import { SaveFile } from '../../wailsjs/go/main/App';
 
-interface ResultTableToolbarProps {
+interface DIYTableToolbarProps {
   globalFilter: string;
   onGlobalFilterChange: (value: string) => void;
   filteredRowCount: number;
@@ -25,14 +25,14 @@ interface ResultTableToolbarProps {
   onBeforeExport?: () => void; // Called before export (e.g., to clear preview)
 }
 
-export interface ResultTableToolbarHandle {
+export interface DIYTableToolbarHandle {
   focusSearch: () => void;
   isSearchFocused: () => boolean;
   exportToClipboard: () => void;
   exportToFile: () => void;
 }
 
-export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTableToolbarProps>(({
+export const DIYTableToolbar = forwardRef<DIYTableToolbarHandle, DIYTableToolbarProps>(({
   globalFilter,
   onGlobalFilterChange,
   filteredRowCount,
@@ -186,4 +186,4 @@ export const ResultTableToolbar = forwardRef<ResultTableToolbarHandle, ResultTab
   );
 });
 
-ResultTableToolbar.displayName = 'ResultTableToolbar';
+DIYTableToolbar.displayName = 'DIYTableToolbar';

@@ -9,7 +9,7 @@ import { useTree, TreeNode, PATH_DELIMITER } from '@/hooks/useTree';
 import { HighlightedText } from './HighlightedText';
 import { DEFAULT_SCHEMA_FIELDS } from '@/lib/constants';
 
-interface NavigationPanelProps {
+interface DynamicFieldTreeProps {
   selectedGVK: main.MultiClusterGVK;
   connectedContexts: string[];
   onFieldsSelected?: (fields: string[][]) => void;
@@ -21,7 +21,7 @@ interface NavigationPanelProps {
   highlightedFieldPath?: string[];
 }
 
-export interface NavigationPanelHandle {
+export interface DynamicFieldTreeHandle {
   clearSelections: () => void;
   getSelectedCount: () => number;
   getSelectedPaths: () => Set<string>;
@@ -215,7 +215,7 @@ const TreeNodeItem = memo(({
 
 TreeNodeItem.displayName = 'TreeNodeItem';
 
-export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanelProps>(({
+export const DynamicFieldTree = forwardRef<DynamicFieldTreeHandle, DynamicFieldTreeProps>(({
   selectedGVK,
   connectedContexts,
   onFieldsSelected,
@@ -378,4 +378,4 @@ export const NavigationPanel = forwardRef<NavigationPanelHandle, NavigationPanel
   );
 });
 
-NavigationPanel.displayName = 'NavigationPanel';
+DynamicFieldTree.displayName = 'DynamicFieldTree';

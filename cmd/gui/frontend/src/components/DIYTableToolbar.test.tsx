@@ -1,5 +1,5 @@
 /**
- * Tests for ResultTableToolbar component
+ * Tests for DIYTableToolbar component
  *
  * Focus on:
  * - Search input focus/blur triggers onSearchFocusChange callback
@@ -9,7 +9,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ResultTableToolbar } from './ResultTableToolbar';
+import { DIYTableToolbar } from './DIYTableToolbar';
 
 // Mock Wails SaveFile function
 vi.mock('../../wailsjs/go/main/App', () => ({
@@ -26,12 +26,12 @@ const defaultProps = {
   resourceKind: 'Pod',
 };
 
-describe('ResultTableToolbar - Search Focus Management', () => {
+describe('DIYTableToolbar - Search Focus Management', () => {
   it('should call onSearchFocusChange(true) when search input is focused', async () => {
     const onSearchFocusChange = vi.fn();
 
     render(
-      <ResultTableToolbar
+      <DIYTableToolbar
         {...defaultProps}
         onSearchFocusChange={onSearchFocusChange}
       />
@@ -47,7 +47,7 @@ describe('ResultTableToolbar - Search Focus Management', () => {
     const onSearchFocusChange = vi.fn();
 
     render(
-      <ResultTableToolbar
+      <DIYTableToolbar
         {...defaultProps}
         onSearchFocusChange={onSearchFocusChange}
       />
@@ -61,7 +61,7 @@ describe('ResultTableToolbar - Search Focus Management', () => {
   });
 
   it('should not throw when onSearchFocusChange is not provided', () => {
-    render(<ResultTableToolbar {...defaultProps} />);
+    render(<DIYTableToolbar {...defaultProps} />);
 
     const searchInput = screen.getByPlaceholderText('Search ...');
 
@@ -73,13 +73,13 @@ describe('ResultTableToolbar - Search Focus Management', () => {
   });
 });
 
-describe('ResultTableToolbar - Keyboard Event Propagation', () => {
+describe('DIYTableToolbar - Keyboard Event Propagation', () => {
   it('should stop keydown event propagation from search input', async () => {
     const parentKeydownHandler = vi.fn();
 
     render(
       <div onKeyDown={parentKeydownHandler}>
-        <ResultTableToolbar {...defaultProps} />
+        <DIYTableToolbar {...defaultProps} />
       </div>
     );
 
@@ -100,7 +100,7 @@ describe('ResultTableToolbar - Keyboard Event Propagation', () => {
     const onGlobalFilterChange = vi.fn();
 
     render(
-      <ResultTableToolbar
+      <DIYTableToolbar
         {...defaultProps}
         onGlobalFilterChange={onGlobalFilterChange}
       />
@@ -120,10 +120,10 @@ describe('ResultTableToolbar - Keyboard Event Propagation', () => {
   });
 });
 
-describe('ResultTableToolbar - Resource Count Display', () => {
+describe('DIYTableToolbar - Resource Count Display', () => {
   it('should show filtered count when search query is present', () => {
     render(
-      <ResultTableToolbar
+      <DIYTableToolbar
         {...defaultProps}
         globalFilter="pod"
         filteredRowCount={5}
@@ -136,7 +136,7 @@ describe('ResultTableToolbar - Resource Count Display', () => {
 
   it('should show total count when search query is empty', () => {
     render(
-      <ResultTableToolbar
+      <DIYTableToolbar
         {...defaultProps}
         globalFilter=""
         filteredRowCount={100}
@@ -148,10 +148,10 @@ describe('ResultTableToolbar - Resource Count Display', () => {
   });
 });
 
-describe('ResultTableToolbar - Export Button', () => {
+describe('DIYTableToolbar - Export Button', () => {
   it('should disable export button when rows are empty', () => {
     render(
-      <ResultTableToolbar
+      <DIYTableToolbar
         {...defaultProps}
         rows={[]}
       />
@@ -162,7 +162,7 @@ describe('ResultTableToolbar - Export Button', () => {
   });
 
   it('should enable export button when rows are present', () => {
-    render(<ResultTableToolbar {...defaultProps} />);
+    render(<DIYTableToolbar {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', { name: /export/i });
     expect(exportButton).not.toBeDisabled();

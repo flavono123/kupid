@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ContextGallery } from './components/ContextGallery';
+import { ContextSelector } from './components/ContextSelector';
 import { MainView } from './components/MainView';
 import { ColorPalette } from './components/debug/ColorPalette';
 import { AboutModal } from './components/AboutModal';
@@ -148,7 +148,7 @@ function App() {
                     onBackToContexts={handleBackToContextsGallery}
                 />
             ) : (
-                <ContextGallery
+                <ContextSelector
                     onContextsConnected={handleContextsConnected}
                     onLogoClick={() => setShowAbout(true)}
                 />
