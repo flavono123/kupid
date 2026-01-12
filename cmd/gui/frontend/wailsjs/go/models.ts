@@ -76,6 +76,7 @@ export namespace main {
 	    group: string;
 	    version: string;
 	    kind: string;
+	    shortNames: string[];
 	    contexts: string[];
 	    allCount: number;
 	
@@ -88,6 +89,7 @@ export namespace main {
 	        this.group = source["group"];
 	        this.version = source["version"];
 	        this.kind = source["kind"];
+	        this.shortNames = source["shortNames"];
 	        this.contexts = source["contexts"];
 	        this.allCount = source["allCount"];
 	    }

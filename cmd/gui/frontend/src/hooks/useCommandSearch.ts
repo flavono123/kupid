@@ -4,6 +4,14 @@ import { useFuzzySearch } from "./useFuzzySearch";
 import { compareVersions } from "@/lib/version";
 
 /**
+ * Get the first short name from a GVK's shortNames array.
+ * Returns undefined if no short names are available.
+ */
+function getFirstShortName(shortNames: string[] | undefined): string | undefined {
+  return shortNames && shortNames.length > 0 ? shortNames[0] : undefined;
+}
+
+/**
  * Internal search item type for unified fuzzy search.
  * This union allows searching across both favorites and GVKs with a single query.
  */
@@ -19,6 +27,8 @@ export interface FavoriteSearchResult {
 export interface GVKSearchResult {
   gvk: main.MultiClusterGVK;
   indices: readonly [number, number][] | null;
+  abbreviation: string | undefined;
+  score: number;
 }
 
 interface UseCommandSearchResult {
@@ -48,11 +58,19 @@ export function useCommandSearch(
       };
     });
 
-    const gvkItems: SearchItem[] = gvks.map((gvk) => ({
-      type: 'gvk' as const,
-      gvk,
-      searchText: gvk.group ? `${gvk.group} ${gvk.kind}` : gvk.kind,
-    }));
+    const gvkItems: SearchItem[] = gvks.map((gvk) => {
+      const abbr = getFirstShortName(gvk.shortNames);
+      // Include abbreviation at the beginning for priority matching
+      // Format: "abbr kind group" or "kind group" if no abbreviation
+      const searchText = abbr
+        ? `${abbr} ${gvk.kind} ${gvk.group}`.trim()
+        : `${gvk.kind} ${gvk.group}`.trim();
+      return {
+        type: 'gvk' as const,
+        gvk,
+        searchText,
+      };
+    });
 
     return [...favItems, ...gvkItems];
   }, [favorites, gvks]);
@@ -62,9 +80,9 @@ export function useCommandSearch(
   // Separate and sort results
   const { filteredFavorites, filteredGVKs } = useMemo(() => {
     const favoriteResults: FavoriteSearchResult[] = [];
-    const gvkResults: Array<GVKSearchResult & { originalIndex: number }> = [];
+    const gvkResults: GVKSearchResult[] = [];
 
-    results.forEach((result, idx) => {
+    results.forEach((result) => {
       if (result.item.type === 'favorite') {
         favoriteResults.push({
           favorite: result.item.favorite,
@@ -74,41 +92,41 @@ export function useCommandSearch(
         gvkResults.push({
           gvk: result.item.gvk,
           indices: result.indices.length > 0 ? result.indices : null,
-          originalIndex: idx,
+          abbreviation: getFirstShortName(result.item.gvk.shortNames),
+          score: result.score,
         });
       }
     });
 
-    // Sort GVKs: group (core first) -> kind -> version (semver desc)
+    // Sort GVKs: score (desc) -> group (core first) -> kind -> version (semver desc)
     gvkResults.sort((a, b) => {
-      // 1. Core group (empty string) comes first
+      // 1. Score first (higher is better, fuzzysort returns negative scores where closer to 0 is better)
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+
+      // 2. Core group (empty string) comes first
       const aIsCore = a.gvk.group === "";
       const bIsCore = b.gvk.group === "";
 
       if (aIsCore && !bIsCore) return -1;
       if (!aIsCore && bIsCore) return 1;
 
-      // 2. Compare groups alphabetically
+      // 3. Compare groups alphabetically
       if (a.gvk.group !== b.gvk.group) {
         return a.gvk.group.localeCompare(b.gvk.group);
       }
 
-      // 3. Compare kinds alphabetically
+      // 4. Compare kinds alphabetically
       if (a.gvk.kind !== b.gvk.kind) {
         return a.gvk.kind.localeCompare(b.gvk.kind);
       }
 
-      // 4. Compare versions (semver descending)
+      // 5. Compare versions (semver descending)
       return compareVersions(a.gvk.version, b.gvk.version);
     });
 
-    // Remove originalIndex from final results
-    const sortedGVKs: GVKSearchResult[] = gvkResults.map(({ gvk, indices }) => ({
-      gvk,
-      indices,
-    }));
-
-    return { filteredFavorites: favoriteResults, filteredGVKs: sortedGVKs };
+    return { filteredFavorites: favoriteResults, filteredGVKs: gvkResults };
   }, [results]);
 
   return { query, setQuery, filteredFavorites, filteredGVKs };

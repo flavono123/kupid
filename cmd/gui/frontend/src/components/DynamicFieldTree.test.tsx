@@ -26,6 +26,7 @@ const createMockGVK = (
   version,
   contexts: ['test-context'],
   allCount: 1,
+  shortNames: [],
 });
 
 describe('DynamicFieldTree', () => {

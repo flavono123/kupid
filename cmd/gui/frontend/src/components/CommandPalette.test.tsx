@@ -41,13 +41,15 @@ const createMockGVK = (
   kind: string,
   group: string = '',
   contexts: string[] = [],
-  allCount: number = 2
+  allCount: number = 2,
+  shortNames: string[] = []
 ): main.MultiClusterGVK => ({
   kind,
   group,
   version: 'v1',
   contexts,
   allCount,
+  shortNames,
 });
 
 // Default props for all tests
@@ -388,8 +390,8 @@ describe('CommandPalette - Resource Sorting', () => {
 
   it('should sort core resources before non-core resources', () => {
     const gvks = [
-      { kind: 'Deployment', group: 'apps', version: 'v1', contexts: ['ctx'], allCount: 1 },
-      { kind: 'Pod', group: '', version: 'v1', contexts: ['ctx'], allCount: 1 },
+      { kind: 'Deployment', group: 'apps', version: 'v1', contexts: ['ctx'], allCount: 1, shortNames: ['deploy'] },
+      { kind: 'Pod', group: '', version: 'v1', contexts: ['ctx'], allCount: 1, shortNames: ['po'] },
     ];
 
     render(
@@ -418,9 +420,9 @@ describe('CommandPalette - Resource Sorting', () => {
 
   it('should sort versions in semver order (stable > beta > alpha)', async () => {
     const gvks = [
-      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1alpha1', contexts: ['ctx'], allCount: 1 },
-      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1', contexts: ['ctx'], allCount: 1 },
-      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1beta1', contexts: ['ctx'], allCount: 1 },
+      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1alpha1', contexts: ['ctx'], allCount: 1, shortNames: ['netpol'] },
+      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1', contexts: ['ctx'], allCount: 1, shortNames: ['netpol'] },
+      { kind: 'NetworkPolicy', group: 'networking.k8s.io', version: 'v1beta1', contexts: ['ctx'], allCount: 1, shortNames: ['netpol'] },
     ];
 
     render(
@@ -460,8 +462,8 @@ describe('CommandPalette - Resource Sorting', () => {
 
   it('should sort higher major versions first', async () => {
     const gvks = [
-      { kind: 'CustomResource', group: 'example.com', version: 'v1', contexts: ['ctx'], allCount: 1 },
-      { kind: 'CustomResource', group: 'example.com', version: 'v2', contexts: ['ctx'], allCount: 1 },
+      { kind: 'CustomResource', group: 'example.com', version: 'v1', contexts: ['ctx'], allCount: 1, shortNames: [] },
+      { kind: 'CustomResource', group: 'example.com', version: 'v2', contexts: ['ctx'], allCount: 1, shortNames: [] },
     ];
 
     render(
