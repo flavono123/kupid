@@ -292,5 +292,81 @@ var _ = Describe("ResourceController", func() {
 
 			wg.Wait()
 		})
+
+		// Regression test for issue: concurrent map read and map write panic
+		// Previously, Objects() called MetaNamespaceKeyFunc during sort which reads
+		// from the Unstructured object's internal map. When the informer concurrently
+		// updates the same object, it causes a race condition.
+		// The fix uses store.ListKeys() and store.GetByKey() to avoid reading object
+		// maps during sorting.
+		It("should not panic when objects are modified during sorting (regression)", func() {
+			store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			controller := &ResourceController{
+				store:     store,
+				nameCache: make(map[string]string),
+			}
+
+			// Create objects and keep references for concurrent modification
+			objects := make([]*unstructured.Unstructured, 20)
+			for i := 0; i < 20; i++ {
+				name := "pod-" + string(rune('a'+i))
+				obj := &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+						"metadata": map[string]interface{}{
+							"name":      name,
+							"namespace": "default",
+							"labels": map[string]interface{}{
+								"app": "test",
+							},
+						},
+					},
+				}
+				objects[i] = obj
+				Expect(store.Add(obj)).To(Succeed())
+
+				key, _ := cache.MetaNamespaceKeyFunc(obj)
+				controller.nameCacheMu.Lock()
+				controller.nameCache[key] = name
+				controller.nameCacheMu.Unlock()
+			}
+
+			var wg sync.WaitGroup
+
+			// Reader goroutines calling Objects() repeatedly
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					defer GinkgoRecover()
+					for j := 0; j < 200; j++ {
+						// This should NOT panic even with concurrent writes
+						objs := controller.Objects()
+						_ = len(objs)
+					}
+				}()
+			}
+
+			// Writer goroutines modifying the object's internal map
+			// This simulates what the informer does when it receives updates
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+				go func(id int) {
+					defer wg.Done()
+					defer GinkgoRecover()
+					for j := 0; j < 200; j++ {
+						// Modify object's internal map (simulates informer update)
+						obj := objects[id%len(objects)]
+						metadata := obj.Object["metadata"].(map[string]interface{})
+						labels := metadata["labels"].(map[string]interface{})
+						labels["iteration"] = j
+						labels["writer"] = id
+					}
+				}(i)
+			}
+
+			wg.Wait()
+		})
 	})
 })
