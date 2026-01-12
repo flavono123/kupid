@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { CommandPalette } from "./CommandPalette";
-import { NavigationPanel, NavigationPanelHandle } from "./NavigationPanel";
-import { ResultTable, ResultTableHandle } from "./ResultTable";
+import { DynamicFieldTree, DynamicFieldTreeHandle } from "./DynamicFieldTree";
+import { DIYTable, DIYTableHandle } from "./DIYTable";
 import { NavHeader } from "./NavHeader";
 import { QuickAccessBar, QuickAccessBarHandle } from "./QuickAccessBar";
 import { KeymapBar, FocusedPanel } from "./KeymapBar";
@@ -24,7 +24,7 @@ interface MainViewProps {
   onBackToContexts: () => void;
 }
 
-// Path delimiter must match NavigationPanel's delimiter
+// Path delimiter must match DynamicFieldTree's delimiter
 const PATH_DELIMITER = '\x00';
 
 export function MainView({ selectedContexts, connectedContexts, onBackToContexts }: MainViewProps) {
@@ -33,14 +33,14 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const [loading, setLoading] = useState(true);
   const [selectedGVK, setSelectedGVK] = useState<main.MultiClusterGVK | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[][]>([]);
-  // Focus sync state between NavigationPanel and ResultTable
+  // Focus sync state between DynamicFieldTree and DIYTable
   const [focusedFieldPath, setFocusedFieldPath] = useState<string[] | null>(null);
   // Pending favorite ID to apply after GVK switch (use ref to avoid stale closure)
   const pendingFavoriteIdRef = useRef<string | null>(null);
   const loadedRef = useRef(false);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
-  const navigationPanelRef = useRef<NavigationPanelHandle>(null);
-  const resultTableRef = useRef<ResultTableHandle>(null);
+  const fieldTreeRef = useRef<DynamicFieldTreeHandle>(null);
+  const diyTableRef = useRef<DIYTableHandle>(null);
   const quickAccessBarRef = useRef<QuickAccessBarHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [focusedPanel, setFocusedPanel] = useState<FocusedPanel>(null);
@@ -110,12 +110,12 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
   // Check if search is focused in nav panel
   const isNavSearchFocused = useCallback(() => {
-    return navigationPanelRef.current?.isSearchFocused() ?? false;
+    return fieldTreeRef.current?.isSearchFocused() ?? false;
   }, []);
 
   // Check if search is focused in result table
   const isTableSearchFocused = useCallback(() => {
-    return resultTableRef.current?.isSearchFocused() ?? false;
+    return diyTableRef.current?.isSearchFocused() ?? false;
   }, []);
 
   // Reset selectedFields when GVK changes
@@ -135,11 +135,11 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   };
 
   const handleClearAllFields = useCallback(() => {
-    navigationPanelRef.current?.clearSelections();
+    fieldTreeRef.current?.clearSelections();
   }, []);
 
   const handleSearch = useCallback(() => {
-    navigationPanelRef.current?.toggleSearch();
+    fieldTreeRef.current?.toggleSearch();
   }, []);
 
   const handleSaveFavorite = useCallback(async (name: string) => {
@@ -154,12 +154,12 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   // Apply favorite by ID (sets paths in NavigationPanel and activates)
   const applyFavoriteById = useCallback((id: string) => {
     const fields = applyFavorite(id);
-    if (!fields || !navigationPanelRef.current) {
+    if (!fields || !fieldTreeRef.current) {
       return;
     }
 
     const pathSet = fieldsToPathSet(fields);
-    navigationPanelRef.current.setSelectedPaths(pathSet);
+    fieldTreeRef.current.setSelectedPaths(pathSet);
   }, [applyFavorite, fieldsToPathSet]);
 
   // Called when NavigationPanel finishes loading - apply pending favorite if any
@@ -212,21 +212,21 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
       // cmd+shift+a to clear all field selections
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
-        navigationPanelRef.current?.clearSelections();
+        fieldTreeRef.current?.clearSelections();
         return;
       }
 
       // cmd+shift+c to export to clipboard
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
         e.preventDefault();
-        resultTableRef.current?.exportToClipboard();
+        diyTableRef.current?.exportToClipboard();
         return;
       }
 
       // cmd+shift+s to download as file
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        resultTableRef.current?.exportToFile();
+        diyTableRef.current?.exportToFile();
         return;
       }
 
@@ -251,13 +251,13 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
         if (focusedPanel === 'nav') {
-          navigationPanelRef.current?.toggleSearch();
+          fieldTreeRef.current?.toggleSearch();
         } else if (focusedPanel === 'table') {
-          resultTableRef.current?.focusSearch();
+          diyTableRef.current?.focusSearch();
         } else {
           // Default to nav panel
           setFocusedPanel('nav');
-          navigationPanelRef.current?.toggleSearch();
+          fieldTreeRef.current?.toggleSearch();
         }
         return;
       }
@@ -281,20 +281,20 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
         if (focusedPanel === 'nav') {
           e.preventDefault();
           if (e.key === 'ArrowUp') {
-            navigationPanelRef.current?.navigateUp();
+            fieldTreeRef.current?.navigateUp();
           } else if (e.key === 'ArrowDown') {
-            navigationPanelRef.current?.navigateDown();
+            fieldTreeRef.current?.navigateDown();
           }
         } else if (focusedPanel === 'table') {
           e.preventDefault();
           if (e.key === 'ArrowUp') {
-            resultTableRef.current?.navigateUp();
+            diyTableRef.current?.navigateUp();
           } else if (e.key === 'ArrowDown') {
-            resultTableRef.current?.navigateDown();
+            diyTableRef.current?.navigateDown();
           } else if (e.key === 'ArrowLeft') {
-            resultTableRef.current?.navigateLeft();
+            diyTableRef.current?.navigateLeft();
           } else if (e.key === 'ArrowRight') {
-            resultTableRef.current?.navigateRight();
+            diyTableRef.current?.navigateRight();
           }
         }
         return;
@@ -307,10 +307,10 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
         if (focusedPanel === 'nav') {
           e.preventDefault();
-          navigationPanelRef.current?.toggleFocused();
+          fieldTreeRef.current?.toggleFocused();
         } else if (focusedPanel === 'table') {
           e.preventDefault();
-          resultTableRef.current?.copyFocusedCell();
+          diyTableRef.current?.copyFocusedCell();
         }
         return;
       }
@@ -323,7 +323,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const handleClearFavorite = useCallback(() => {
     clearFavorite();
     // Also clear nav panel selections
-    navigationPanelRef.current?.clearSelections();
+    fieldTreeRef.current?.clearSelections();
   }, [clearFavorite]);
 
   // Handle column reorder - update fields and clear active favorite
@@ -335,11 +335,11 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   // Handle column removal from ResultTable header
   const handleFieldRemove = useCallback((field: string[]) => {
     const pathKey = field.join(PATH_DELIMITER);
-    const currentPaths = navigationPanelRef.current?.getSelectedPaths();
+    const currentPaths = fieldTreeRef.current?.getSelectedPaths();
     if (currentPaths) {
       const newPaths = new Set(currentPaths);
       newPaths.delete(pathKey);
-      navigationPanelRef.current?.setSelectedPaths(newPaths);
+      fieldTreeRef.current?.setSelectedPaths(newPaths);
     }
     clearFavorite();
   }, [clearFavorite]);
@@ -406,8 +406,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
             {/* Navigation Content */}
             <div className="flex-1 overflow-auto">
               {selectedGVK ? (
-                <NavigationPanel
-                  ref={navigationPanelRef}
+                <DynamicFieldTree
+                  ref={fieldTreeRef}
                   selectedGVK={selectedGVK}
                   connectedContexts={connectedContexts}
                   onReady={handleNavigationReady}
@@ -459,8 +459,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
             {/* Table or Empty State */}
             {selectedGVK ? (
-              <ResultTable
-                ref={resultTableRef}
+              <DIYTable
+                ref={diyTableRef}
                 selectedFields={selectedFields}
                 selectedGVK={selectedGVK}
                 connectedContexts={connectedContexts}

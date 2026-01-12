@@ -101,21 +101,28 @@ func (i *ResourceController) Context() string {
 }
 
 func (i *ResourceController) Objects() []*unstructured.Unstructured {
-	objs := make([]*unstructured.Unstructured, 0)
-	for _, obj := range i.store.List() {
-		objs = append(objs, obj.(*unstructured.Unstructured))
-	}
+	// Get keys from store first to avoid reading from object maps during sort.
+	// This prevents race conditions with concurrent informer updates.
+	keys := i.store.ListKeys()
 
-	// Use cached names for sorting to avoid race conditions.
-	// The nameCache is updated synchronously by informer handlers.
-	// Hold read lock during sort to prevent writes while sorting.
+	// Sort keys using cached names (avoid reading from objects)
 	i.nameCacheMu.RLock()
-	sort.Slice(objs, func(a, b int) bool {
-		keyA, _ := cache.MetaNamespaceKeyFunc(objs[a])
-		keyB, _ := cache.MetaNamespaceKeyFunc(objs[b])
-		return i.nameCache[keyA] < i.nameCache[keyB]
+	sort.Slice(keys, func(a, b int) bool {
+		return i.nameCache[keys[a]] < i.nameCache[keys[b]]
 	})
 	i.nameCacheMu.RUnlock()
+
+	// Retrieve objects by sorted keys
+	objs := make([]*unstructured.Unstructured, 0, len(keys))
+	for _, key := range keys {
+		item, exists, err := i.store.GetByKey(key)
+		if err != nil || !exists {
+			continue
+		}
+		if u, ok := item.(*unstructured.Unstructured); ok {
+			objs = append(objs, u)
+		}
+	}
 
 	return objs
 }
