@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import fuzzysort from "fuzzysort";
 import { main } from "../../wailsjs/go/models";
-import { useFuzzySearch, indexesToRanges } from "./useFuzzySearch";
+import { indexesToRanges } from "./useFuzzySearch";
 import { compareVersions } from "@/lib/version";
 
 /**
@@ -142,13 +142,23 @@ function calculateBoostedScore(
 /**
  * Custom hook for CommandPalette search functionality.
  *
+ * ## Why not use useFuzzySearch?
+ *
+ * This hook uses fuzzysort directly instead of useFuzzySearch because:
+ * 1. useFuzzySearch manages its own internal query state, which would create
+ *    synchronization issues with our shared query state
+ * 2. GVKs require multi-key search (abbr, kind, group) with custom scoring,
+ *    which useFuzzySearch doesn't support
+ * 3. Both favorites and GVKs share the same query state, so we need direct
+ *    control over when and how searches are executed
+ *
  * ## Search Strategy
  *
  * ### Favorites
- * Uses single-key fuzzy search on combined text (name + GVK info).
+ * Single-key fuzzy search on combined text (name + GVK info).
  *
  * ### GVKs (Kubernetes Resources)
- * Uses multi-key fuzzy search with prioritized matching:
+ * Multi-key fuzzy search with prioritized matching:
  *
  * | Priority | Match Type | Score Bonus | Example |
  * |----------|------------|-------------|---------|
@@ -197,13 +207,9 @@ export function useCommandSearch(
     }));
   }, [gvks]);
 
-  // Search favorites using existing fuzzy search
-  const { results: favoriteResults } = useFuzzySearch(
-    favoriteItems,
-    (item) => item.searchText
-  );
-
-  // Filter favorites based on query
+  // Search favorites using fuzzysort directly
+  // Note: We don't use useFuzzySearch here because it manages its own internal
+  // query state, which would be out of sync with our shared query state.
   const filteredFavorites = useMemo((): FavoriteSearchResult[] => {
     if (!query) {
       // No query: return all favorites
@@ -213,13 +219,16 @@ export function useCommandSearch(
       }));
     }
 
-    return favoriteResults
-      .filter((result) => result.item.favorite)
-      .map((result) => ({
-        favorite: result.item.favorite,
-        indices: result.indices.length > 0 ? result.indices : null,
-      }));
-  }, [query, favorites, favoriteResults]);
+    const searchResults = fuzzysort.go(query, favoriteItems, {
+      key: (item) => item.searchText,
+      threshold: -10000,
+    });
+
+    return searchResults.map((result) => ({
+      favorite: result.obj.favorite,
+      indices: indexesToRanges(result.indexes),
+    }));
+  }, [query, favorites, favoriteItems]);
 
   // Search GVKs using multi-key fuzzysort with field boosting
   const filteredGVKs = useMemo((): GVKSearchResult[] => {
