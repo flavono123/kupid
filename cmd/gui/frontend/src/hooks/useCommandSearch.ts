@@ -309,7 +309,7 @@ export function useCommandSearch(
 
     // Sort by score (desc) -> group (core first) -> kind -> version
     results.sort((a, b) => {
-      // 1. Score first (closer to 0 is better)
+      // 1. Score first (higher is better)
       if (a.score !== b.score) {
         return b.score - a.score;
       }
