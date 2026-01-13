@@ -255,60 +255,9 @@ export function CommandPalette({ contexts, gvks, favorites, loading, theme, onCl
                 {/* RESOURCES Group */}
                 {filteredGVKs.length > 0 && (
                   <CommandGroup heading="RESOURCES">
-                {filteredGVKs.map(({ gvk, indices, abbreviation }, index) => {
+                {filteredGVKs.map(({ gvk, abbrIndices, kindIndices, groupIndices, abbreviation }, index) => {
                   const isCore = gvk.group === "";
                   const availableCount = gvk.contexts?.length || 0;
-
-                  // Calculate indices for abbr, kind, and group separately
-                  // searchText format: "abbr kind group" or "kind group" (if no abbr)
-                  let abbrIndices: readonly [number, number][] = [];
-                  let kindIndices: readonly [number, number][] = [];
-                  let groupIndices: readonly [number, number][] = [];
-
-                  if (indices && indices.length > 0) {
-                    const abbrLength = abbreviation ? abbreviation.length : 0;
-                    const kindLength = gvk.kind.length;
-                    const groupLength = gvk.group.length;
-
-                    // Calculate start positions
-                    const kindStart = abbreviation ? abbrLength + 1 : 0; // +1 for space after abbr
-                    const groupStart = abbreviation
-                      ? abbrLength + 1 + kindLength + 1 // abbr + space + kind + space
-                      : kindLength + 1; // kind + space
-
-                    const abbrRanges: [number, number][] = [];
-                    const kindRanges: [number, number][] = [];
-                    const groupRanges: [number, number][] = [];
-
-                    indices.forEach(([start, end]) => {
-                      // Check abbr region (if exists)
-                      if (abbreviation && start < abbrLength && end < kindStart) {
-                        abbrRanges.push([start, Math.min(end, abbrLength - 1)]);
-                      }
-
-                      // Check kind region
-                      if (start < groupStart && end >= kindStart) {
-                        const kindRangeStart = Math.max(start, kindStart) - kindStart;
-                        const kindRangeEnd = Math.min(end, groupStart - 2) - kindStart; // -2 for space before group
-                        if (kindRangeEnd >= kindRangeStart && kindRangeEnd < kindLength) {
-                          kindRanges.push([kindRangeStart, kindRangeEnd]);
-                        }
-                      }
-
-                      // Check group region (if exists)
-                      if (groupLength > 0 && end >= groupStart) {
-                        const groupRangeStart = Math.max(start, groupStart) - groupStart;
-                        const groupRangeEnd = end - groupStart;
-                        if (groupRangeEnd >= groupRangeStart && groupRangeEnd < groupLength) {
-                          groupRanges.push([groupRangeStart, groupRangeEnd]);
-                        }
-                      }
-                    });
-
-                    abbrIndices = abbrRanges;
-                    kindIndices = kindRanges;
-                    groupIndices = groupRanges;
-                  }
 
                   return (
                     <CommandItem
@@ -325,7 +274,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, theme, onCl
                             variant="outline"
                             className="text-xs font-mono px-1.5 py-0 h-5"
                           >
-                            {abbrIndices.length > 0 ? (
+                            {abbrIndices && abbrIndices.length > 0 ? (
                               <HighlightedText
                                 text={abbreviation}
                                 indices={abbrIndices}
@@ -337,7 +286,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, theme, onCl
                         )}
 
                         <span className={abbreviation ? "" : "ml-2"}>
-                          {kindIndices.length > 0 ? (
+                          {kindIndices && kindIndices.length > 0 ? (
                             <HighlightedText
                               text={gvk.kind}
                               indices={kindIndices}
@@ -354,7 +303,7 @@ export function CommandPalette({ contexts, gvks, favorites, loading, theme, onCl
                         >
                           {isCore ? (
                             gvk.version
-                          ) : groupIndices.length > 0 ? (
+                          ) : groupIndices && groupIndices.length > 0 ? (
                             <>
                               <HighlightedText
                                 text={gvk.group}
