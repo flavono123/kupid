@@ -182,11 +182,12 @@ func (a *App) ConnectToContexts(contexts []string) []ContextConnectionResult {
 
 // MultiClusterGVK represents a Kubernetes resource (Group/Version/Kind) with context availability
 type MultiClusterGVK struct {
-	Group    string   `json:"group"`
-	Version  string   `json:"version"`
-	Kind     string   `json:"kind"`
-	Contexts []string `json:"contexts"` // Contexts where this GVK is available
-	AllCount int      `json:"allCount"` // Total number of contexts
+	Group      string   `json:"group"`
+	Version    string   `json:"version"`
+	Kind       string   `json:"kind"`
+	ShortNames []string `json:"shortNames"` // Short names from API (e.g., "po" for Pod, "deploy" for Deployment)
+	Contexts   []string `json:"contexts"`   // Contexts where this GVK is available
+	AllCount   int      `json:"allCount"`   // Total number of contexts
 }
 
 // GetGVKs retrieves all unique GVKs from the specified contexts
@@ -203,29 +204,34 @@ func (a *App) GetGVKs(contexts []string) []MultiClusterGVK {
 		go func(ctx string) {
 			defer wg.Done()
 
-			gvks, err := kube.GetGVKsForContext(ctx)
+			gvkInfos, err := kube.GetGVKInfosForContext(ctx)
 			if err != nil {
 				// Skip contexts that fail
 				return
 			}
 
-			for _, gvk := range gvks {
+			for _, info := range gvkInfos {
 				// Create unique key using GVK (no GVR conversion needed)
-				key := fmt.Sprintf("%s/%s/%s", gvk.Group, gvk.Version, gvk.Kind)
+				key := fmt.Sprintf("%s/%s/%s", info.Group, info.Version, info.Kind)
 
 				// Thread-safe map update
 				mu.Lock()
-				if info, exists := resourceMap[key]; exists {
+				if existing, exists := resourceMap[key]; exists {
 					// Add context to existing GVK
-					info.Contexts = append(info.Contexts, ctx)
+					existing.Contexts = append(existing.Contexts, ctx)
+					// ShortNames should be consistent across contexts, but take the first non-empty one
+					if len(existing.ShortNames) == 0 && len(info.ShortNames) > 0 {
+						existing.ShortNames = info.ShortNames
+					}
 				} else {
 					// Create new GVK entry
 					resourceMap[key] = &MultiClusterGVK{
-						Group:    gvk.Group,
-						Version:  gvk.Version,
-						Kind:     gvk.Kind,
-						Contexts: []string{ctx},
-						AllCount: len(contexts),
+						Group:      info.Group,
+						Version:    info.Version,
+						Kind:       info.Kind,
+						ShortNames: info.ShortNames,
+						Contexts:   []string{ctx},
+						AllCount:   len(contexts),
 					}
 				}
 				mu.Unlock()

@@ -63,6 +63,7 @@ const defaultGVK = {
   kind: 'Pod',
   contexts: ['ctx1'],
   allCount: 1,
+  shortNames: ['po'],
 };
 
 const defaultProps = {
