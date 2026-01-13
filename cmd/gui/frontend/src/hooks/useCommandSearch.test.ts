@@ -37,7 +37,9 @@ const createMockFavorite = (
   name,
   gvk: { kind, group, version: 'v1' },
   fields: [],
-});
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+} as unknown as main.FavoriteViewResponse);
 
 describe('useCommandSearch', () => {
   describe('GVK search scoring', () => {
