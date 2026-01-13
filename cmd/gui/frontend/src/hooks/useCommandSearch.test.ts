@@ -26,20 +26,21 @@ const createMockGVK = (
   allCount: contexts.length,
 });
 
-// Helper to create mock favorite
+// Helper to create mock favorite using the class constructor
 const createMockFavorite = (
   id: string,
   name: string,
   kind: string,
   group: string = ''
-): main.FavoriteViewResponse => ({
-  id,
-  name,
-  gvk: { kind, group, version: 'v1' },
-  fields: [],
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
-} as unknown as main.FavoriteViewResponse);
+): main.FavoriteViewResponse =>
+  main.FavoriteViewResponse.createFrom({
+    id,
+    name,
+    gvk: { kind, group, version: 'v1' },
+    fields: [],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  });
 
 describe('useCommandSearch', () => {
   describe('GVK search scoring', () => {
