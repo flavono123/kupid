@@ -27,7 +27,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, pluralize } from '../lib/utils';
 import { Spinner } from './ui/spinner';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card';
 import { CellContent } from './CellContent';
@@ -36,6 +36,9 @@ import { useCellHighlight } from '../hooks/useCellHighlight';
 import { useResourceData } from '../hooks/useResourceData';
 import { useFlashingCells } from '../hooks/useFlashingCells';
 import type { main } from '../../wailsjs/go/models';
+
+// Delay before showing cell popover (prevents popover flash during scroll)
+const POPOVER_DELAY_MS = 300;
 
 interface DIYTableProps {
   selectedFields: string[][];  // From DynamicFieldTree
@@ -313,7 +316,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
   // Track copied cell for "Copied" feedback
   const [copiedCellKey, setCopiedCellKey] = useState<string | null>(null);
 
-  // Debounce popover display (300ms delay)
+  // Debounce popover display
   useEffect(() => {
     // Clear any existing timeout
     if (popoverTimeoutRef.current) {
@@ -328,7 +331,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
       // Set timeout to show popover after delay
       popoverTimeoutRef.current = setTimeout(() => {
         setPopoverCell({ row: focusedRowIndex, col: focusedColIndex });
-      }, 300);
+      }, POPOVER_DELAY_MS);
     }
 
     return () => {
@@ -366,7 +369,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
   // Calculate column width based on field name and data
   // Returns { size: initial display width, maxSize: max possible width }
   const calculateColumnWidth = (fieldName: string, values: any[]): { size: number; maxSize: number } => {
-    // Header is displayed capitalized, estimate 8px per char
+    // Header is displayed in title case (CSS capitalize), estimate 8px per char
     // Add 40px for padding (px-4 = 32px) + resize handle (8px)
     const headerWidth = fieldName.length * 8 + 40;
 
@@ -683,7 +686,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
           <div className="h-full flex flex-col items-center justify-center gap-2">
             <Spinner className="w-8 h-8" />
             <p className="text-sm text-muted-foreground">
-              Loading {selectedGVK?.kind?.toLowerCase() ?? 'resource'}s...
+              Loading {pluralize(selectedGVK?.kind?.toLowerCase() ?? 'resource')}...
             </p>
           </div>
         ) : data.length === 0 ? (

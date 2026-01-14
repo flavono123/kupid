@@ -10,6 +10,7 @@ import { Download, Clipboard, FileDown, AlertCircle } from 'lucide-react';
 import { useState, forwardRef, useRef, useImperativeHandle, useCallback } from 'react';
 import { Kbd } from './ui/kbd';
 import { convertToCSV, copyToClipboard, downloadCSV } from '@/lib/csv-export';
+import { pluralize } from '@/lib/utils';
 import { SaveFile } from '../../wailsjs/go/main/App';
 
 interface DIYTableToolbarProps {
@@ -134,8 +135,8 @@ export const DIYTableToolbar = forwardRef<DIYTableToolbarHandle, DIYTableToolbar
           />
           <span className="text-sm text-muted-foreground whitespace-nowrap">
             {globalFilter
-              ? `${filteredRowCount}/${totalRowCount} ${resourceKind}s`
-              : `${totalRowCount} ${resourceKind}s`
+              ? `${filteredRowCount}/${totalRowCount} ${pluralize(resourceKind)}`
+              : `${totalRowCount} ${pluralize(resourceKind)}`
             }
           </span>
         </div>
