@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
-import { Star, ChevronDown, Pencil, Trash2, Check, X } from "lucide-react";
+import { Star, Book, BookOpen, Pencil, Trash2, Check, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Kbd } from "./ui/kbd";
@@ -387,7 +387,11 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
               <button className="flex-1 px-1 py-2 flex items-center gap-2 hover:bg-focus transition-colors min-w-0">
                 <span className="text-xs font-medium text-foreground truncate">Favorites</span>
                 <span className="text-xs text-muted-foreground shrink-0">({favorites.length})</span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 ml-auto" />
+                {listPopoverOpen ? (
+                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
+                ) : (
+                  <Book className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
+                )}
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="start" side="bottom">
