@@ -48,6 +48,7 @@ interface DIYTableProps {
   highlightedColumnPath?: string[];  // Column to highlight (from DynamicFieldTree hover)
   previewField?: string[];  // Unchecked field to preview as muted column at the end
   onPreviewClear?: () => void;  // Callback to clear preview before export
+  expandButton?: React.ReactNode;  // Sidebar expand button (shown when collapsed)
 }
 
 export interface DIYTableHandle {
@@ -171,7 +172,7 @@ function SortableHeader({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative px-2 py-2 text-left text-sm font-semibold flex-shrink-0 text-muted-foreground group",
+        "relative px-2 h-full text-left text-sm font-semibold flex-shrink-0 text-muted-foreground group flex items-center",
         isDragging && "bg-accent",
         isDraggable && "cursor-grab active:cursor-grabbing",
         isHighlighted && "bg-focus",
@@ -258,6 +259,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
   highlightedColumnPath,
   previewField,
   onPreviewClear,
+  expandButton,
 }, ref) => {
   // Use extracted hook for data fetching (watch enabled for real-time updates)
   const { data, loading, getRowId, changedCells } = useResourceData(
@@ -664,6 +666,7 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
         resourceKind={selectedGVK?.kind || 'resources'}
         onSearchFocusChange={handleSearchFocusChange}
         onBeforeExport={onPreviewClear}
+        expandButton={expandButton}
       />
 
       {/* Table Content with Virtual Scrolling */}
@@ -701,14 +704,14 @@ export const DIYTable = forwardRef<DIYTableHandle, DIYTableProps>(({
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <div className="sticky top-0 bg-background z-10 border-b border-border">
+              <div className="sticky top-0 bg-background z-10 border-b border-border h-8">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <SortableContext
                     key={headerGroup.id}
                     items={selectedFields.map(f => f.join('.'))}
                     strategy={horizontalListSortingStrategy}
                   >
-                    <div className="flex">
+                    <div className="flex h-full">
                       {headerGroup.headers.map((header, headerIndex) => {
                         const headerText = typeof header.column.columnDef.header === 'string'
                           ? header.column.columnDef.header

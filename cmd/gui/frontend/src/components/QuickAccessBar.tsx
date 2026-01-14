@@ -198,7 +198,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
 
     return (
       <>
-        <div className="border-b border-border">
+        <div className="h-8 border-b border-border">
           <Popover
             open={savePopoverOpen}
             onOpenChange={(newOpen) => {
@@ -208,7 +208,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
           >
             <PopoverTrigger asChild>
               <button
-                className="w-full px-4 py-2 flex items-center gap-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-full px-4 flex items-center gap-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!canSave}
               >
                 <Star
@@ -262,7 +262,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
   return (
     <>
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border-b border-border">
-        <div className="flex items-center">
+        <div className="h-8 flex items-center">
           <Popover
             open={savePopoverOpen}
             onOpenChange={(newOpen) => {
