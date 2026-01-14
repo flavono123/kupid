@@ -15,10 +15,15 @@ export default {
   				'0%': { backgroundColor: 'hsl(var(--accent) / 0.10)' },
   				'100%': { backgroundColor: 'transparent' },
   			},
+  			'panel-focus': {
+  				'0%': { backgroundColor: 'hsl(var(--accent) / 0.15)' },
+  				'100%': { backgroundColor: 'transparent' },
+  			},
   		},
   		animation: {
   			// TODO: [CONFIG] Move to YAML config. Must sync with useFlashingCells.ts FLASH_DURATION_MS
   			'cell-flash': 'cell-flash 1s ease-out forwards',
+  			'panel-focus': 'panel-focus 1s ease-out forwards',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

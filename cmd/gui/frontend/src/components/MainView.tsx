@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { CommandPalette } from "./CommandPalette";
 import { DynamicFieldTree, DynamicFieldTreeHandle } from "./DynamicFieldTree";
 import { DIYTable, DIYTableHandle } from "./DIYTable";
+import { ContextBar } from "./ContextBar";
 import { NavHeader } from "./NavHeader";
 import { QuickAccessBar, QuickAccessBarHandle } from "./QuickAccessBar";
 import { KeymapBar, FocusedPanel } from "./KeymapBar";
@@ -43,6 +44,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const diyTableRef = useRef<DIYTableHandle>(null);
   const quickAccessBarRef = useRef<QuickAccessBarHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarWidthPercent, setSidebarWidthPercent] = useState(20); // Track sidebar width for ContextBar alignment
   const [focusedPanel, setFocusedPanel] = useState<FocusedPanel>(null);
   const { setTheme, resolvedTheme } = useTheme();
 
@@ -355,6 +357,17 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
 
   return (
     <div className="h-screen bg-background flex flex-col">
+      {/* Context Bar - full width at top, collapse button aligned with panel border */}
+      {!isSidebarCollapsed && (
+        <ContextBar
+          selectedContexts={selectedContexts}
+          connectedContexts={connectedContexts}
+          onBackToContexts={onBackToContexts}
+          onCollapse={toggleSidebar}
+          sidebarWidthPercent={sidebarWidthPercent}
+        />
+      )}
+
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Left Sidebar Navigation */}
         <ResizablePanel
@@ -366,23 +379,20 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
           collapsedSize={0}
           onCollapse={() => setIsSidebarCollapsed(true)}
           onExpand={() => setIsSidebarCollapsed(false)}
+          onResize={(size) => setSidebarWidthPercent(size)}
         >
           <div
             className="flex flex-col h-full relative"
             onMouseDown={() => setFocusedPanel('nav')}
           >
-            {/* Focus overlay - renders above all content including sticky headers */}
+            {/* Focus overlay - fades out after focus */}
             {focusedPanel === 'nav' && (
-              <div className="absolute inset-0 ring-2 ring-primary/50 ring-inset pointer-events-none z-50" />
+              <div className="absolute inset-0 animate-panel-focus pointer-events-none z-50" />
             )}
-            {/* Nav Header */}
+            {/* Nav Header - GVK row (aligns with DIYTableToolbar) */}
             <NavHeader
-              selectedContexts={selectedContexts}
-              connectedContexts={connectedContexts}
               selectedGVK={selectedGVK}
               selectedFieldCount={selectedFields.length}
-              onCollapse={toggleSidebar}
-              onBackToContexts={onBackToContexts}
               onClearAllFields={handleClearAllFields}
               onSearch={handleSearch}
             />
@@ -438,23 +448,9 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
             className="h-full relative"
             onMouseDown={() => setFocusedPanel('table')}
           >
-            {/* Focus overlay - renders above all content including sticky headers */}
+            {/* Focus overlay - fades out after focus */}
             {focusedPanel === 'table' && (
-              <div className="absolute inset-0 ring-2 ring-primary/50 ring-inset pointer-events-none z-50" />
-            )}
-            {/* Floating Expand Button (only when collapsed) */}
-            {isSidebarCollapsed && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleSidebar();
-                }}
-                className="absolute top-4 left-4 z-10 shadow-md"
-              >
-                <PanelLeft className="w-4 h-4" />
-              </Button>
+              <div className="absolute inset-0 animate-panel-focus pointer-events-none z-50" />
             )}
 
             {/* Table or Empty State */}
@@ -471,6 +467,19 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                 highlightedColumnPath={focusedFieldPath ?? undefined}
                 previewField={previewField}
                 onPreviewClear={handlePreviewClear}
+                expandButton={isSidebarCollapsed ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSidebar();
+                    }}
+                    className="h-6 w-6 shrink-0"
+                  >
+                    <PanelLeft className="w-4 h-4" />
+                  </Button>
+                ) : undefined}
               />
             ) : (
               <div className="h-full flex items-center justify-center px-4">

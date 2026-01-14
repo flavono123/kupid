@@ -10,6 +10,7 @@ import { Download, Clipboard, FileDown, AlertCircle } from 'lucide-react';
 import { useState, forwardRef, useRef, useImperativeHandle, useCallback } from 'react';
 import { Kbd } from './ui/kbd';
 import { convertToCSV, copyToClipboard, downloadCSV } from '@/lib/csv-export';
+import { pluralize } from '@/lib/utils';
 import { SaveFile } from '../../wailsjs/go/main/App';
 
 interface DIYTableToolbarProps {
@@ -23,6 +24,8 @@ interface DIYTableToolbarProps {
   resourceKind?: string; // For filename generation
   onSearchFocusChange?: (focused: boolean) => void;
   onBeforeExport?: () => void; // Called before export (e.g., to clear preview)
+  // Sidebar expand button (shown when sidebar is collapsed)
+  expandButton?: React.ReactNode;
 }
 
 export interface DIYTableToolbarHandle {
@@ -42,6 +45,7 @@ export const DIYTableToolbar = forwardRef<DIYTableToolbarHandle, DIYTableToolbar
   resourceKind = 'resources',
   onSearchFocusChange,
   onBeforeExport,
+  expandButton,
 }, ref) => {
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'downloaded' | 'error'>('idle');
@@ -110,10 +114,11 @@ export const DIYTableToolbar = forwardRef<DIYTableToolbarHandle, DIYTableToolbar
   }), [handleExportToClipboard, handleExportToFile]);
 
   return (
-    <div className="p-4 border-b border-border">
-      <div className="flex items-center justify-between gap-4">
-        {/* Left: Search input with resource count */}
+    <div className="h-10 px-3 border-b border-border flex items-center">
+      <div className="flex items-center justify-between gap-4 w-full">
+        {/* Left: Expand button (when collapsed) + Search input with resource count */}
         <div className="flex items-center gap-3">
+          {expandButton}
           <Input
             ref={searchInputRef}
             placeholder="Search ..."
@@ -126,12 +131,12 @@ export const DIYTableToolbar = forwardRef<DIYTableToolbarHandle, DIYTableToolbar
             }}
             onFocus={() => onSearchFocusChange?.(true)}
             onBlur={() => onSearchFocusChange?.(false)}
-            className="w-48 h-8 py-1 px-2"
+            className="w-48 h-6 py-0 px-2 text-sm"
           />
           <span className="text-sm text-muted-foreground whitespace-nowrap">
             {globalFilter
-              ? `${filteredRowCount}/${totalRowCount} ${resourceKind}s`
-              : `${totalRowCount} ${resourceKind}s`
+              ? `${filteredRowCount}/${totalRowCount} ${pluralize(resourceKind)}`
+              : `${totalRowCount} ${pluralize(resourceKind)}`
             }
           </span>
         </div>
@@ -140,10 +145,10 @@ export const DIYTableToolbar = forwardRef<DIYTableToolbarHandle, DIYTableToolbar
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               disabled={exporting || rows.length === 0}
-              className="gap-2"
+              className="gap-2 h-6 py-0 text-sm"
             >
               {exportStatus === 'idle' && <Download className="h-4 w-4" />}
               {exportStatus === 'copied' && <Clipboard className="h-4 w-4 text-primary" />}

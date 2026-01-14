@@ -1,13 +1,8 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
-import { Star, ChevronRight, ChevronDown, Pencil, Trash2, Check, X } from "lucide-react";
+import { Star, Book, BookOpen, Pencil, Trash2, Check, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Kbd } from "./ui/kbd";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "./ui/collapsible";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -56,7 +51,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
   onDelete,
   onSaveFavorite,
 }, ref) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [listPopoverOpen, setListPopoverOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<main.FavoriteViewResponse | null>(null);
@@ -184,290 +179,233 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
   const isConfirmValid = confirmText.toLowerCase() === "confirm";
   const hasFavorites = favorites.length > 0;
 
-  // Determine message based on state
-  const getEmptyStateMessage = () => {
-    if (!selectedGVK) return "No saved views";
-    if (fieldCount === 0) return "Select fields to save";
-    return "Save as favorite";
-  };
+  // Save popover content - reusable
+  const SavePopoverContent = (
+    <div className="space-y-3">
+      <h4 className="font-medium text-sm">Save as favorite</h4>
+      <Input
+        ref={saveInputRef}
+        placeholder="Enter name..."
+        value={saveName}
+        onChange={(e) => setSaveName(e.target.value)}
+        onKeyDown={handleSaveKeyDown}
+        disabled={isSaving}
+      />
+      <p className="text-xs text-muted-foreground">
+        {gvkLabel} &middot; {fieldCount} field{fieldCount !== 1 ? "s" : ""}
+      </p>
+      {saveError && <p className="text-xs text-destructive">{saveError}</p>}
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSavePopoverOpen(false)}
+          disabled={isSaving}
+        >
+          Cancel
+        </Button>
+        <Button size="sm" onClick={handleSaveFavorite} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save"}
+        </Button>
+      </div>
+    </div>
+  );
 
-  // Render empty state when no favorites
-  if (!hasFavorites) {
-    const message = getEmptyStateMessage();
-    const canSave = selectedGVK && fieldCount > 0;
+  // Favorites list content - reusable
+  const FavoritesListContent = (
+    <div className="py-1">
+      {favorites.map((fav, index) => {
+        const isActive = fav.id === activeFavoriteId;
+        const isEditing = fav.id === editingId;
+        const shortcutNumber = index < 9 ? index + 1 : null;
 
-    return (
-      <>
-        <div className="border-b border-border">
-          <Popover
-            open={savePopoverOpen}
-            onOpenChange={(newOpen) => {
-              if (newOpen && (isFavoriteSaved || !canSave)) return;
-              setSavePopoverOpen(newOpen);
+        if (isEditing) {
+          return (
+            <div
+              key={fav.id}
+              className="px-3 py-1.5 flex items-center gap-2 bg-muted/50"
+            >
+              <Star className="h-3 w-3 text-accent shrink-0" />
+              <Input
+                ref={inputRef}
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="h-7 text-sm flex-1"
+                disabled={isRenaming}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                onClick={handleSaveEdit}
+                disabled={!editingName.trim() || isRenaming}
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={handleCancelEdit}
+                disabled={isRenaming}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          );
+        }
+
+        // Check if current GVK matches this favorite's GVK
+        const isSameGVK = selectedGVK &&
+          selectedGVK.group === fav.gvk.group &&
+          selectedGVK.version === fav.gvk.version &&
+          selectedGVK.kind === fav.gvk.kind;
+
+        return (
+          <div
+            key={fav.id}
+            className={cn(
+              "group px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors min-w-0",
+              isActive
+                ? "bg-focus-active hover:bg-focus-active"
+                : "hover:bg-focus"
+            )}
+            onClick={() => {
+              if (isActive) {
+                onClear();
+              } else {
+                onApply(fav);
+              }
+              setListPopoverOpen(false);
             }}
           >
-            <PopoverTrigger asChild>
-              <button
-                className="w-full px-4 py-2 flex items-center gap-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!canSave}
-              >
-                <Star
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0",
-                    isFavoriteSaved ? "text-accent fill-accent" : "text-accent"
-                  )}
-                />
-                <span className="text-xs text-muted-foreground truncate">
-                  {message}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-72" align="start" side="bottom">
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm">Save as favorite</h4>
-                <Input
-                  ref={saveInputRef}
-                  placeholder="Enter name..."
-                  value={saveName}
-                  onChange={(e) => setSaveName(e.target.value)}
-                  onKeyDown={handleSaveKeyDown}
-                  disabled={isSaving}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {gvkLabel} &middot; {fieldCount} field{fieldCount !== 1 ? "s" : ""}
-                </p>
-                {saveError && <p className="text-xs text-destructive">{saveError}</p>}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSavePopoverOpen(false)}
-                    disabled={isSaving}
-                  >
-                    Cancel
-                  </Button>
-                  <Button size="sm" onClick={handleSaveFavorite} disabled={isSaving}>
-                    {isSaving ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      </>
-    );
-  }
+            {shortcutNumber ? (
+              <Kbd className="text-[10px] w-4 h-4 flex items-center justify-center shrink-0">
+                {shortcutNumber}
+              </Kbd>
+            ) : (
+              <Star
+                className={cn(
+                  "h-3 w-3 shrink-0",
+                  isActive ? "text-accent fill-accent" : "text-accent/60"
+                )}
+              />
+            )}
 
-  // Render collapsible list when favorites exist
+            {/* Name with minimum width guarantee */}
+            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+              <span
+                className={cn(
+                  "text-sm truncate min-w-[80px]",
+                  isActive ? "text-foreground font-medium" : "text-muted-foreground"
+                )}
+              >
+                {fav.name}
+              </span>
+
+              {/* GVK info - only show when different GVK, can truncate */}
+              {!isSameGVK && (
+                <span className="text-xs flex items-center gap-1 truncate min-w-0 text-muted-foreground/60">
+                  <span className="truncate">
+                    {fav.gvk.kind} ({fav.gvk.group ? `${fav.gvk.group}/${fav.gvk.version}` : fav.gvk.version})
+                  </span>
+                </span>
+              )}
+            </div>
+
+            {/* Field count - always visible */}
+            <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
+              {!isSameGVK && <span>&middot;</span>}
+              <span>{fav.fields.length} {fav.fields.length === 1 ? 'field' : 'fields'}</span>
+            </span>
+
+            {/* Action buttons - visible on hover */}
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                onClick={(e) => handleStartEdit(fav, e)}
+                title="Rename"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(fav);
+                }}
+                title="Delete"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Single unified render
   return (
     <>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border-b border-border">
-        <div className="flex items-center">
-          <Popover
-            open={savePopoverOpen}
-            onOpenChange={(newOpen) => {
-              if (newOpen && isFavoriteSaved) return;
-              setSavePopoverOpen(newOpen);
-            }}
-          >
-            <PopoverTrigger asChild>
-              <button
-                className="px-3 py-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!selectedGVK || fieldCount === 0}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Star
-                  className={cn(
-                    "h-3.5 w-3.5",
-                    activeFavoriteId ? "text-accent fill-accent" : "text-accent"
-                  )}
-                />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-72" align="start" side="bottom">
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm">Save as favorite</h4>
-                <Input
-                  ref={saveInputRef}
-                  placeholder="Enter name..."
-                  value={saveName}
-                  onChange={(e) => setSaveName(e.target.value)}
-                  onKeyDown={handleSaveKeyDown}
-                  disabled={isSaving}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {gvkLabel} &middot; {fieldCount} field{fieldCount !== 1 ? "s" : ""}
-                </p>
-                {saveError && <p className="text-xs text-destructive">{saveError}</p>}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSavePopoverOpen(false)}
-                    disabled={isSaving}
-                  >
-                    Cancel
-                  </Button>
-                  <Button size="sm" onClick={handleSaveFavorite} disabled={isSaving}>
-                    {isSaving ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+      <div className="h-8 border-b border-border flex items-center">
+        {/* Save as favorite button */}
+        <Popover
+          open={savePopoverOpen}
+          onOpenChange={(newOpen) => {
+            if (newOpen && (isFavoriteSaved || !canSave)) return;
+            setSavePopoverOpen(newOpen);
+          }}
+        >
+          <PopoverTrigger asChild>
+            <button
+              className="px-3 py-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!canSave}
+            >
+              <Star
+                className={cn(
+                  "h-3.5 w-3.5",
+                  activeFavoriteId ? "text-accent fill-accent" : "text-accent"
+                )}
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72" align="start" side="bottom">
+            {SavePopoverContent}
+          </PopoverContent>
+        </Popover>
 
-          <CollapsibleTrigger asChild>
-            <button className="flex-1 px-1 py-2 flex items-center justify-between hover:bg-focus transition-colors min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
+        {/* Favorites list popover */}
+        {hasFavorites ? (
+          <Popover open={listPopoverOpen} onOpenChange={setListPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button className="flex-1 px-1 py-2 flex items-center gap-2 hover:bg-focus transition-colors min-w-0">
                 <span className="text-xs font-medium text-foreground truncate">Favorites</span>
                 <span className="text-xs text-muted-foreground shrink-0">({favorites.length})</span>
-              </div>
-              {isOpen ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              )}
-            </button>
-          </CollapsibleTrigger>
-        </div>
-
-        <CollapsibleContent>
-          <div className="border-t border-border">
-            {favorites.map((fav, index) => {
-              const isActive = fav.id === activeFavoriteId;
-              const isEditing = fav.id === editingId;
-              const shortcutNumber = index < 9 ? index + 1 : null;
-
-              if (isEditing) {
-                return (
-                  <div
-                    key={fav.id}
-                    className="px-3 py-1.5 flex items-center gap-2 bg-muted/50"
-                  >
-                    <Star className="h-3 w-3 text-accent shrink-0" />
-                    <Input
-                      ref={inputRef}
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      className="h-7 text-sm flex-1"
-                      disabled={isRenaming}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
-                      onClick={handleSaveEdit}
-                      disabled={!editingName.trim() || isRenaming}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={handleCancelEdit}
-                      disabled={isRenaming}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                );
-              }
-
-              // Check if current GVK matches this favorite's GVK
-              const isSameGVK = selectedGVK &&
-                selectedGVK.group === fav.gvk.group &&
-                selectedGVK.version === fav.gvk.version &&
-                selectedGVK.kind === fav.gvk.kind;
-
-              return (
-                <div
-                  key={fav.id}
-                  className={cn(
-                    "group px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors min-w-0",
-                    isActive
-                      ? "bg-focus-active hover:bg-focus-active"
-                      : "hover:bg-focus"
-                  )}
-                  onClick={() => {
-                    if (isActive) {
-                      onClear();
-                    } else {
-                      onApply(fav);
-                    }
-                  }}
-                >
-                  {shortcutNumber ? (
-                    <Kbd className="text-[10px] w-4 h-4 flex items-center justify-center shrink-0">
-                      {shortcutNumber}
-                    </Kbd>
-                  ) : (
-                    <Star
-                      className={cn(
-                        "h-3 w-3 shrink-0",
-                        isActive ? "text-accent fill-accent" : "text-accent/60"
-                      )}
-                    />
-                  )}
-
-                  {/* Name with minimum width guarantee */}
-                  <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                    <span
-                      className={cn(
-                        "text-sm truncate min-w-[80px]",
-                        isActive ? "text-foreground font-medium" : "text-muted-foreground"
-                      )}
-                    >
-                      {fav.name}
-                    </span>
-
-                    {/* GVK info - only show when different GVK, can truncate */}
-                    {!isSameGVK && (
-                      <span className="text-xs hidden sm:flex items-center gap-1 truncate min-w-0 text-muted-foreground/60">
-                        <span className="truncate">
-                          {fav.gvk.kind} ({fav.gvk.group ? `${fav.gvk.group}/${fav.gvk.version}` : fav.gvk.version})
-                        </span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Field count - always visible */}
-                  <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
-                    {!isSameGVK && <span className="hidden sm:inline">&middot;</span>}
-                    <span>{fav.fields.length} {fav.fields.length === 1 ? 'field' : 'fields'}</span>
-                  </span>
-
-                  {/* Action buttons - visible on hover */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => handleStartEdit(fav, e)}
-                      title="Rename"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget(fav);
-                      }}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+                {listPopoverOpen ? (
+                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
+                ) : (
+                  <Book className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start" side="bottom">
+              {FavoritesListContent}
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <div className="flex-1 px-1 py-2 flex items-center gap-2 min-w-0">
+            <span className="text-xs text-muted-foreground truncate">
+              {!selectedGVK ? "No saved views" : fieldCount === 0 ? "Select fields to save" : "Save as favorite"}
+            </span>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        )}
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
