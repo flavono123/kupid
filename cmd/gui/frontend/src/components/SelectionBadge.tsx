@@ -21,7 +21,7 @@ export function SelectionBadge({ count, onClearAll }: SelectionBadgeProps) {
 
   return (
     <div
-      className="h-6 flex items-center"
+      className="@container h-6 flex items-center"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -29,14 +29,15 @@ export function SelectionBadge({ count, onClearAll }: SelectionBadgeProps) {
         <Button
           variant="destructive"
           size="sm"
-          className="h-6 px-2 text-xs rounded-full"
+          className="h-6 px-2 text-xs rounded-full whitespace-nowrap"
           onClick={onClearAll}
         >
           Clear all
         </Button>
       ) : (
-        <Badge variant="secondary">
-          {count} selected
+        <Badge variant="secondary" className="whitespace-nowrap">
+          <span>{count}</span>
+          <span className="hidden @[70px]:inline"> selected</span>
         </Badge>
       )}
     </div>
