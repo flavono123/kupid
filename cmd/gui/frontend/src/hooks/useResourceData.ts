@@ -59,6 +59,9 @@ export function useResourceData(
   // Track watch generation to avoid stale operations
   const watchGenRef = useRef(0);
 
+  // Track ongoing watch operation for serialization (prevents race between StartWatch/StopWatch)
+  const watchOperationRef = useRef<Promise<void>>(Promise.resolve());
+
   // Pending keys for ADDED/MODIFIED events (Pull Model)
   const pendingKeys = useRef<Set<string>>(new Set());
 
@@ -83,8 +86,10 @@ export function useResourceData(
     pendingKeys.current.clear();
     pendingDeletes.current.clear();
 
-    // Start watch
-    StartWatch(gvk, contexts)
+    // Start watch (chained through watchOperationRef for serialization)
+    watchOperationRef.current = watchOperationRef.current
+      .catch(() => {}) // Ignore previous errors to allow new watch to start
+      .then(() => StartWatch(gvk, contexts))
       .then(() => {
         if (watchGen !== watchGenRef.current) return;
         console.log(`useResourceData: watch connected for ${gvk.kind}`);
@@ -112,10 +117,12 @@ export function useResourceData(
       }
     });
 
-    // Cleanup
+    // Cleanup (chained through watchOperationRef to prevent race with StartWatch)
     return () => {
       unsubscribe();
-      StopWatch()
+      watchOperationRef.current = watchOperationRef.current
+        .catch(() => {}) // Ignore previous errors
+        .then(() => StopWatch())
         .then(() => console.log('useResourceData: watch stopped'))
         .catch((err) => console.error('useResourceData: failed to stop watch:', err));
       setWatchStatus('disconnected');

@@ -210,6 +210,8 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
               <button
                 className="w-full px-4 py-2 flex items-center gap-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!canSave}
+                title={canSave ? "Save as favorite" : message}
+                aria-label={canSave ? "Save as favorite" : message}
               >
                 <Star
                   className={cn(
@@ -275,6 +277,8 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
                 className="px-3 py-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedGVK || fieldCount === 0}
                 onClick={(e) => e.stopPropagation()}
+                title="Save as favorite"
+                aria-label="Save as favorite"
               >
                 <Star
                   className={cn(
