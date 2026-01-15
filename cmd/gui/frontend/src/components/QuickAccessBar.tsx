@@ -319,6 +319,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
             </span>
 
             {/* Action buttons - visible on hover */}
+            {/* cursor-pointer overrides parent's cursor-not-allowed when isActive */}
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
               <Button
                 variant="ghost"
