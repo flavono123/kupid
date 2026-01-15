@@ -36,8 +36,7 @@ export function SelectionBadge({ count, onClearAll }: SelectionBadgeProps) {
         </Button>
       ) : (
         <Badge variant="secondary" className="whitespace-nowrap">
-          <span>{count}</span>
-          <span className="hidden @[180px]:inline"> selected</span>
+          {count}<span className="hidden @[180px]:inline">&nbsp;selected</span>
         </Badge>
       )}
     </div>
