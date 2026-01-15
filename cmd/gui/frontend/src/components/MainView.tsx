@@ -38,6 +38,8 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
   const [focusedFieldPath, setFocusedFieldPath] = useState<string[] | null>(null);
   // Pending favorite ID to apply after GVK switch (use ref to avoid stale closure)
   const pendingFavoriteIdRef = useRef<string | null>(null);
+  // Track if there's a pending favorite (state version for triggering re-render)
+  const [hasPendingFavorite, setHasPendingFavorite] = useState(false);
   const loadedRef = useRef(false);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const fieldTreeRef = useRef<DynamicFieldTreeHandle>(null);
@@ -169,6 +171,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     if (pendingFavoriteIdRef.current) {
       applyFavoriteById(pendingFavoriteIdRef.current);
       pendingFavoriteIdRef.current = null;
+      setHasPendingFavorite(false);
     }
   }, [applyFavoriteById]);
 
@@ -194,6 +197,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     } else {
       // Different GVK - need to wait for NavigationPanel to load
       pendingFavoriteIdRef.current = favorite.id;
+      setHasPendingFavorite(true);
       setSelectedGVK(matchingGVK);
     }
   }, [gvks, selectedGVK, applyFavoriteById]);
@@ -322,12 +326,6 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
     return () => window.removeEventListener('keydown', handleKeydown);
   }, [showCommandPalette, focusedPanel, isNavSearchFocused, isTableSearchFocused, allFavorites, handleApplyFavorite]);
 
-  const handleClearFavorite = useCallback(() => {
-    clearFavorite();
-    // Also clear nav panel selections
-    fieldTreeRef.current?.clearSelections();
-  }, [clearFavorite]);
-
   // Handle column reorder - update fields and clear active favorite
   const handleFieldsReorder = useCallback((newFields: string[][]) => {
     setSelectedFields(newFields);
@@ -407,7 +405,6 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
               fieldCount={selectedFields.length}
               isFavoriteSaved={activeFavorite !== null}
               onApply={handleApplyFavorite}
-              onClear={handleClearFavorite}
               onRename={renameFavorite}
               onDelete={deleteFavorite}
               onSaveFavorite={handleSaveFavorite}
@@ -424,6 +421,7 @@ export function MainView({ selectedContexts, connectedContexts, onBackToContexts
                   onFieldsSelected={setSelectedFields}
                   onFieldFocus={setFocusedFieldPath}
                   highlightedFieldPath={focusedFieldPath ?? undefined}
+                  skipDefaultPaths={hasPendingFavorite}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center px-4">
