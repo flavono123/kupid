@@ -393,12 +393,12 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
                     <span className="flex-1" />
                     <span className="text-xs font-medium text-foreground shrink-0">Favorites</span>
                     <span className="text-xs text-muted-foreground shrink-0">({favorites.length})</span>
+                    {listPopoverOpen ? (
+                      <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    ) : (
+                      <Book className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    )}
                   </>
-                )}
-                {listPopoverOpen ? (
-                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                ) : (
-                  <Book className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 )}
               </button>
             </PopoverTrigger>
