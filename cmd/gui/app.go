@@ -336,7 +336,11 @@ func (a *App) GetDefaultSelectedPaths(gvk MultiClusterGVK, contexts []string) []
 	return nil
 }
 
-// getWatchedResources returns resources from active watch controllers if available
+// getWatchedResources returns resources from active watch controllers if available.
+// HACK: Returns deep copies to prevent concurrent map read/write panics when watch events
+// modify the original objects while CreateNodeTree is reading from them.
+// TODO: Remove this deep copy once Field-based Store is implemented (see planning/optimize-go-mem.md).
+// Field-based Store will naturally solve this by storing extracted field snapshots instead of live objects.
 func (a *App) getWatchedResources() []*unstructured.Unstructured {
 	a.watchMu.RLock()
 	defer a.watchMu.RUnlock()
@@ -348,7 +352,9 @@ func (a *App) getWatchedResources() []*unstructured.Unstructured {
 	var allObjs []*unstructured.Unstructured
 	for _, wc := range a.controllers {
 		objs := wc.controller.Objects()
-		allObjs = append(allObjs, objs...)
+		for _, obj := range objs {
+			allObjs = append(allObjs, obj.DeepCopy())
+		}
 	}
 	return allObjs
 }
