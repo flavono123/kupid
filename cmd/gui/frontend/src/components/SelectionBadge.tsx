@@ -21,7 +21,7 @@ export function SelectionBadge({ count, onClearAll }: SelectionBadgeProps) {
 
   return (
     <div
-      className="@container h-6 flex items-center"
+      className="h-6 flex items-center"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -37,7 +37,7 @@ export function SelectionBadge({ count, onClearAll }: SelectionBadgeProps) {
       ) : (
         <Badge variant="secondary" className="whitespace-nowrap">
           <span>{count}</span>
-          <span className="hidden @[70px]:inline"> selected</span>
+          <span className="hidden @[180px]:inline"> selected</span>
         </Badge>
       )}
     </div>

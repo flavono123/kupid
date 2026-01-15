@@ -22,14 +22,14 @@ export function NavHeader({
   onSearch,
 }: NavHeaderProps) {
   return (
-    <div className="h-10 px-3 border-b border-border flex items-center justify-between gap-2 shrink-0">
+    <div className="@container h-10 px-3 border-b border-border flex items-center justify-between gap-2 shrink-0">
       {/* GVK Display */}
       <ResourceDisplay
         selectedGVK={selectedGVK}
         className="min-w-0"
       />
       {/* Selection Badge + Search */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
         <SelectionBadge
           count={selectedFieldCount}
           onClearAll={onClearAllFields}
@@ -39,7 +39,7 @@ export function NavHeader({
             variant="ghost"
             size="icon"
             onClick={onSearch}
-            className="h-6 w-6"
+            className="h-6 w-6 shrink-0"
             title="Search fields (⌘F)"
           >
             <Search className="h-3.5 w-3.5" />
