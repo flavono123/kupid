@@ -1454,3 +1454,158 @@ describe('wildcardIndeterminatePaths calculation', () => {
     });
   });
 });
+
+// ============================================================================
+// skipDefaultPaths option tests (Bug 2 fix: favorite view field overwrite prevention)
+// ============================================================================
+
+describe('skipDefaultPaths option (favorite view field overwrite prevention)', () => {
+  // Test the conditional logic used in useTree's default paths effect
+  // This simulates the effect's guard conditions
+
+  interface DefaultPathsConditions {
+    skipDefaultPaths: boolean;
+    loading: boolean;
+    nodeTreeLength: number;
+    selectedPathsSize: number;
+  }
+
+  // Replicate the condition logic from useTree.ts
+  const shouldApplyDefaultPaths = (conditions: DefaultPathsConditions): boolean => {
+    // Skip if explicitly disabled (e.g., when favorite will be applied instead)
+    if (conditions.skipDefaultPaths) {
+      return false;
+    }
+    // Skip if still loading, no tree, or already have selections
+    if (conditions.loading || conditions.nodeTreeLength === 0 || conditions.selectedPathsSize > 0) {
+      return false;
+    }
+    return true;
+  };
+
+  describe('when skipDefaultPaths is true (favorite pending)', () => {
+    it('should NOT apply default paths even when tree is loaded and no selections', () => {
+      const result = shouldApplyDefaultPaths({
+        skipDefaultPaths: true,
+        loading: false,
+        nodeTreeLength: 10,
+        selectedPathsSize: 0,
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it('should NOT apply default paths regardless of other conditions', () => {
+      // All conditions that would normally trigger default paths
+      expect(shouldApplyDefaultPaths({
+        skipDefaultPaths: true,
+        loading: false,
+        nodeTreeLength: 50,
+        selectedPathsSize: 0,
+      })).toBe(false);
+
+      // Even with various tree sizes
+      expect(shouldApplyDefaultPaths({
+        skipDefaultPaths: true,
+        loading: false,
+        nodeTreeLength: 1,
+        selectedPathsSize: 0,
+      })).toBe(false);
+    });
+  });
+
+  describe('when skipDefaultPaths is false (normal loading)', () => {
+    it('should apply default paths when tree loaded and no selections', () => {
+      const result = shouldApplyDefaultPaths({
+        skipDefaultPaths: false,
+        loading: false,
+        nodeTreeLength: 10,
+        selectedPathsSize: 0,
+      });
+
+      expect(result).toBe(true);
+    });
+
+    it('should NOT apply default paths when still loading', () => {
+      const result = shouldApplyDefaultPaths({
+        skipDefaultPaths: false,
+        loading: true,
+        nodeTreeLength: 0,
+        selectedPathsSize: 0,
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it('should NOT apply default paths when tree is empty', () => {
+      const result = shouldApplyDefaultPaths({
+        skipDefaultPaths: false,
+        loading: false,
+        nodeTreeLength: 0,
+        selectedPathsSize: 0,
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it('should NOT apply default paths when selections already exist', () => {
+      // This prevents overwriting user-made selections
+      const result = shouldApplyDefaultPaths({
+        skipDefaultPaths: false,
+        loading: false,
+        nodeTreeLength: 10,
+        selectedPathsSize: 5,  // User already has 5 fields selected
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('favorite application flow (Bug 2 scenario)', () => {
+    // Simulates the timing of favorite application
+    // This tests the logical flow, not the actual hook behavior
+
+    it('should prevent race condition: skipDefaultPaths=true blocks default paths until favorite is applied', () => {
+      // Step 1: User clicks favorite from different GVK
+      // - hasPendingFavorite set to true
+      // - GVK changes, tree starts loading
+      const step1 = shouldApplyDefaultPaths({
+        skipDefaultPaths: true,  // hasPendingFavorite=true
+        loading: true,
+        nodeTreeLength: 0,
+        selectedPathsSize: 0,
+      });
+      expect(step1).toBe(false);  // Good: no default paths applied
+
+      // Step 2: Tree finishes loading, but favorite hasn't been applied yet
+      const step2 = shouldApplyDefaultPaths({
+        skipDefaultPaths: true,  // Still true until favorite applied
+        loading: false,
+        nodeTreeLength: 50,
+        selectedPathsSize: 0,  // No selections yet
+      });
+      expect(step2).toBe(false);  // Good: still blocked
+
+      // Step 3: Favorite is applied, hasPendingFavorite cleared
+      // After this, selections from favorite exist
+      const step3 = shouldApplyDefaultPaths({
+        skipDefaultPaths: false,  // hasPendingFavorite=false after apply
+        loading: false,
+        nodeTreeLength: 50,
+        selectedPathsSize: 8,  // Favorite fields selected
+      });
+      expect(step3).toBe(false);  // Good: won't overwrite favorite fields
+    });
+
+    it('should allow default paths when loading same GVK without favorite', () => {
+      // Normal GVK selection flow (no favorite involved)
+      const normalFlow = shouldApplyDefaultPaths({
+        skipDefaultPaths: false,  // No pending favorite
+        loading: false,
+        nodeTreeLength: 50,
+        selectedPathsSize: 0,
+      });
+      expect(normalFlow).toBe(true);  // Default paths should apply
+    });
+  });
+});

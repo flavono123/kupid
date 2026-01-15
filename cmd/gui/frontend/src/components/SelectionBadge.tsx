@@ -29,14 +29,14 @@ export function SelectionBadge({ count, onClearAll }: SelectionBadgeProps) {
         <Button
           variant="destructive"
           size="sm"
-          className="h-6 px-2 text-xs rounded-full"
+          className="h-6 px-2 text-xs rounded-full whitespace-nowrap"
           onClick={onClearAll}
         >
           Clear all
         </Button>
       ) : (
-        <Badge variant="secondary">
-          {count} selected
+        <Badge variant="secondary" className="whitespace-nowrap">
+          {count}<span className="hidden @[180px]:inline">&nbsp;selected</span>
         </Badge>
       )}
     </div>

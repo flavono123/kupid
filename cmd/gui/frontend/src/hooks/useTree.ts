@@ -402,6 +402,8 @@ export interface UseTreeOptions {
   watch?: boolean;
   /** Debounce interval for tree refresh on watch events (default: 100ms) */
   watchDebounceMs?: number;
+  /** Skip fetching and applying default selected paths (used when favorite will be applied) */
+  skipDefaultPaths?: boolean;
 }
 
 export function useTree({
@@ -411,6 +413,7 @@ export function useTree({
   onReady,
   watch = false,
   watchDebounceMs = 100,
+  skipDefaultPaths = false,
 }: UseTreeOptions) {
   const [state, dispatch] = useReducer(treeReducer, initialState);
   const {
@@ -480,6 +483,10 @@ export function useTree({
   // Fetch and apply default selected paths (additionalPrinterColumns) when GVK changes
   // Only applies when tree is first loaded and no selections exist yet
   useEffect(() => {
+    // Skip if explicitly disabled (e.g., when favorite will be applied instead)
+    if (skipDefaultPaths) {
+      return;
+    }
     // Skip if still loading, no tree, or already have selections
     if (loading || nodeTree.length === 0 || selectedPaths.size > 0) {
       return;
@@ -517,7 +524,7 @@ export function useTree({
         console.error('Failed to get default selected paths:', error);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, nodeTree.length, selectedGVK, connectedContexts]);
+  }, [skipDefaultPaths, loading, nodeTree.length, selectedGVK, connectedContexts]);
 
   // Watch subscription for real-time tree updates
   useEffect(() => {

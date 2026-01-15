@@ -19,6 +19,8 @@ interface DynamicFieldTreeProps {
   onFieldFocus?: (path: string[] | null) => void;
   /** Field path to highlight (from ResultTable hover) */
   highlightedFieldPath?: string[];
+  /** Skip applying default selected paths (used when favorite will be applied instead) */
+  skipDefaultPaths?: boolean;
 }
 
 export interface DynamicFieldTreeHandle {
@@ -222,6 +224,7 @@ export const DynamicFieldTree = forwardRef<DynamicFieldTreeHandle, DynamicFieldT
   onReady,
   onFieldFocus,
   highlightedFieldPath,
+  skipDefaultPaths = false,
 }, ref) => {
   const {
     // State
@@ -267,6 +270,7 @@ export const DynamicFieldTree = forwardRef<DynamicFieldTreeHandle, DynamicFieldT
     onFieldsSelected,
     onReady,
     watch: true,  // Enable real-time tree updates
+    skipDefaultPaths,
   });
 
   const fieldSearchBarRef = useRef<FieldSearchBarHandle>(null);

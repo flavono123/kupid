@@ -179,6 +179,143 @@ describe('useResourceData core logic', () => {
     });
   });
 
+  describe('watch operation serialization (race condition prevention)', () => {
+    // Simulate the promise chaining pattern used to prevent race conditions
+    it('should serialize stop/start operations', async () => {
+      const operations: string[] = [];
+
+      // Simulate watchOperationRef pattern
+      let operationChain = Promise.resolve();
+
+      const simulateStopWatch = () => new Promise<void>((resolve) => {
+        setTimeout(() => {
+          operations.push('stop');
+          resolve();
+        }, 50); // Simulate async delay
+      });
+
+      const simulateStartWatch = (gvk: string) => new Promise<void>((resolve) => {
+        setTimeout(() => {
+          operations.push(`start:${gvk}`);
+          resolve();
+        }, 30);
+      });
+
+      // First watch for GVK-A
+      operationChain = operationChain
+        .then(() => simulateStopWatch())
+        .then(() => simulateStartWatch('GVK-A'));
+
+      // Immediately switch to GVK-B (simulating fast GVK switch)
+      operationChain = operationChain
+        .then(() => simulateStopWatch())
+        .then(() => simulateStartWatch('GVK-B'));
+
+      await operationChain;
+
+      // Operations should be serialized: stop -> start:A -> stop -> start:B
+      expect(operations).toEqual(['stop', 'start:GVK-A', 'stop', 'start:GVK-B']);
+    });
+
+    it('should skip stale operations using watchGen pattern', async () => {
+      let watchGen = 0;
+      const operations: string[] = [];
+
+      const simulateAsyncOperation = (gen: number, name: string) => {
+        return new Promise<void>((resolve) => {
+          setTimeout(() => {
+            // Check if this operation is still current
+            if (gen === watchGen) {
+              operations.push(name);
+            } else {
+              operations.push(`skipped:${name}`);
+            }
+            resolve();
+          }, 50);
+        });
+      };
+
+      // Start first operation
+      const gen1 = ++watchGen;
+      const op1 = simulateAsyncOperation(gen1, 'op1');
+
+      // Immediately start second operation (simulating fast switch)
+      const gen2 = ++watchGen;
+      const op2 = simulateAsyncOperation(gen2, 'op2');
+
+      await Promise.all([op1, op2]);
+
+      // First operation should be skipped, second should complete
+      expect(operations).toContain('skipped:op1');
+      expect(operations).toContain('op2');
+    });
+  });
+
+  describe('initial sync timeout logic', () => {
+    // Test the hasReceivedAnyEvent flag logic
+    it('should not trigger timeout if events have been received', () => {
+      let hasReceivedFirstBatch = false;
+      let hasReceivedAnyEvent = false;
+      let loadingComplete = false;
+
+      // Simulate receiving events
+      hasReceivedAnyEvent = true;
+
+      // Timeout check (should NOT set loading complete if events received)
+      const checkTimeout = () => {
+        if (!hasReceivedFirstBatch && !hasReceivedAnyEvent) {
+          loadingComplete = true;
+          hasReceivedFirstBatch = true;
+        }
+      };
+
+      checkTimeout();
+
+      // Loading should NOT be complete because events were received
+      expect(loadingComplete).toBe(false);
+      expect(hasReceivedFirstBatch).toBe(false);
+    });
+
+    it('should trigger timeout if no events have been received (0 resources)', () => {
+      let hasReceivedFirstBatch = false;
+      let hasReceivedAnyEvent = false;
+      let loadingComplete = false;
+
+      // No events received (simulating GVK with 0 resources)
+
+      const checkTimeout = () => {
+        if (!hasReceivedFirstBatch && !hasReceivedAnyEvent) {
+          loadingComplete = true;
+          hasReceivedFirstBatch = true;
+        }
+      };
+
+      checkTimeout();
+
+      // Loading should be complete
+      expect(loadingComplete).toBe(true);
+      expect(hasReceivedFirstBatch).toBe(true);
+    });
+
+    it('should complete loading after batch processing even without timeout', () => {
+      let hasReceivedFirstBatch = false;
+      let loadingComplete = false;
+
+      // Simulate batch processing completing (events were received and processed)
+      const completeBatch = () => {
+        if (!hasReceivedFirstBatch) {
+          hasReceivedFirstBatch = true;
+          loadingComplete = true;
+        }
+      };
+
+      completeBatch();
+
+      expect(loadingComplete).toBe(true);
+      expect(hasReceivedFirstBatch).toBe(true);
+    });
+  });
+
   describe('change tracking for cell flashing', () => {
     it('should generate CellChange for modified fields', () => {
       const prev = {

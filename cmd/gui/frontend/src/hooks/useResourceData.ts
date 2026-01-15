@@ -65,6 +65,15 @@ export function useResourceData(
   // Pending deletes - keys to remove
   const pendingDeletes = useRef<Set<string>>(new Set());
 
+  // Flag to track if first batch has been received
+  const hasReceivedFirstBatch = useRef(false);
+
+  // Flag to track if any events have been received (for timeout decision)
+  const hasReceivedAnyEvent = useRef(false);
+
+  // Promise to serialize StopWatch/StartWatch operations
+  const watchOperationRef = useRef<Promise<void>>(Promise.resolve());
+
   // Watch subscription
   useEffect(() => {
     if (!watch || !gvk || contexts.length === 0) {
@@ -82,13 +91,35 @@ export function useResourceData(
     setWatchStatus('connecting');
     pendingKeys.current.clear();
     pendingDeletes.current.clear();
+    hasReceivedFirstBatch.current = false;
+    hasReceivedAnyEvent.current = false;
 
-    // Start watch
-    StartWatch(gvk, contexts)
+    // Initial sync timeout - if no data arrives within this time, assume sync is complete
+    let initialSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    // Chain the start operation to ensure previous stop completes first
+    const startOperation = watchOperationRef.current
+      .then(() => StopWatch().catch(() => {})) // Stop any existing watch first, ignore errors
+      .then(() => {
+        if (watchGen !== watchGenRef.current) return;
+        return StartWatch(gvk, contexts);
+      })
       .then(() => {
         if (watchGen !== watchGenRef.current) return;
         console.log(`useResourceData: watch connected for ${gvk.kind}`);
         setWatchStatus('connected');
+
+        // Set timeout to complete loading only if no events have been received
+        // This handles GVKs with 0 resources
+        initialSyncTimeout = setTimeout(() => {
+          if (watchGen !== watchGenRef.current) return;
+          // Only trigger timeout if no events at all (truly 0 resources)
+          if (!hasReceivedFirstBatch.current && !hasReceivedAnyEvent.current) {
+            console.log(`useResourceData: initial sync timeout for ${gvk.kind}, no events received, completing loading`);
+            setLoading(false);
+            hasReceivedFirstBatch.current = true;
+          }
+        }, 500);
       })
       .catch((err) => {
         if (watchGen !== watchGenRef.current) return;
@@ -98,9 +129,14 @@ export function useResourceData(
         setLoading(false);
       });
 
+    watchOperationRef.current = startOperation;
+
     // Subscribe to lightweight events (Pull Model)
     const unsubscribe = EventsOn('resource:update', (event: ResourceEventMeta) => {
       if (watchGen !== watchGenRef.current) return;
+
+      // Mark that we've received at least one event (for timeout decision)
+      hasReceivedAnyEvent.current = true;
 
       if (event.type === 'DELETED') {
         // Collect deletes separately
@@ -112,21 +148,37 @@ export function useResourceData(
       }
     });
 
-    // Cleanup
+    // Cleanup - only clear timeout and unsubscribe
+    // StopWatch is called in the chained operation to avoid race conditions
     return () => {
+      if (initialSyncTimeout) {
+        clearTimeout(initialSyncTimeout);
+      }
       unsubscribe();
-      StopWatch()
-        .then(() => console.log('useResourceData: watch stopped'))
-        .catch((err) => console.error('useResourceData: failed to stop watch:', err));
       setWatchStatus('disconnected');
     };
   }, [watch, gvk, contexts]);
 
+  // Cleanup on unmount - ensure watch is stopped
+  useEffect(() => {
+    return () => {
+      StopWatch()
+        .then(() => console.log('useResourceData: watch stopped on unmount'))
+        .catch(() => {}); // Ignore errors on unmount
+    };
+  }, []);
+
   // Batch processor: fetch resources and apply updates (Pull Model)
   useEffect(() => {
-    if (!watch) return;
+    if (!watch || !gvk) return;
+
+    // Capture current watchGen to detect GVK changes during async operations
+    const currentWatchGen = watchGenRef.current;
 
     const flush = async () => {
+      // Check if GVK has changed since this effect started
+      if (currentWatchGen !== watchGenRef.current) return;
+
       const keysToFetch = Array.from(pendingKeys.current);
       const keysToDelete = Array.from(pendingDeletes.current);
 
@@ -149,6 +201,9 @@ export function useResourceData(
           return;
         }
       }
+
+      // Check again after async operation in case GVK changed during fetch
+      if (currentWatchGen !== watchGenRef.current) return;
 
       // Apply updates to data
       setData((prev) => {
@@ -187,13 +242,16 @@ export function useResourceData(
         return Array.from(dataMap.values());
       });
 
-      // Loading complete after first batch
-      setLoading(false);
+      // Loading complete after first batch with data
+      if (!hasReceivedFirstBatch.current) {
+        hasReceivedFirstBatch.current = true;
+        setLoading(false);
+      }
     };
 
     const timer = setInterval(flush, batchInterval);
     return () => clearInterval(timer);
-  }, [watch, batchInterval]);
+  }, [watch, batchInterval, gvk]);
 
   // Manual refresh - restarts the watch
   const refresh = useCallback(() => {
@@ -205,18 +263,36 @@ export function useResourceData(
     setData([]);
     pendingKeys.current.clear();
     pendingDeletes.current.clear();
+    hasReceivedFirstBatch.current = false;
+    hasReceivedAnyEvent.current = false;
 
-    StopWatch()
-      .then(() => StartWatch(gvk, contexts))
+    // Chain the operation to avoid race conditions
+    const refreshOperation = watchOperationRef.current
+      .then(() => StopWatch().catch(() => {}))
+      .then(() => {
+        if (watchGen !== watchGenRef.current) return;
+        return StartWatch(gvk, contexts);
+      })
       .then(() => {
         if (watchGen !== watchGenRef.current) return;
         setWatchStatus('connected');
+
+        // Set timeout to complete loading only if no events received
+        setTimeout(() => {
+          if (watchGen !== watchGenRef.current) return;
+          if (!hasReceivedFirstBatch.current && !hasReceivedAnyEvent.current) {
+            setLoading(false);
+            hasReceivedFirstBatch.current = true;
+          }
+        }, 500);
       })
       .catch((err) => {
         if (watchGen !== watchGenRef.current) return;
         setError(err instanceof Error ? err : new Error(String(err)));
         setLoading(false);
       });
+
+    watchOperationRef.current = refreshOperation;
   }, [gvk, contexts]);
 
   // Stable row ID function for TanStack Table
