@@ -251,7 +251,7 @@ export function useResourceData(
 
     const timer = setInterval(flush, batchInterval);
     return () => clearInterval(timer);
-  }, [watch, batchInterval, gvk, contexts]);
+  }, [watch, batchInterval, gvk]);
 
   // Manual refresh - restarts the watch
   const refresh = useCallback(() => {
