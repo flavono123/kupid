@@ -28,7 +28,6 @@ interface QuickAccessBarProps {
   fieldCount: number;
   isFavoriteSaved: boolean;
   onApply: (favorite: main.FavoriteViewResponse) => void;
-  onClear: () => void;
   onRename: (id: string, newName: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSaveFavorite: (name: string) => Promise<void>;
@@ -46,7 +45,6 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
   fieldCount,
   isFavoriteSaved,
   onApply,
-  onClear,
   onRename,
   onDelete,
   onSaveFavorite,
@@ -62,6 +60,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
   const [saveName, setSaveName] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isStarHovered, setIsStarHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
 
@@ -266,18 +265,17 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
           <div
             key={fav.id}
             className={cn(
-              "group px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors min-w-0",
+              "group px-3 py-2 flex items-center gap-2 transition-colors min-w-0",
               isActive
-                ? "bg-focus-active hover:bg-focus-active"
-                : "hover:bg-focus"
+                ? "bg-focus-active cursor-not-allowed"
+                : "cursor-pointer hover:bg-focus"
             )}
             onClick={() => {
-              if (isActive) {
-                onClear();
-              } else {
+              // Selected item click is disabled - only allow clicking unselected items
+              if (!isActive) {
                 onApply(fav);
+                setListPopoverOpen(false);
               }
-              setListPopoverOpen(false);
             }}
           >
             {shortcutNumber ? (
@@ -325,7 +323,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={(e) => handleStartEdit(fav, e)}
                 title="Rename"
               >
@@ -334,7 +332,7 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   setDeleteTarget(fav);
@@ -366,6 +364,8 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
             <button
               className="px-3 py-2 hover:bg-focus transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!canSave}
+              onMouseEnter={() => setIsStarHovered(true)}
+              onMouseLeave={() => setIsStarHovered(false)}
             >
               <Star
                 className={cn(
@@ -385,8 +385,14 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
           <Popover open={listPopoverOpen} onOpenChange={setListPopoverOpen}>
             <PopoverTrigger asChild>
               <button className="flex-1 px-1 py-2 flex items-center gap-2 hover:bg-focus transition-colors min-w-0">
-                <span className="text-xs font-medium text-foreground truncate">Favorites</span>
-                <span className="text-xs text-muted-foreground shrink-0">({favorites.length})</span>
+                {isStarHovered && canSave ? (
+                  <span className="text-xs font-medium text-accent truncate">Save as favorite</span>
+                ) : (
+                  <>
+                    <span className="text-xs font-medium text-foreground truncate">Favorites</span>
+                    <span className="text-xs text-muted-foreground shrink-0">({favorites.length})</span>
+                  </>
+                )}
                 {listPopoverOpen ? (
                   <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
                 ) : (
