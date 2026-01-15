@@ -389,14 +389,16 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
                   <span className="text-xs font-medium text-accent truncate">Save as favorite</span>
                 ) : (
                   <>
-                    <span className="text-xs font-medium text-foreground truncate">Favorites</span>
+                    {/* Spacer to push content to right */}
+                    <span className="flex-1" />
+                    <span className="text-xs font-medium text-foreground shrink-0">Favorites</span>
                     <span className="text-xs text-muted-foreground shrink-0">({favorites.length})</span>
                   </>
                 )}
                 {listPopoverOpen ? (
-                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
+                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 ) : (
-                  <Book className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
+                  <Book className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 )}
               </button>
             </PopoverTrigger>
@@ -406,9 +408,13 @@ export const QuickAccessBar = forwardRef<QuickAccessBarHandle, QuickAccessBarPro
           </Popover>
         ) : (
           <div className="flex-1 px-1 py-2 flex items-center gap-2 min-w-0">
-            <span className="text-xs text-muted-foreground truncate">
-              {!selectedGVK ? "No saved views" : fieldCount === 0 ? "Select fields to save" : "Save as favorite"}
-            </span>
+            {canSave ? (
+              <span className="text-xs font-medium text-accent truncate">Save as favorite</span>
+            ) : (
+              <span className="text-xs text-muted-foreground truncate">
+                {!selectedGVK ? "No saved views" : "Select fields to save"}
+              </span>
+            )}
           </div>
         )}
       </div>
